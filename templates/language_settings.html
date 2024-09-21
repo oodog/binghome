@@ -1,0 +1,27 @@
+<!-- templates/language_settings.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Language Settings - Hey Bing Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="content-wrapper">
+        <h1>Language Settings</h1>
+        <form action="#" method="POST">
+            <label for="language-select">Select Language:</label>
+            <select id="language-select" name="language">
+                {% for language in available_languages %}
+                    <option value="{{ language }}" {% if language == current_language %}selected{% endif %}>{{ language }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit">Save</button>
+        </form>
+        <div class="back-link">
+            <a href="/settings">← Back to Settings</a>
+        </div>
+    </div>
+</body>
+</html>

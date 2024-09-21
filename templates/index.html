@@ -5,217 +5,42 @@
 <head>
     <meta charset="UTF-8">
     <title>Hey Bing Assistant</title>
-    <style>
-        body {
-            background-color: #f0f0f0;
-            color: #333;
-            font-family: Arial, sans-serif;
-            margin: 0;
-            display: flex;
-            height: 100vh;
-            overflow: hidden;
-        }
-        .top-right {
-            position: absolute;
-            top: 10px;
-            right: 20px;
-            font-size: 1.2em;
-            font-weight: bold;
-            text-align: right;
-        }
-        .top-right #clock {
-            display: block;
-        }
-        .top-right #date {
-            display: block;
-            font-size: 0.9em;
-            color: #555;
-        }
-        .left-panel {
-            width: 220px;
-            background-color: #2c3e50;
-            padding: 25px;
-            box-sizing: border-box;
-            display: flex;
-            flex-direction: column;
-            justify-content: flex-start;
-            gap: 20px;
-        }
-        .left-panel button {
-            background-color: #34495e;
-            color: white;
-            border: none;
-            padding: 20px;
-            cursor: pointer;
-            font-size: 1.1em;
-            border-radius: 10px;
-            transition: background-color 0.3s;
-            width: 100%;
-            text-align: left;
-        }
-        .left-panel button:hover {
-            background-color: #3d566e;
-        }
-        .left-panel .spotify-btn {
-            background-color: #1DB954;
-            font-size: 1.1em;
-        }
-        .left-panel .spotify-btn:hover {
-            background-color: #1ed760;
-        }
-        .left-panel .logout-btn {
-            background-color: #e74c3c;
-            margin-top: auto;
-            font-size: 1.1em;
-        }
-        .left-panel .logout-btn:hover {
-            background-color: #c0392b;
-        }
-        .main-panel {
-            flex-grow: 1;
-            padding: 25px;
-            box-sizing: border-box;
-            position: relative;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            overflow: hidden;
-        }
-        .google-photos {
-            width: 80%;
-            height: 70vh;
-            border: none;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.2);
-        }
-        .news-feed {
-            width: 16.66%; /* 1/6 of the screen */
-            position: absolute;
-            top: 80px;
-            right: 20px;
-            background-color: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            box-shadow: 0 0 15px rgba(0,0,0,0.2);
-            overflow-y: auto;
-            max-height: 75vh;
-        }
-        .news-feed h2 {
-            margin-top: 0;
-            font-size: 1.3em;
-            text-align: center;
-        }
-        .news-feed ul {
-            list-style-type: none;
-            padding: 0;
-            margin: 0;
-        }
-        .news-feed li {
-            margin-bottom: 15px;
-        }
-        .news-feed a {
-            text-decoration: none;
-            color: #2980b9;
-            font-size: 1em;
-        }
-        .news-feed a:hover {
-            text-decoration: underline;
-        }
-        /* Dark Mode Styles */
-        body.dark-mode {
-            background-color: #121212;
-            color: #e0e0e0;
-        }
-        body.dark-mode .left-panel {
-            background-color: #1e272e;
-        }
-        body.dark-mode .left-panel button {
-            background-color: #485460;
-            color: #ecf0f1;
-        }
-        body.dark-mode .left-panel button:hover {
-            background-color: #606e7f;
-        }
-        body.dark-mode .news-feed {
-            background-color: #2c3e50;
-            color: #ecf0f1;
-        }
-        body.dark-mode .news-feed a {
-            color: #74b9ff;
-        }
-        /* Toggle Switch */
-        .toggle-switch {
-            position: absolute;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-        }
-        .toggle-switch input {
-            display: none;
-        }
-        .toggle-switch label {
-            background-color: #34495e;
-            width: 70px;
-            height: 35px;
-            display: block;
-            border-radius: 17.5px;
-            position: relative;
-            cursor: pointer;
-            transition: background-color 0.3s;
-        }
-        .toggle-switch label::after {
-            content: '';
-            width: 31px;
-            height: 31px;
-            background-color: white;
-            border-radius: 50%;
-            position: absolute;
-            top: 2px;
-            left: 2px;
-            transition: transform 0.3s;
-        }
-        .toggle-switch input:checked + label {
-            background-color: #2980b9;
-        }
-        .toggle-switch input:checked + label::after {
-            transform: translateX(35px);
-        }
-        /* Loading Overlay */
-        .loading-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0,0,0,0.7);
-            color: white;
-            display: none;
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
-            font-size: 1.8em;
-        }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
 </head>
 <body>
-    <div class="top-right">
+    <!-- Top Center for Date and Time -->
+    <div class="top-center">
+        <span id="date">Loading Date...</span>
         <span id="clock">--:--:--</span>
-        <span id="date">Loading date...</span>
+    </div>
+    
+    <!-- Top Right for Wi-Fi Strength -->
+    <div class="top-right">
+        <span id="wifi">Wi-Fi: --%</span>
     </div>
 
+    <!-- Left Panel with Navigation Buttons -->
     <div class="left-panel">
         <button onclick="window.location.href='/settings'" aria-label="Open Settings">Settings</button>
         <button onclick="window.location.href='http://localhost:8123'" aria-label="Open Home Assistant">Home Assistant</button>
         <button onclick="window.location.href='https://www.xbox.com/en-US/live'" aria-label="Open Xbox Live">Xbox Live</button>
         <button onclick="window.location.href='https://www.youtube.com'" aria-label="Open YouTube">YouTube</button>
         <button onclick="window.location.href='https://open.spotify.com'" aria-label="Open Spotify" class="spotify-btn">Spotify</button>
-        <button onclick="logout()" class="logout-btn" aria-label="Logout">Logout</button>
+        <button onclick="window.location.href='https://teams.microsoft.com'" aria-label="Open Microsoft Teams" class="teams-btn">Microsoft Teams</button>
     </div>
 
+    <!-- Main Panel for Displaying Images -->
     <div class="main-panel">
-        <iframe src="https://photos.google.com" class="google-photos"></iframe>
+        {% if images %}
+            {% for image in images %}
+                <img src="{{ image }}" alt="Display Image" class="image-display fade-in">
+            {% endfor %}
+        {% else %}
+            <p>No images to display.</p>
+        {% endif %}
     </div>
 
+    <!-- News Feed -->
     <div class="news-feed">
         <h2>Latest News</h2>
         <ul id="news-list">
@@ -225,10 +50,7 @@
         </ul>
     </div>
 
-    <div class="wifi-strength">
-        Wi-Fi Strength: <span id="wifi-signal">--%</span>
-    </div>
-
+    <!-- Dark Mode Toggle Switch -->
     <div class="toggle-switch">
         <input type="checkbox" id="dark-mode-toggle">
         <label for="dark-mode-toggle" aria-label="Toggle Dark Mode"></label>
@@ -239,143 +61,47 @@
         Connecting to Wi-Fi...
     </div>
 
-    <script>
-        // Clock Functionality
-        function updateClock() {
-            const clockElement = document.getElementById('clock');
-            const dateElement = document.getElementById('date');
-            const now = new Date();
-            const hours = now.getHours().toString().padStart(2, '0');
-            const minutes = now.getMinutes().toString().padStart(2, '0');
-            const seconds = now.getSeconds().toString().padStart(2, '0');
-            const day = now.toLocaleDateString('en-US', { weekday: 'long' });
-            const date = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-            clockElement.textContent = `${hours}:${minutes}:${seconds}`;
-            dateElement.textContent = `${day}, ${date}`;
-        }
-        setInterval(updateClock, 1000);
-        updateClock(); // Initial call
+    <!-- Dimmed Overlay for Inactivity -->
+    <div class="dim-overlay" id="dim-overlay">
+        <div class="dim-clock">
+            <span id="dim-clock-time">--:--</span>
+        </div>
+    </div>
 
-        // Fetch and Display Wi-Fi Strength
-        function fetchWifiStrength() {
-            fetch('/wifi_strength')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    const strength = data.signal_strength;
-                    document.getElementById('wifi-signal').textContent = strength + '%';
-                    hideLoading(); // Hide the loading overlay
-                })
-                .catch(error => {
-                    console.error('Error fetching Wi-Fi strength:', error);
-                    document.getElementById('wifi-signal').textContent = '--%';
-                    hideLoading(); // Hide the loading overlay even on error
-                });
-        }
+    <!-- On-Screen Keyboard -->
+    <div id="on-screen-keyboard" class="on-screen-keyboard">
+        <button onclick="insertCharacter('A')">A</button>
+        <button onclick="insertCharacter('B')">B</button>
+        <button onclick="insertCharacter('C')">C</button>
+        <button onclick="insertCharacter('D')">D</button>
+        <button onclick="insertCharacter('E')">E</button>
+        <button onclick="insertCharacter('F')">F</button>
+        <button onclick="insertCharacter('G')">G</button>
+        <button onclick="insertCharacter('H')">H</button>
+        <button onclick="insertCharacter('I')">I</button>
+        <button onclick="insertCharacter('J')">J</button>
+        <button onclick="insertCharacter('K')">K</button>
+        <button onclick="insertCharacter('L')">L</button>
+        <button onclick="insertCharacter('M')">M</button>
+        <button onclick="insertCharacter('N')">N</button>
+        <button onclick="insertCharacter('O')">O</button>
+        <button onclick="insertCharacter('P')">P</button>
+        <button onclick="insertCharacter('Q')">Q</button>
+        <button onclick="insertCharacter('R')">R</button>
+        <button onclick="insertCharacter('S')">S</button>
+        <button onclick="insertCharacter('T')">T</button>
+        <button onclick="insertCharacter('U')">U</button>
+        <button onclick="insertCharacter('V')">V</button>
+        <button onclick="insertCharacter('W')">W</button>
+        <button onclick="insertCharacter('X')">X</button>
+        <button onclick="insertCharacter('Y')">Y</button>
+        <button onclick="insertCharacter('Z')">Z</button>
+        <button onclick="insertCharacter(' ')">Space</button>
+        <button onclick="closeKeyboard()">Close</button>
+    </div>
 
-        // Fetch Wi-Fi Strength on Load and Every Minute
-        fetchWifiStrength();
-        setInterval(fetchWifiStrength, 60000); // 60,000 ms = 1 minute
-
-        // Fetch News Dynamically
-        function fetchNews() {
-            fetch('/get_news')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Network response was not ok');
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    const newsList = document.getElementById('news-list');
-                    newsList.innerHTML = '';
-                    if (data.news_items.length === 0) {
-                        newsList.innerHTML = '<li>No news available.</li>';
-                        return;
-                    }
-                    data.news_items.forEach(item => {
-                        const li = document.createElement('li');
-                        const a = document.createElement('a');
-                        a.href = item.link;
-                        a.target = '_blank';
-                        a.textContent = item.title;
-                        a.onclick = openNews;
-                        li.appendChild(a);
-                        newsList.appendChild(li);
-                    });
-                })
-                .catch(error => {
-                    console.error('Error fetching news:', error);
-                    const newsList = document.getElementById('news-list');
-                    newsList.innerHTML = '<li>No news available.</li>';
-                });
-        }
-
-        // Fetch news every 10 minutes
-        setInterval(fetchNews, 600000); // 600,000 ms = 10 minutes
-
-        // Initial fetch on load
-        window.onload = fetchNews;
-
-        // Dark Mode Toggle
-        const toggleSwitch = document.getElementById('dark-mode-toggle');
-        toggleSwitch.addEventListener('change', () => {
-            if (toggleSwitch.checked) {
-                document.body.classList.add('dark-mode');
-                localStorage.setItem('darkMode', 'enabled');
-            } else {
-                document.body.classList.remove('dark-mode');
-                localStorage.setItem('darkMode', 'disabled');
-            }
-        });
-
-        // Apply Dark Mode based on saved preference
-        const darkMode = localStorage.getItem('darkMode');
-        if (darkMode === 'enabled') {
-            toggleSwitch.checked = true;
-            document.body.classList.add('dark-mode');
-        }
-
-        // Loading Overlay Controls
-        function showLoading() {
-            document.getElementById('loading').style.display = 'flex';
-        }
-
-        function hideLoading() {
-            document.getElementById('loading').style.display = 'none';
-        }
-
-        // Show Loading Indicator when connecting to Wi-Fi
-        function connectWifi() {
-            showLoading();
-            // Assume there's a form submission or AJAX call here
-        }
-
-        // Listen for form submissions to show loading
-        document.addEventListener('DOMContentLoaded', () => {
-            const form = document.querySelector('form');
-            if (form) {
-                form.addEventListener('submit', () => {
-                    showLoading();
-                });
-            }
-        });
-
-        // Logout Function (Optional)
-        function logout() {
-            // Implement logout functionality if needed
-            alert('Logout functionality is not implemented.');
-        }
-
-        // Handle News Link Click to Prevent Losing State (Optional)
-        function openNews(event) {
-            // You can implement history management or modals if needed
-            // For now, it simply opens the link in a new tab
-        }
-    </script>
+    <!-- Include JavaScript Files -->
+    <script src="{{ url_for('static', filename='js/main.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/keyboard.js') }}"></script>
 </body>
 </html>

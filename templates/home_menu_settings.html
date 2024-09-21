@@ -1,0 +1,59 @@
+<!-- templates/home_menu_settings.html -->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Home Menu Settings - Hey Bing Assistant</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+</head>
+<body>
+    <div class="content-wrapper">
+        <h1>Home Menu Settings</h1>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+            {% if messages %}
+                <div class="flash-messages">
+                    {% for category, message in messages %}
+                        <div class="{{ category }}">{{ message }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        {% endwith %}
+        
+        {% if not authenticated %}
+            <div class="auth-section">
+                <p>To display your Google Photos on the home screen, please authenticate with Google.</p>
+                <button onclick="window.location.href='{{ url_for('google.login') }}'">Authenticate with Google</button>
+            </div>
+        {% else %}
+            <div class="auth-section">
+                <p>You are authenticated with Google.</p>
+                <button onclick="window.location.href='{{ url_for('logout_google') }}'">Logout from Google</button>
+            </div>
+            {% if albums %}
+                <div class="albums-section">
+                    <h2>Select a Google Photos Album</h2>
+                    <ul class="albums-list">
+                        {% for album in albums %}
+                            <li>
+                                <form action="{{ url_for('select_album') }}" method="POST">
+                                    <input type="hidden" name="album_id" value="{{ album.id }}">
+                                    <button type="submit">{{ album.title }}</button>
+                                </form>
+                            </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            {% else %}
+                <div class="albums-section">
+                    <p>No albums found or unable to fetch albums.</p>
+                </div>
+            {% endif %}
+        {% endif %}
+        
+        <div class="back-link">
+            <a href="/settings">← Back to Settings</a>
+        </div>
+    </div>
+</body>
+</html>
