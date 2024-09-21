@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Hey Bing Assistant</title>
+    <style>
+        body {
+            background-color: #f0f0f0;
+            color: #333;
+            font-family: Arial, sans-serif;
+            margin: 0;
+            display: flex;
+            height: 100vh;
+        }
+        .top-bar {
+            position: absolute;
+            top: 10px;
+            left: 20px;
+            font-size: 1.2em;
+            font-weight: bold;
+        }
+        .left-panel {
+            width: 200px;
+            background-color: #2c3e50;
+            padding: 20px;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+        .left-panel button {
+            background-color: #34495e;
+            color: white;
+            border: none;
+            padding: 15px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            font-size: 1em;
+            border-radius: 5px;
+            transition: background-color 0.3s;
+        }
+        .left-panel button:hover {
+            background-color: #3d566e;
+        }
+        .left-panel .logout-btn {
+            background-color: #e74c3c;
+        }
+        .main-panel {
+            flex-grow: 1;
+            padding: 20px;
+            box-sizing: border-box;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .wifi-strength {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 1.2em;
+            background-color: rgba(0,0,0,0.6);
+            color: white;
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+        .news-feed {
+            width: 16.66%; /* 1/6 of the screen */
+            position: absolute;
+            top: 80px;
+            right: 20px;
+            background-color: #ffffff;
+            padding: 15px;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            max-height: 80vh;
+        }
+        .news-feed h2 {
+            margin-top: 0;
+            font-size: 1.2em;
+        }
+        .news-feed ul {
+            list-style-type: none;
+            padding: 0;
+            margin: 0;
+        }
+        .news-feed li {
+            margin-bottom: 10px;
+        }
+        .news-feed a {
+            text-decoration: none;
+            color: #2980b9;
+            font-size: 0.9em;
+        }
+        .news-feed a:hover {
+            text-decoration: underline;
+        }
+        /* Dark Mode Styles */
+        body.dark-mode {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        body.dark-mode .left-panel {
+            background-color: #1e272e;
+        }
+        body.dark-mode .left-panel button {
+            background-color: #485460;
+            color: #ecf0f1;
+        }
+        body.dark-mode .left-panel button:hover {
+            background-color: #606e7f;
+        }
+        body.dark-mode .wifi-strength {
+            background-color: rgba(255,255,255,0.2);
+            color: #ecf0f1;
+        }
+        body.dark-mode .news-feed {
+            background-color: #2c3e50;
+        }
+        body.dark-mode .news-feed a {
+            color: #74b9ff;
+        }
+        /* Toggle Switch */
+        .toggle-switch {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .toggle-switch input {
+            display: none;
+        }
+        .toggle-switch label {
+            background-color: #34495e;
+            width: 60px;
+            height: 30px;
+            display: block;
+            border-radius: 15px;
+            position: relative;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        .toggle-switch label::after {
+            content: '';
+            width: 26px;
+            height: 26px;
+            background-color: white;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+        .toggle-switch input:checked + label {
+            background-color: #2980b9;
+        }
+        .toggle-switch input:checked + label::after {
+            transform: translateX(30px);
+        }
+        /* Loading Overlay */
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0,0,0,0.7);
+            color: white;
+            display: none;
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+            font-size: 1.5em;
+        }
+        /* Spotify Shortcut Styling */
+        .spotify-btn {
+            background-color: #1DB954;
+            color: white;
+        }
+        .spotify-btn:hover {
+            background-color: #1ed760;
+        }
+        /* Clock Styling */
+        #clock {
+            font-size: 1.5em;
+            margin-bottom: 20px;
+        }
+        /* Google Photos Stream Styling */
+        .google-photos {
+            width: 80%;
+            height: 60vh;
+            border: none;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body>
+    <div class="top-bar" id="clock">
+        <!-- Clock will be populated by JavaScript -->
+    </div>
+
+    <div class="left-panel">
+        <div>
+            <button onclick="window.location.href='/settings'" aria-label="Open Settings">Settings</button>
+            <button onclick="window.location.href='http://localhost:8123'" aria-label="Open Home Assistant">Home Assistant</button>
+            <button onclick="window.location.href='https://www.xbox.com/en-US/live'" aria-label="Open Xbox Live">Xbox Live</button>
+            <button onclick="window.location.href='https://www.youtube.com'" aria-label="Open YouTube">YouTube</button>
+            <button onclick="window.location.href='https://open.spotify.com'" aria-label="Open Spotify" class="spotify-btn">Spotify</button>
+        </div>
+        <div>
+            <button onclick="logout()" class="logout-btn" aria-label="Logout">Logout</button>
+        </div>
+    </div>
+
+    <div class="main-panel">
+        <div class="google-photos">
+            <iframe src="https://photos.google.com" width="100%" height="100%"></iframe>
+        </div>
+    </div>
+
+    <div class="news-feed">
+        <h2>Latest News</h2>
+        <ul id="news-list">
+            {% for item in news_items %}
+                <li><a href="{{ item.link }}" target="_blank" onclick="openNews(event)">{{ item.title }}</a></li>
+            {% endfor %}
+        </ul>
+    </div>
+
+    <div class="wifi-strength">
+        Wi-Fi Strength: <span id="wifi-signal">{{ wifi_strength }}%</span>
+    </div>
+
+    <div class="toggle-switch">
+        <input type="checkbox" id="dark-mode-toggle">
+        <label for="dark-mode-toggle" aria-label="Toggle Dark Mode"></label>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loading">
+        Connecting to Wi-Fi...
+    </div>
+
+    <script>
+        // Clock Functionality
+        function updateClock() {
+            const clockElement = document.getElementById('clock');
+            const now = new Date();
+            const hours = now.getHours().toString().padStart(2, '0');
+            const minutes = now.getMinutes().toString().padStart(2, '0');
+            const seconds = now.getSeconds().toString().padStart(2, '0');
+            clockElement.textContent = `${hours}:${minutes}:${seconds}`;
+        }
+        setInterval(updateClock, 1000);
+        updateClock(); // Initial call
+
+        // Fetch and Display Wi-Fi Strength
+        function fetchWifiStrength() {
+            fetch('/wifi_strength')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const strength = data.signal_strength;
+                    document.getElementById('wifi-signal').textContent = strength + '%';
+                    hideLoading(); // Hide the loading overlay
+                })
+                .catch(error => {
+                    console.error('Error fetching Wi-Fi strength:', error);
+                    document.getElementById('wifi-signal').textContent = '--%';
+                    hideLoading(); // Hide the loading overlay even on error
+                });
+        }
+
+        // Fetch Wi-Fi Strength on Load and Every Minute
+        fetchWifiStrength();
+        setInterval(fetchWifiStrength, 60000); // 60,000 ms = 1 minute
+
+        // Fetch News Dynamically
+        function fetchNews() {
+            fetch('/get_news')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Network response was not ok');
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    const newsList = document.getElementById('news-list');
+                    newsList.innerHTML = '';
+                    if (data.news_items.length === 0) {
+                        newsList.innerHTML = '<li>No news available.</li>';
+                        return;
+                    }
+                    data.news_items.forEach(item => {
+                        const li = document.createElement('li');
+                        const a = document.createElement('a');
+                        a.href = item.link;
+                        a.target = '_blank';
+                        a.textContent = item.title;
+                        a.onclick = openNews;
+                        li.appendChild(a);
+                        newsList.appendChild(li);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error fetching news:', error);
+                    const newsList = document.getElementById('news-list');
+                    newsList.innerHTML = '<li>No news available.</li>';
+                });
+        }
+
+        // Fetch news every 10 minutes
+        setInterval(fetchNews, 600000); // 600,000 ms = 10 minutes
+
+        // Initial fetch on load
+        window.onload = fetchNews;
+
+        // Dark Mode Toggle
+        const toggleSwitch = document.getElementById('dark-mode-toggle');
+        toggleSwitch.addEventListener('change', () => {
+            if (toggleSwitch.checked) {
+                document.body.classList.add('dark-mode');
+                localStorage.setItem('darkMode', 'enabled');
+            } else {
+                document.body.classList.remove('dark-mode');
+                localStorage.setItem('darkMode', 'disabled');
+            }
+        });
+
+        // Apply Dark Mode based on saved preference
+        const darkMode = localStorage.getItem('darkMode');
+        if (darkMode === 'enabled') {
+            toggleSwitch.checked = true;
+            document.body.classList.add('dark-mode');
+        }
+
+        // Loading Overlay Controls
+        function showLoading() {
+            document.getElementById('loading').style.display = 'flex';
+        }
+
+        function hideLoading() {
+            document.getElementById('loading').style.display = 'none';
+        }
+
+        // Show Loading Indicator when connecting to Wi-Fi
+        function connectWifi() {
+            showLoading();
+            // Assume there's a form submission or AJAX call here
+        }
+
+        // Listen for form submissions to show loading
+        document.addEventListener('DOMContentLoaded', () => {
+            const form = document.querySelector('form');
+            if (form) {
+                form.addEventListener('submit', () => {
+                    showLoading();
+                });
+            }
+        });
+
+        // Logout Function (Optional)
+        function logout() {
+            // Implement logout functionality if needed
+            alert('Logout functionality is not implemented.');
+        }
+
+        // Handle News Link Click to Prevent Losing State (Optional)
+        function openNews(event) {
+            // You can implement history management or modals if needed
+            // For now, it simply opens the link in a new tab
+        }
+    </script>
+</body>
+</html>
