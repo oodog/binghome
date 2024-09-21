@@ -1,15 +1,14 @@
+# web_server.py
+
 import os
 import subprocess
 import logging
-from flask import Flask, render_template, request, redirect, url_for, flash, jsonify, session
+from flask import Flask, render_template, request, redirect, url_for, flash, jsonify
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
 import feedparser
 from dotenv import load_dotenv
 from functools import wraps
-from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import Flow
-import google.auth.transport.requests
 
 # Load environment variables from .env file
 load_dotenv()
@@ -29,22 +28,21 @@ users = {
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Google OAuth 2.0 Configuration
-GOOGLE_CLIENT_SECRETS_FILE = "client_secret.json"  # Ensure this file is in your project directory
-SCOPES = ['https://www.googleapis.com/auth/photoslibrary.readonly']
+# Path to nmcli
+NMCLI_PATH = '/usr/bin/nmcli'  # Update this path if different
 
-def login_required(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        if 'google_credentials' not in session:
-            return redirect(url_for('google_auth'))
-        return f(*args, **kwargs)
-    return decorated_function
-
+# Verify password for authentication
 @auth.verify_password
 def verify_password(username, password):
     if username in users and check_password_hash(users.get(username), password):
         return username
+
+# Decorator to protect routes without requiring auth
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        return f(*args, **kwargs)
+    return decorated_function
 
 @app.route('/')
 def index():
@@ -109,11 +107,8 @@ def connect_wifi_route():
         with open(temp_password_file, 'w') as f:
             f.write(password)
 
-        # Use the full path to 'nmcli'
-        nmcli_path = '/usr/bin/nmcli'  # Update this path if different
-
         # Call the connect_wifi.py script
-        subprocess.run(['python3', 'connect_wifi.py', ssid, temp_password_file, nmcli_path], check=True)
+        subprocess.run(['python3', 'connect_wifi.py', ssid, temp_password_file, NMCLI_PATH], check=True)
         flash(f'Successfully connected to {ssid}.', 'success')
     except subprocess.CalledProcessError as e:
         logger.error(f"Failed to connect to Wi-Fi: {e}")
@@ -128,78 +123,11 @@ def connect_wifi_route():
 
     return redirect(url_for('wifi_settings'))
 
-@app.route('/google_auth')
-def google_auth():
-    flow = Flow.from_client_secrets_file(
-        GOOGLE_CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        redirect_uri=url_for('google_callback', _external=True)
-    )
-    authorization_url, state = flow.authorization_url(
-        access_type='offline',
-        include_granted_scopes='true'
-    )
-    session['state'] = state
-    return redirect(authorization_url)
-
-@app.route('/google_callback')
-def google_callback():
-    state = session.get('state')
-    flow = Flow.from_client_secrets_file(
-        GOOGLE_CLIENT_SECRETS_FILE,
-        scopes=SCOPES,
-        state=state,
-        redirect_uri=url_for('google_callback', _external=True)
-    )
-    flow.fetch_token(authorization_response=request.url)
-
-    if not flow.credentials:
-        flash('Authentication failed.', 'danger')
-        return redirect(url_for('settings'))
-
-    creds = flow.credentials
-    session['google_credentials'] = {
-        'token': creds.token,
-        'refresh_token': creds.refresh_token,
-        'token_uri': creds.token_uri,
-        'client_id': creds.client_id,
-        'client_secret': creds.client_secret,
-        'scopes': creds.scopes
-    }
-
-    flash('Google Photos authenticated successfully.', 'success')
-    return redirect(url_for('settings'))
-
-@app.route('/google_photos')
-@login_required
-def google_photos():
-    credentials = Credentials(**session['google_credentials'])
-    request_obj = google.auth.transport.requests.Request()
-
-    if credentials.expired and credentials.refresh_token:
-        credentials.refresh(request_obj)
-        session['google_credentials'] = {
-            'token': credentials.token,
-            'refresh_token': credentials.refresh_token,
-            'token_uri': credentials.token_uri,
-            'client_id': credentials.client_id,
-            'client_secret': credentials.client_secret,
-            'scopes': credentials.scopes
-        }
-
-    # Placeholder for Google Photos integration
-    # You can use Google Photos API to fetch and display photos
-    # For simplicity, we'll embed Google Photos web interface
-    return render_template('google_photos.html')
-
 def get_wifi_strength():
     try:
-        # Use the full path to 'nmcli'
-        nmcli_path = '/usr/bin/nmcli'  # Update this path if different
-
         # Use nmcli to get the signal strength of the current connection
         result = subprocess.run(
-            [nmcli_path, '-t', '-f', 'ACTIVE,SSID,SIGNAL', 'dev', 'wifi'],
+            [NMCLI_PATH, '-t', '-f', 'ACTIVE,SSID,SIGNAL', 'dev', 'wifi'],
             capture_output=True,
             text=True,
             check=True
@@ -224,12 +152,9 @@ def get_wifi_strength():
 
 def scan_wifi():
     try:
-        # Use the full path to 'nmcli'
-        nmcli_path = '/usr/bin/nmcli'  # Update this path if different
-
-        # Scan for available Wi-Fi networks
+        # Use nmcli to scan for available Wi-Fi networks
         result = subprocess.run(
-            [nmcli_path, '-t', '-f', 'SSID,SIGNAL', 'dev', 'wifi', 'list'],
+            [NMCLI_PATH, '-t', '-f', 'SSID,SIGNAL', 'dev', 'wifi', 'list'],
             capture_output=True,
             text=True,
             check=True

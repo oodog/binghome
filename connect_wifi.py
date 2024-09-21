@@ -1,3 +1,5 @@
+# connect_wifi.py
+
 import sys
 import subprocess
 import os
