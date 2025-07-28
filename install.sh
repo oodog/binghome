@@ -117,7 +117,7 @@ install_system_dependencies() {
         libfreetype6-dev \
         liblcms2-dev \
         libopenjp2-7 \
-        libtiff5 \
+        libtiff6 \
         chromium-browser \
         unclutter \
         network-manager \
