@@ -109,6 +109,13 @@ install_system_dependencies() {
         python3-pip \
         python3-venv \
         python3-dev \
+        python3-flask \
+        python3-requests \
+        python3-psutil \
+        python3-smbus \
+        python3-rpi.gpio \
+        python3-setuptools \
+        python3-wheel \
         build-essential \
         libffi-dev \
         libssl-dev \
