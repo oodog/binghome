@@ -42,7 +42,7 @@ A modern smart home control interface designed for Raspberry Pi with touchscreen
 For Raspberry Pi OS, simply run:
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/oodog/binghome/main/install.sh | bash
+curl -sSL https://github.com/oodog/binghome/blob/master/install.sh | bash
 ```
 
 Or download and run manually:
