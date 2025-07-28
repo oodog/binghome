@@ -243,7 +243,7 @@ setup_python_environment() {
         
         # Install Raspberry Pi specific packages
         pip install RPi.GPIO==0.7.1 || print_warning "RPi.GPIO installation failed"
-        pip install Adafruit-DHT==1.4.0 || pip install adafruit-circuitpython-dht || print_warning "DHT sensor library installation failed"
+        pip install --global-option="--force-pi" Adafruit-DHT==1.4.0 || pip install adafruit-circuitpython-dht || print_warning "DHT sensor library installation failed"
     fi
     
     print_success "Python environment setup completed"
