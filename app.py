@@ -159,18 +159,30 @@ def api_voice():
 
 @app.route('/api/wifi_scan')
 def api_wifi_scan():
-    """WiFi network scan endpoint"""
+    """WiFi network scan endpoint with signal strength"""
     try:
-        # Mock WiFi networks - replace with actual scan
+        # Get current WiFi signal strength (mock implementation)
+        import random
+        current_strength = random.randint(60, 100)
+        
+        # Mock WiFi networks with realistic signal strengths
         networks = [
-            {'ssid': 'HomeNetwork', 'signal': -45, 'security': 'WPA2'},
-            {'ssid': 'GuestWiFi', 'signal': -65, 'security': 'WPA2'},
-            {'ssid': 'NeighborNet', 'signal': -80, 'security': 'WPA2'}
+            {'ssid': 'HomeNetwork_5G', 'signal': -35, 'security': 'WPA3', 'frequency': '5GHz'},
+            {'ssid': 'HomeNetwork_2.4G', 'signal': -45, 'security': 'WPA3', 'frequency': '2.4GHz'},
+            {'ssid': 'GuestWiFi', 'signal': -65, 'security': 'WPA2', 'frequency': '2.4GHz'},
+            {'ssid': 'NeighborNet', 'signal': -80, 'security': 'WPA2', 'frequency': '2.4GHz'},
+            {'ssid': 'CoffeeShop_Free', 'signal': -85, 'security': 'Open', 'frequency': '2.4GHz'},
+            {'ssid': 'Hidden_Network', 'signal': -75, 'security': 'WPA2', 'frequency': '5GHz'}
         ]
+        
+        # Sort by signal strength (higher is better, so closer to 0)
+        networks.sort(key=lambda x: x['signal'], reverse=True)
         
         return jsonify({
             'success': True,
             'networks': networks,
+            'current_strength': current_strength,
+            'connected_ssid': 'HomeNetwork_5G',
             'timestamp': datetime.now().isoformat()
         })
     except Exception as e:

@@ -1,4 +1,143 @@
-<!DOCTYPE html>
+// WiFi scan with signal strength
+        async function scanWiFi() {
+            try {
+                const response = await fetch('/api/wifi_scan');
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update current connection strength if available
+                    if (result.current_strength) {
+                        wifiSignalStrength = result.current_strength;
+                        updateWiFiSignal();
+                    }
+                    
+                    showSuccess(`Found ${result.networks.length} WiFi networks`);
+                    
+                    // Show WiFi networks in a modal or list
+                    displayWiFiNetworks(result.networks);
+                } else {
+                    showError('WiFi scan failed');
+                }
+            } catch (error) {
+                console.error('WiFi scan error:', error);
+                showError('WiFi scan failed');
+            }
+        }
+
+        // Display WiFi networks
+        function displayWiFiNetworks(networks) {
+            const networkList = networks.map(network => {
+                const signalBars = getSignalBars(network.signal);
+                return `
+                    <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid rgba(255,255,255,0.1);">
+                        <div>
+                            <strong>${network.ssid}</strong>
+                            <div style="font-size: 12px; opacity: 0.7;">${network.security}</div>
+                        </div>
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <div style="display: flex; align-items: flex-end; gap: 1px; height: 12px;">
+                                ${signalBars}
+                            </div>
+                            <span style="font-size: 11px;">${Math.abs(network.signal)}dBm</span>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            // Create modal or update existing element
+            showModal('Available WiFi Networks', networkList);
+        }
+
+        // Convert signal strength to bars
+        function getSignalBars(signalDbm) {
+            // Convert dBm to percentage (typical range: -30 to -90 dBm)
+            const percentage = Math.max(0, Math.min(100, (signalDbm + 90) * (100 / 60)));
+            const barCount = Math.ceil(percentage / 25);
+            
+            let bars = '';
+            for (let i = 1; i <= 4; i++) {
+                const height = i * 3;
+                const active = i <= barCount;
+                const color = active ? '#4CAF50' : '#666';
+                bars += `<div style="width: 2px; height: ${height}px; background: ${color}; border-radius: 1px;"></div>`;
+            }
+            return bars;
+        }
+
+        // Show modal dialog
+        function showModal(title, content) {
+            // Remove existing modal if any
+            const existingModal = document.getElementById('wifi-modal');
+            if (existingModal) {
+                document.body.removeChild(existingModal);
+            }
+
+            const modal = document.createElement('div');
+            modal.id = 'wifi-modal';
+            modal.style.cssText = `
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0,0,0,0.8);
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                z-index: 2000;
+                backdrop-filter: blur(5px);
+            `;
+
+            modal.innerHTML = `
+                <div style="
+                    background: rgba(26,26,26,0.95);
+                    border-radius: 15px;
+                    padding: 25px;
+                    max-width: 500px;
+                    width: 90%;
+                    max-height: 80%;
+                    overflow-y: auto;
+                    border: 1px solid rgba(255,255,255,0.1);
+                ">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0; color: #4CAF50;">${title}</h3>
+                        <button onclick="closeModal()" style="
+                            background: none;
+                            border: none;
+                            color: white;
+                            font-size: 24px;
+                            cursor: pointer;
+                            padding: 0;
+                            width: 30px;
+                            height: 30px;
+                            display: flex;
+                            align-items: center;
+                            justify-content: center;
+                        ">×</button>
+                    </div>
+                    <div style="color: white;">
+                        ${content}
+                    </div>
+                </div>
+            `;
+
+            document.body.appendChild(modal);
+
+            // Close modal when clicking outside
+            modal.addEventListener('click', function(e) {
+                if (e.target === modal) {
+                    closeModal();
+                }
+            });
+        }
+
+        // Close modal
+        function closeModal() {
+            const modal = document.getElementById('wifi-modal');
+            if (modal) {
+                document.body.removeChild(modal);
+            }
+        }<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -142,6 +281,55 @@
             font-size: 40px;
             margin-bottom: 10px;
             display: block;
+            width: 50px;
+            height: 50px;
+            background: #4CAF50;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 10px;
+            position: relative;
+        }
+
+        .app-icon svg {
+            width: 24px;
+            height: 24px;
+            fill: white;
+        }
+
+        .wifi-signal {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .wifi-bars {
+            display: flex;
+            align-items: flex-end;
+            gap: 2px;
+            height: 16px;
+        }
+
+        .wifi-bar {
+            width: 3px;
+            background: #666;
+            border-radius: 1px;
+            transition: background-color 0.3s ease;
+        }
+
+        .wifi-bar:nth-child(1) { height: 4px; }
+        .wifi-bar:nth-child(2) { height: 8px; }
+        .wifi-bar:nth-child(3) { height: 12px; }
+        .wifi-bar:nth-child(4) { height: 16px; }
+
+        .wifi-bar.active {
+            background: #4CAF50;
+        }
+
+        .wifi-percentage {
+            font-size: 12px;
+            color: #ccc;
         }
 
         .news-feed {
@@ -290,17 +478,28 @@
                     <span>💧 <span id="humidity-display">--%</span></span>
                 </div>
                 <div class="status-item">
-                    <span id="connection-status">🔗 Connected</span>
+                    <div class="wifi-signal">
+                        <div class="wifi-bars" id="wifi-bars">
+                            <div class="wifi-bar"></div>
+                            <div class="wifi-bar"></div>
+                            <div class="wifi-bar"></div>
+                            <div class="wifi-bar"></div>
+                        </div>
+                        <span class="wifi-percentage" id="wifi-percentage">100%</span>
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- Dashboard Grid -->
+        <!-- Card Titles with SVG Icons -->
         <div class="dashboard-grid">
             <!-- Sensor Data Card -->
             <div class="dashboard-card">
                 <div class="card-title">
-                    🌡️ Environmental Sensors
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8zm0 18c-3.35 0-6-2.57-6-6.2 0-2.34 1.95-5.44 6-9.14 4.05 3.7 6 6.79 6 9.14 0 3.63-2.65 6.2-6 6.2z"/>
+                    </svg>
+                    Environmental Sensors
                 </div>
                 <div class="card-content">
                     <div>Temperature: <span class="sensor-value" id="temperature">Loading...</span></div>
@@ -316,7 +515,10 @@
             <!-- Home Assistant Card -->
             <div class="dashboard-card">
                 <div class="card-title">
-                    🏠 Home Assistant
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+                    </svg>
+                    Home Assistant
                 </div>
                 <div class="card-content">
                     <p>Control your smart home devices</p>
@@ -330,7 +532,10 @@
             <!-- Voice Assistant Card -->
             <div class="dashboard-card">
                 <div class="card-title">
-                    🎤 Voice Assistant
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M12 2c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2s2-.9 2-2V4c0-1.1-.9-2-2-2zm6 6c0 3.53-2.61 6.43-6 6.92V21h-2v-6.08c-3.39-.49-6-3.39-6-6.92h2c0 2.76 2.24 5 5 5s5-2.24 5-5h2z"/>
+                    </svg>
+                    Voice Assistant
                 </div>
                 <div class="card-content">
                     <p>ChatGPT-powered voice commands</p>
@@ -344,7 +549,10 @@
             <!-- System Info Card -->
             <div class="dashboard-card">
                 <div class="card-title">
-                    ⚙️ System Status
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+                    </svg>
+                    System Status
                 </div>
                 <div class="card-content">
                     <div>Status: <span class="sensor-value" style="color: #4CAF50;">Online</span></div>
@@ -360,27 +568,51 @@
         <!-- App Tiles -->
         <div class="app-tiles">
             <div class="app-tile" onclick="openApp('youtube')">
-                <div class="app-icon">📺</div>
+                <div class="app-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+                    </svg>
+                </div>
                 <div>YouTube</div>
             </div>
             <div class="app-tile" onclick="openApp('netflix')">
-                <div class="app-icon">🎬</div>
+                <div class="app-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M5.398 0v.006c3.028 8.556 5.37 15.175 8.348 23.596 2.344.058 4.85.398 4.854.398-2.8-7.924-5.923-16.747-8.487-24zm8.489 0v9.63L18.6 22.951c-.043-7.86-.004-15.913.002-22.95zM5.398 1.05V24c1.873-.225 2.81-.312 4.715-.398v-9.22z"/>
+                    </svg>
+                </div>
                 <div>Netflix</div>
             </div>
             <div class="app-tile" onclick="openApp('spotify')">
-                <div class="app-icon">🎵</div>
+                <div class="app-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.42 1.56-.299.421-1.02.599-1.559.3z"/>
+                    </svg>
+                </div>
                 <div>Spotify</div>
             </div>
             <div class="app-tile" onclick="openApp('xbox')">
-                <div class="app-icon">🎮</div>
+                <div class="app-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M4.102 21.033C6.211 22.881 8.977 24 12 24c3.026 0 5.789-1.119 7.902-2.967 1.877-1.912-4.316-8.709-7.902-11.417-3.582 2.708-9.779 9.505-7.898 11.417zm11.16-14.406c2.5 2.961 7.484 10.313 6.076 12.912A11.992 11.992 0 0024 12.004C24 8.339 22.562 4.975 20.207 2.506c-1.767 3.237-4.945 4.121-4.945 4.121zm-6.524 0S5.56 5.743 3.793 2.506C1.438 4.975 0 8.339 0 12.004c0 2.623.845 5.054 2.764 7.535-1.408-2.599 3.576-9.951 6.076-12.912zM8.25 2.121c1.549-1.342 3.61-2.115 5.75-2.115 2.14 0 4.201.773 5.75 2.115-2.52 3.066-5.75 4.178-5.75 4.178S10.77 5.187 8.25 2.121z"/>
+                    </svg>
+                </div>
                 <div>Xbox Cloud</div>
             </div>
             <div class="app-tile" onclick="openApp('weather')">
-                <div class="app-icon">🌤️</div>
+                <div class="app-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6 0 3.31 2.69 6 6 6s6-2.69 6-6c0-3.31-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"/>
+                    </svg>
+                </div>
                 <div>Weather</div>
             </div>
             <div class="app-tile" onclick="openApp('settings')">
-                <div class="app-icon">⚙️</div>
+                <div class="app-icon">
+                    <svg viewBox="0 0 24 24">
+                        <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+                    </svg>
+                </div>
                 <div>Settings</div>
             </div>
         </div>
@@ -406,12 +638,14 @@
         // Global variables
         let sensorData = {};
         let isListening = false;
+        let wifiSignalStrength = 100; // Default to 100%
 
         // Initialize the application
         function init() {
             console.log('BingHome initializing...');
             updateClock();
             loadSensorData();
+            updateWiFiSignal();
             
             // Update clock every second
             setInterval(updateClock, 1000);
@@ -419,7 +653,51 @@
             // Update sensor data every 30 seconds
             setInterval(loadSensorData, 30000);
             
+            // Update WiFi signal every 10 seconds
+            setInterval(updateWiFiSignal, 10000);
+            
             console.log('BingHome initialized successfully');
+        }
+
+        // Update WiFi signal strength display
+        function updateWiFiSignal() {
+            // Simulate WiFi signal fluctuation (replace with actual WiFi strength detection)
+            wifiSignalStrength = Math.max(20, Math.min(100, wifiSignalStrength + (Math.random() - 0.5) * 20));
+            
+            const bars = document.querySelectorAll('.wifi-bar');
+            const percentage = document.getElementById('wifi-percentage');
+            
+            if (bars && percentage) {
+                // Update percentage display
+                percentage.textContent = Math.round(wifiSignalStrength) + '%';
+                
+                // Update bars based on signal strength
+                const barThresholds = [25, 50, 75, 100];
+                bars.forEach((bar, index) => {
+                    if (wifiSignalStrength >= barThresholds[index]) {
+                        bar.classList.add('active');
+                    } else {
+                        bar.classList.remove('active');
+                    }
+                });
+                
+                // Change color based on signal strength
+                let color = '#4CAF50'; // Green for good signal
+                if (wifiSignalStrength < 50) {
+                    color = '#FF9800'; // Orange for medium signal
+                }
+                if (wifiSignalStrength < 25) {
+                    color = '#F44336'; // Red for poor signal
+                }
+                
+                bars.forEach(bar => {
+                    if (bar.classList.contains('active')) {
+                        bar.style.background = color;
+                    }
+                });
+                
+                percentage.style.color = color;
+            }
         }
 
         // Update the clock display
