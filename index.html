@@ -507,7 +507,12 @@
                     <div>Gas Sensor: <span class="sensor-value" id="gas-sensor">Loading...</span></div>
                     <div>Light Level: <span class="sensor-value" id="light-sensor">Loading...</span></div>
                     <div class="control-buttons">
-                        <button class="btn btn-secondary" onclick="refreshSensors()">🔄 Refresh</button>
+                        <button class="btn btn-secondary" onclick="refreshSensors()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 5px;">
+                                <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+                            </svg>
+                            Refresh
+                        </button>
                     </div>
                 </div>
             </div>
@@ -523,8 +528,18 @@
                 <div class="card-content">
                     <p>Control your smart home devices</p>
                     <div class="control-buttons">
-                        <button class="btn" onclick="toggleLights()">💡 Toggle Lights</button>
-                        <button class="btn" onclick="openHomeAssistant()">🔧 Open HA</button>
+                        <button class="btn" onclick="toggleLights()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 5px;">
+                                <path d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/>
+                            </svg>
+                            Toggle Lights
+                        </button>
+                        <button class="btn" onclick="openHomeAssistant()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 5px;">
+                                <path d="M19.14,12.94c0.04-0.3,0.06-0.61,0.06-0.94c0-0.32-0.02-0.64-0.07-0.94l2.03-1.58c0.18-0.14,0.23-0.41,0.12-0.61 l-1.92-3.32c-0.12-0.22-0.37-0.29-0.59-0.22l-2.39,0.96c-0.5-0.38-1.03-0.7-1.62-0.94L14.4,2.81c-0.04-0.24-0.24-0.41-0.48-0.41 h-3.84c-0.24,0-0.43,0.17-0.47,0.41L9.25,5.35C8.66,5.59,8.12,5.92,7.63,6.29L5.24,5.33c-0.22-0.08-0.47,0-0.59,0.22L2.74,8.87 C2.62,9.08,2.66,9.34,2.86,9.48l2.03,1.58C4.84,11.36,4.8,11.69,4.8,12s0.02,0.64,0.07,0.94l-2.03,1.58 c-0.18,0.14-0.23,0.41-0.12,0.61l1.92,3.32c0.12,0.22,0.37,0.29,0.59,0.22l2.39-0.96c0.5,0.38,1.03,0.7,1.62,0.94l0.36,2.54 c0.05,0.24,0.24,0.41,0.48,0.41h3.84c0.24,0,0.44-0.17,0.47-0.41l0.36-2.54c0.59-0.24,1.13-0.56,1.62-0.94l2.39,0.96 c0.22,0.08,0.47,0,0.59-0.22l1.92-3.32c0.12-0.22,0.07-0.47-0.12-0.61L19.14,12.94z M12,15.6c-1.98,0-3.6-1.62-3.6-3.6 s1.62-3.6,3.6-3.6s3.6,1.62,3.6,3.6S13.98,15.6,12,15.6z"/>
+                            </svg>
+                            Open HA
+                        </button>
                     </div>
                 </div>
             </div>
@@ -541,7 +556,12 @@
                     <p>ChatGPT-powered voice commands</p>
                     <div id="voice-status">Ready to listen...</div>
                     <div class="control-buttons">
-                        <button class="btn" onclick="startVoiceCommand()">🎤 Voice Command</button>
+                        <button class="btn" onclick="startVoiceCommand()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 5px;">
+                                <path d="M12 2c-1.1 0-2 .9-2 2v6c0 1.1.9 2 2 2s2-.9 2-2V4c0-1.1-.9-2-2-2zm6 6c0 3.53-2.61 6.43-6 6.92V21h-2v-6.08c-3.39-.49-6-3.39-6-6.92h2c0 2.76 2.24 5 5 5s5-2.24 5-5h2z"/>
+                            </svg>
+                            Voice Command
+                        </button>
                     </div>
                 </div>
             </div>
@@ -558,8 +578,18 @@
                     <div>Status: <span class="sensor-value" style="color: #4CAF50;">Online</span></div>
                     <div>Last Update: <span id="last-update">--</span></div>
                     <div class="control-buttons">
-                        <button class="btn btn-secondary" onclick="checkHealth()">🔍 Health Check</button>
-                        <button class="btn btn-secondary" onclick="scanWiFi()">📶 WiFi Scan</button>
+                        <button class="btn btn-secondary" onclick="checkHealth()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 5px;">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                            </svg>
+                            Health Check
+                        </button>
+                        <button class="btn btn-secondary" onclick="scanWiFi()">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" style="margin-right: 5px;">
+                                <path d="M12.01 21.49L23.64 7c-.45-.34-4.93-4-11.64-4C5.28 3 .81 6.66.36 7l11.63 14.49.01.01.01-.01z"/>
+                            </svg>
+                            WiFi Scan
+                        </button>
                     </div>
                 </div>
             </div>
@@ -619,7 +649,12 @@
 
         <!-- News Feed -->
         <div class="news-feed">
-            <div class="card-title">📰 News Feed</div>
+            <div class="card-title">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M4 6H2v14c0 1.1.9 2 2 2h14v-2H4V6zm16-4H8c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-1 9H9V9h10v2zm-4 4H9v-2h6v2zm4-8H9V5h10v2z"/>
+                </svg>
+                News Feed
+            </div>
             <div id="news-container">
                 <div class="news-item">
                     <div class="news-title">Welcome to BingHome!</div>
