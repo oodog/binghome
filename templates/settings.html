@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BingHome - Settings</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
+            color: #ffffff;
+            min-height: 100vh;
+            touch-action: manipulation;
+        }
+
+        .header {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .header h1 {
+            font-size: 2rem;
+            font-weight: 300;
+        }
+
+        .nav-buttons {
+            display: flex;
+            gap: 15px;
+        }
+
+        .nav-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: translateY(-2px);
+        }
+
+        .back-btn {
+            background: rgba(0, 120, 215, 0.8);
+        }
+
+        .back-btn:hover {
+            background: rgba(0, 120, 215, 1);
+        }
+
+        .container {
+            padding: 30px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        .settings-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 30px;
+        }
+
+        .settings-card {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 25px;
+            backdrop-filter: blur(10px);
+            transition: all 0.3s ease;
+        }
+
+        .settings-card:hover {
+            background: rgba(255, 255, 255, 0.08);
+            transform: translateY(-5px);
+        }
+
+        .settings-card h3 {
+            font-size: 1.4rem;
+            margin-bottom: 15px;
+            color: #00d4ff;
+        }
+
+        .settings-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 15px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .settings-item:last-child {
+            border-bottom: none;
+        }
+
+        .settings-label {
+            font-size: 1rem;
+            color: #ffffff;
+        }
+
+        .settings-value {
+            font-size: 1rem;
+            color: #00d4ff;
+            font-weight: 500;
+        }
+
+        .volume-control {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            margin-top: 15px;
+        }
+
+        .volume-btn {
+            background: rgba(0, 120, 215, 0.8);
+            border: none;
+            color: white;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .volume-btn:hover {
+            background: rgba(0, 120, 215, 1);
+            transform: scale(1.1);
+        }
+
+        .volume-slider {
+            flex: 1;
+            height: 8px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+            outline: none;
+            appearance: none;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            background: #00d4ff;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .volume-display {
+            font-size: 1.2rem;
+            font-weight: bold;
+            min-width: 50px;
+            text-align: center;
+        }
+
+        .menu-link {
+            display: block;
+            background: rgba(0, 120, 215, 0.1);
+            border: 1px solid rgba(0, 120, 215, 0.3);
+            color: #ffffff;
+            padding: 20px;
+            border-radius: 10px;
+            text-decoration: none;
+            margin-bottom: 15px;
+            transition: all 0.3s ease;
+            font-size: 1.1rem;
+        }
+
+        .menu-link:hover {
+            background: rgba(0, 120, 215, 0.2);
+            transform: translateX(10px);
+        }
+
+        .sensor-status {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: #ff4444;
+        }
+
+        .status-dot.active {
+            background: #44ff44;
+            box-shadow: 0 0 10px rgba(68, 255, 68, 0.5);
+        }
+
+        /* Responsive design */
+        @media (max-width: 768px) {
+            .settings-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .nav-buttons {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+
+        /* Touch gestures for navigation */
+        .gesture-area {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 50px;
+            height: 100vh;
+            z-index: 1000;
+            background: transparent;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <!-- Gesture area for swipe back -->
+    <div class="gesture-area" id="gestureArea"></div>
+
+    <div class="header">
+        <h1>Settings</h1>
+        <div class="nav-buttons">
+            <a href="/back" class="nav-btn back-btn">← Back</a>
+            <a href="/" class="nav-btn">🏠 Home</a>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="settings-grid">
+            <!-- System Status Card -->
+            <div class="settings-card">
+                <h3>🔧 System</h3>
+                <a href="/settings/system_status" class="menu-link">
+                    System Status & Monitoring
+                </a>
+                <div class="settings-item">
+                    <span class="settings-label">Temperature</span>
+                    <span class="settings-value">
+                        {% if sensor_data.temperature %}
+                            {{ sensor_data.temperature }}°C
+                        {% else %}
+                            --°C
+                        {% endif %}
+                    </span>
+                </div>
+                <div class="settings-item">
+                    <span class="settings-label">Humidity</span>
+                    <span class="settings-value">
+                        {% if sensor_data.humidity %}
+                            {{ sensor_data.humidity }}%
+                        {% else %}
+                            --%
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+
+            <!-- Audio Control Card -->
+            <div class="settings-card">
+                <h3>🔊 Audio</h3>
+                <div class="settings-item">
+                    <span class="settings-label">Audio Amplifier</span>
+                    <div class="sensor-status">
+                        <div class="status-dot {% if audio_available %}active{% endif %}"></div>
+                        <span class="settings-value">
+                            {% if audio_available %}Connected{% else %}Disconnected{% endif %}
+                        </span>
+                    </div>
+                </div>
+                {% if audio_available %}
+                <div class="volume-control">
+                    <button class="volume-btn" onclick="changeVolume(-5)">-</button>
+                    <input type="range" class="volume-slider" id="volumeSlider" 
+                           min="0" max="100" value="{{ current_volume }}" 
+                           onchange="setVolume(this.value)">
+                    <button class="volume-btn" onclick="changeVolume(5)">+</button>
+                    <div class="volume-display" id="volumeDisplay">{{ current_volume }}%</div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button class="nav-btn" onclick="toggleMute()">🔇 Mute</button>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Network Card -->
+            <div class="settings-card">
+                <h3>📶 Network</h3>
+                <a href="/settings/wifi" class="menu-link">
+                    WiFi Connection Settings
+                </a>
+                <div class="settings-item">
+                    <span class="settings-label">Gas Sensor</span>
+                    <div class="sensor-status">
+                        <div class="status-dot {% if sensor_data.gas_detected %}active{% endif %}"></div>
+                        <span class="settings-value">
+                            {% if sensor_data.gas_detected %}Detected{% else %}Clear{% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="settings-item">
+                    <span class="settings-label">Light Sensor</span>
+                    <div class="sensor-status">
+                        <div class="status-dot {% if sensor_data.light_detected %}active{% endif %}"></div>
+                        <span class="settings-value">
+                            {% if sensor_data.light_detected %}Bright{% else %}Dark{% endif %}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions Card -->
+            <div class="settings-card">
+                <h3>⚡ Quick Actions</h3>
+                <button class="menu-link" onclick="refreshSensors()" style="border: none; width: 100%;">
+                    🔄 Refresh Sensor Data
+                </button>
+                <button class="menu-link" onclick="restartSystem()" style="border: none; width: 100%;">
+                    🔄 Restart System
+                </button>
+                <button class="menu-link" onclick="shutdownSystem()" style="border: none; width: 100%;">
+                    ⏻ Shutdown System
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentVolume = {{ current_volume }};
+        let startX = 0;
+        let startTime = 0;
+
+        // Volume control functions
+        async function changeVolume(delta) {
+            try {
+                const endpoint = delta > 0 ? '/api/volume/up' : '/api/volume/down';
+                const response = await fetch(endpoint, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ step: Math.abs(delta) })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    currentVolume = data.volume;
+                    updateVolumeDisplay();
+                }
+            } catch (error) {
+                console.error('Volume control error:', error);
+            }
+        }
+
+        async function setVolume(volume) {
+            try {
+                const response = await fetch('/api/volume/set', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ volume: parseInt(volume) })
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    currentVolume = data.volume;
+                    updateVolumeDisplay();
+                }
+            } catch (error) {
+                console.error('Volume control error:', error);
+            }
+        }
+
+        async function toggleMute() {
+            try {
+                const response = await fetch('/api/volume/mute', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+                
+                const data = await response.json();
+                if (data.success) {
+                    currentVolume = data.volume;
+                    updateVolumeDisplay();
+                    
+                    // Update button text
+                    event.target.textContent = data.muted ? '🔊 Unmute' : '🔇 Mute';
+                }
+            } catch (error) {
+                console.error('Mute toggle error:', error);
+            }
+        }
+
+        function updateVolumeDisplay() {
+            const slider = document.getElementById('volumeSlider');
+            const display = document.getElementById('volumeDisplay');
+            
+            if (slider) slider.value = currentVolume;
+            if (display) display.textContent = currentVolume + '%';
+        }
+
+        // Sensor refresh
+        async function refreshSensors() {
+            try {
+                const response = await fetch('/api/sensor_data');
+                const data = await response.json();
+                
+                // Refresh the page to show updated data
+                location.reload();
+            } catch (error) {
+                console.error('Sensor refresh error:', error);
+            }
+        }
+
+        // System control functions
+        async function restartSystem() {
+            if (confirm('Are you sure you want to restart the system?')) {
+                // In a real implementation, you'd call an API endpoint
+                alert('Restart command would be executed');
+            }
+        }
+
+        async function shutdownSystem() {
+            if (confirm('Are you sure you want to shutdown the system?')) {
+                // In a real implementation, you'd call an API endpoint
+                alert('Shutdown command would be executed');
+            }
+        }
+
+        // Gesture navigation
+        document.getElementById('gestureArea').addEventListener('touchstart', function(e) {
+            startX = e.touches[0].clientX;
+            startTime = Date.now();
+        });
+
+        document.getElementById('gestureArea').addEventListener('touchend', function(e) {
+            const endX = e.changedTouches[0].clientX;
+            const endTime = Date.now();
+            const deltaX = endX - startX;
+            const deltaTime = endTime - startTime;
+            
+            // Swipe right gesture (swipe from left edge)
+            if (deltaX > 50 && deltaTime < 300 && startX < 50) {
+                window.location.href = '/back';
+            }
+        });
+
+        // Pinch to home gesture (simplified - just double tap)
+        let lastTap = 0;
+        document.addEventListener('touchend', function(e) {
+            const currentTime = new Date().getTime();
+            const tapLength = currentTime - lastTap;
+            
+            if (tapLength < 500 && tapLength > 0 && e.touches.length === 0) {
+                // Double tap detected - go home
+                if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A') {
+                    window.location.href = '/';
+                }
+            }
+            lastTap = currentTime;
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            switch(e.key) {
+                case 'Escape':
+                case 'Backspace':
+                    e.preventDefault();
+                    window.location.href = '/back';
+                    break;
+                case 'Home':
+                    e.preventDefault();
+                    window.location.href = '/';
+                    break;
+                case 'ArrowUp':
+                    e.preventDefault();
+                    changeVolume(5);
+                    break;
+                case 'ArrowDown':
+                    e.preventDefault();
+                    changeVolume(-5);
+                    break;
+            }
+        });
+    </script>
+</body>
+</html>
