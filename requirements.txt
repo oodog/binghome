@@ -1,35 +1,43 @@
-# BingHome Minimal Requirements for Raspberry Pi
-# Essential packages only
-
+# BingHome Requirements
 # Core web framework
 Flask==2.3.3
+Werkzeug==2.3.7
 
-# Hardware interfaces (essential)
+# Hardware interfaces
 RPi.GPIO==0.7.1
 smbus==1.1.post2
-
-# DHT22 sensor support
 Adafruit-DHT==1.4.0
 
-# HTTP requests
+# HTTP requests and APIs
 requests==2.31.0
+
+# JSON handling (built-in, but listing for completeness)
+# json (built-in)
 
 # System utilities
 psutil==5.9.5
 
-# Configuration management
+# Optional: Advanced GPIO control
+gpiozero==1.6.2
+pigpio==1.78
+
+# Optional: Audio processing
+pyaudio==0.2.11
+pydub==0.25.1
+
+# Optional: Network utilities
+netifaces==0.11.0
+python-wifi==0.6.1
+
+# Development and debugging
 python-dotenv==1.0.0
 
-# Optional: Better GPIO control (install if needed)
-# gpiozero==1.6.2
+# Optional: Database support
+# sqlite3 is built-in to Python, no installation needed
 
-# Optional: Network utilities (install if WiFi features needed)
-# netifaces==0.11.0
+# Optional: Advanced sensor support
+w1thermsensor==2.0.0
+adafruit-circuitpython-dht==3.7.7
 
-# Optional: Audio processing (install if audio features needed)
-# pyaudio==0.2.11
-
-# Note: sqlite3 is built-in to Python
-# Note: json is built-in to Python
-# Note: subprocess is built-in to Python
-# Note: threading is built-in to Python
+# Optional: Home Assistant integration
+homeassistant==2023.9.3
