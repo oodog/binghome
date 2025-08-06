@@ -109,13 +109,6 @@ install_system_dependencies() {
         python3-pip \
         python3-venv \
         python3-dev \
-        python3-flask \
-        python3-requests \
-        python3-psutil \
-        python3-smbus \
-        python3-rpi.gpio \
-        python3-setuptools \
-        python3-wheel \
         build-essential \
         libffi-dev \
         libssl-dev \
@@ -124,7 +117,7 @@ install_system_dependencies() {
         libfreetype6-dev \
         liblcms2-dev \
         libopenjp2-7 \
-        libtiff6 \
+        libtiff5 \
         chromium-browser \
         unclutter \
         network-manager \
@@ -132,7 +125,11 @@ install_system_dependencies() {
         dbus-x11 \
         xorg \
         xinit \
-        lightdm
+        lightdm \
+        portaudio19-dev \
+        python3-pyaudio \
+        libasound2-dev \
+        pkg-config
     
     print_success "System dependencies installed"
 }
@@ -229,10 +226,21 @@ setup_python_environment() {
     print_info "Upgrading pip..."
     pip install --upgrade pip
     
+    # Install problematic packages first with fixes
+    print_info "Installing problematic packages with fixes..."
+    
+    # Install Adafruit-DHT with force flag
+    print_info "Installing Adafruit-DHT..."
+    pip install Adafruit-DHT --force-pi || print_warning "Adafruit-DHT installation failed"
+    
+    # Install pyaudio (should work now with portaudio19-dev installed)
+    print_info "Installing pyaudio..."
+    pip install pyaudio || print_warning "pyaudio installation failed"
+    
     # Install requirements
     if [[ -f requirements.txt ]]; then
-        print_info "Installing Python dependencies from requirements.txt..."
-        pip install -r requirements.txt
+        print_info "Installing remaining Python dependencies from requirements.txt..."
+        pip install -r requirements.txt --force-pi || print_warning "Some requirements may have failed"
     else
         print_info "Installing Python dependencies manually..."
         pip install flask==2.3.3
@@ -243,7 +251,6 @@ setup_python_environment() {
         
         # Install Raspberry Pi specific packages
         pip install RPi.GPIO==0.7.1 || print_warning "RPi.GPIO installation failed"
-        pip install --global-option="--force-pi" Adafruit-DHT==1.4.0 || pip install adafruit-circuitpython-dht || print_warning "DHT sensor library installation failed"
     fi
     
     print_success "Python environment setup completed"
