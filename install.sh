@@ -103,6 +103,7 @@ install_system_dependencies() {
     print_info "Installing essential packages..."
     
     # Install basic development tools first
+    print_info "Installing development tools..."
     sudo apt install -y \
         git \
         curl \
@@ -112,40 +113,58 @@ install_system_dependencies() {
         python3-venv \
         python3-dev \
         build-essential \
-        pkg-config
+        pkg-config || { print_error "Failed to install basic development tools"; exit 1; }
         
     # Install audio dependencies for pyaudio
+    print_info "Installing audio dependencies..."
     sudo apt install -y \
         portaudio19-dev \
         python3-pyaudio \
-        libasound2-dev
+        libasound2-dev || print_warning "Some audio dependencies failed to install"
         
-    # Install image processing libraries
+    # Install core libraries
+    print_info "Installing core libraries..."
     sudo apt install -y \
         libffi-dev \
         libssl-dev \
         libjpeg-dev \
-        zlib1g-dev \
-        libfreetype6-dev \
-        liblcms2-dev \
-        libopenjp2-7
+        zlib1g-dev || print_warning "Some core libraries failed to install"
+        
+    # Install optional image processing libraries
+    print_info "Installing image processing libraries..."
+    sudo apt install -y libfreetype6-dev || print_warning "libfreetype6-dev not available"
+    sudo apt install -y liblcms2-dev || print_warning "liblcms2-dev not available"
+    sudo apt install -y libopenjp2-7 || print_warning "libopenjp2-7 not available"
+    
+    # Try to install image library with multiple fallbacks
+    print_info "Installing image library..."
+    if ! sudo apt install -y libtiff6 2>/dev/null; then
+        if ! sudo apt install -y libtiff5 2>/dev/null; then
+            if ! sudo apt install -y libtiff-dev 2>/dev/null; then
+                print_warning "Could not install any libtiff library version"
+            fi
+        fi
+    fi
         
     # Install system tools
+    print_info "Installing system tools..."
     sudo apt install -y \
         chromium-browser \
         unclutter \
         network-manager \
-        i2c-tools \
+        i2c-tools || print_warning "Some system tools failed to install"
+        
+    # Install display tools
+    print_info "Installing display tools..."        
+    sudo apt install -y \
         dbus-x11 \
         xorg \
         xinit \
-        lightdm
+        lightdm || print_warning "Some display tools failed to install"
         
     # Try to install newer GPIO libraries (optional)
-    sudo apt install -y libgpiod2 python3-libgpiod || print_warning "Could not install newer GPIO libraries"
-    
-    # Try to install image library (with fallback for older versions)
-    sudo apt install -y libtiff6 || sudo apt install -y libtiff5 || print_warning "Could not install libtiff library"
+    print_info "Installing GPIO libraries..."
+    sudo apt install -y libgpiod2 python3-libgpiod 2>/dev/null || print_warning "Newer GPIO libraries not available"
     
     print_success "System dependencies installed"
 }
