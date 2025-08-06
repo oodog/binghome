@@ -101,6 +101,8 @@ install_system_dependencies() {
     
     # Install essential packages
     print_info "Installing essential packages..."
+    
+    # Install basic development tools first
     sudo apt install -y \
         git \
         curl \
@@ -110,14 +112,26 @@ install_system_dependencies() {
         python3-venv \
         python3-dev \
         build-essential \
+        pkg-config
+        
+    # Install audio dependencies for pyaudio
+    sudo apt install -y \
+        portaudio19-dev \
+        python3-pyaudio \
+        libasound2-dev
+        
+    # Install image processing libraries
+    sudo apt install -y \
         libffi-dev \
         libssl-dev \
         libjpeg-dev \
         zlib1g-dev \
         libfreetype6-dev \
         liblcms2-dev \
-        libopenjp2-7 \
-        libtiff5 \
+        libopenjp2-7
+        
+    # Install system tools
+    sudo apt install -y \
         chromium-browser \
         unclutter \
         network-manager \
@@ -125,11 +139,13 @@ install_system_dependencies() {
         dbus-x11 \
         xorg \
         xinit \
-        lightdm \
-        portaudio19-dev \
-        python3-pyaudio \
-        libasound2-dev \
-        pkg-config
+        lightdm
+        
+    # Try to install newer GPIO libraries (optional)
+    sudo apt install -y libgpiod2 python3-libgpiod || print_warning "Could not install newer GPIO libraries"
+    
+    # Try to install image library (with fallback for older versions)
+    sudo apt install -y libtiff6 || sudo apt install -y libtiff5 || print_warning "Could not install libtiff library"
     
     print_success "System dependencies installed"
 }
@@ -226,31 +242,24 @@ setup_python_environment() {
     print_info "Upgrading pip..."
     pip install --upgrade pip
     
-    # Install problematic packages first with fixes
-    print_info "Installing problematic packages with fixes..."
-    
-    # Install Adafruit-DHT with force flag
-    print_info "Installing Adafruit-DHT..."
-    pip install Adafruit-DHT --force-pi || print_warning "Adafruit-DHT installation failed"
-    
-    # Install pyaudio (should work now with portaudio19-dev installed)
-    print_info "Installing pyaudio..."
-    pip install pyaudio || print_warning "pyaudio installation failed"
-    
-    # Install requirements
+    # Install requirements from requirements.txt with necessary fixes
     if [[ -f requirements.txt ]]; then
-        print_info "Installing remaining Python dependencies from requirements.txt..."
-        pip install -r requirements.txt --force-pi || print_warning "Some requirements may have failed"
-    else
-        print_info "Installing Python dependencies manually..."
-        pip install flask==2.3.3
-        pip install requests==2.31.0
-        pip install psutil==5.9.5
-        pip install openai==0.28.1
-        pip install smbus2==0.4.2
+        print_info "Installing Python dependencies from requirements.txt..."
         
-        # Install Raspberry Pi specific packages
-        pip install RPi.GPIO==0.7.1 || print_warning "RPi.GPIO installation failed"
+        # Install problematic packages first with fixes
+        print_info "Pre-installing problematic packages with fixes..."
+        pip install Adafruit-DHT --force-pi || print_warning "Adafruit-DHT installation failed, will try again with requirements.txt"
+        pip install pyaudio || print_warning "pyaudio installation failed, will try again with requirements.txt"
+        
+        # Install all requirements with force flags to handle Pi detection issues
+        print_info "Installing all requirements..."
+        pip install -r requirements.txt --force-pi || {
+            print_warning "Some packages failed with --force-pi, trying without force flag..."
+            pip install -r requirements.txt || print_warning "Some requirements may have failed to install"
+        }
+    else
+        print_error "requirements.txt file not found!"
+        exit 1
     fi
     
     print_success "Python environment setup completed"
