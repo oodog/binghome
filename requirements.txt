@@ -1,7 +1,8 @@
 # BingHome Requirements
 # Core web framework
 Flask==2.3.3
-Werkzeug==2.3.7
+requests==2.31.0
+beautifulsoup4==4.12.2
 
 # Hardware interfaces
 RPi.GPIO==0.7.1

@@ -1,207 +1,202 @@
 #!/bin/bash
-#
-# BingHome Smart Hub - Simple Fixed Installer
-#
+# binghome - Auto Installer for Raspberry Pi 5 (7" Screen)
+# Run with: curl -sSL https://your-link-here/install.sh | bash
 
-set -e  # Exit on any error
+echo "🚀 Installing binghome on Raspberry Pi..."
 
-# Configuration
-GITHUB_REPO="https://github.com/oodog/binghome.git"
-PROJECT_DIR="/home/$USER/binghome"
-SERVICE_NAME="binghome"
-SERVICE_USER="$USER"
-
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
-
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-echo "🏠 BingHome Smart Hub - Simple Installer"
-echo "========================================"
-
-# Check if running as root
-if [[ $EUID -eq 0 ]]; then
-    print_error "Please run this script as a regular user, not as root!"
-    exit 1
+# Ensure we're on Pi OS
+if ! [ -f /etc/os-release ] || ! grep -q "Rasp" /etc/os-release; then
+    echo "⚠️  Warning: Not running on Raspberry Pi OS, continuing anyway..."
 fi
 
-# Update system and install dependencies
-print_info "Updating system and installing dependencies..."
-sudo apt update -q
+# Install system packages
+sudo apt update
+sudo apt install -y git python3-pip python3-venv python3-flask \
+                   python3-bs4 xserver-xorg x11-xserver-utils \
+                   xinit openbox chromium-browser unclutter
 
-# Install essential packages (split into smaller groups to avoid failures)
-print_info "Installing basic tools..."
-sudo apt install -y git curl wget python3 python3-pip python3-venv python3-dev build-essential
-
-print_info "Installing audio dependencies..."
-sudo apt install -y portaudio19-dev libasound2-dev || print_warning "Audio dependencies may have failed"
-
-print_info "Installing additional libraries..."
-sudo apt install -y libffi-dev libssl-dev pkg-config || print_warning "Some libraries may have failed"
-
-print_info "Installing optional packages..."
-sudo apt install -y chromium-browser unclutter network-manager i2c-tools || print_warning "Some optional packages may have failed"
-
-# Enable I2C
-print_info "Enabling I2C..."
-sudo raspi-config nonint do_i2c 0 2>/dev/null || print_warning "Could not enable I2C automatically"
-
-# Add user to gpio group
-print_info "Adding user to gpio group..."
-sudo usermod -a -G gpio,i2c,dialout $USER 2>/dev/null || print_warning "Could not add user to all groups"
-
-# Remove existing directory if it exists
-if [[ -d "$PROJECT_DIR" ]]; then
-    print_warning "Existing installation found. Removing..."
-    rm -rf "$PROJECT_DIR"
-fi
-
-# Clone the repository
-print_info "Cloning repository..."
-git clone "$GITHUB_REPO" "$PROJECT_DIR"
-
-if [[ ! -d "$PROJECT_DIR" ]]; then
-    print_error "Failed to clone repository"
-    exit 1
-fi
-
-cd "$PROJECT_DIR"
+# Setup project directory
+cd /home/pi || exit
+rm -rf binghome
+mkdir -p binghome/templates binghome/static/images
+cd binghome || exit
 
 # Create virtual environment
-print_info "Creating Python virtual environment..."
 python3 -m venv venv
-
-# Activate virtual environment
 source venv/bin/activate
 
-# Upgrade pip
-print_info "Upgrading pip..."
+# Upgrade pip and install Python deps
 pip install --upgrade pip
+pip install flask requests beautifulsoup4
 
-# Install the problematic packages first with fixes
-print_info "Installing Adafruit-DHT with --force-pi..."
-pip install Adafruit-DHT --force-pi || print_warning "Adafruit-DHT installation failed"
+# --------------------------------------------------
+# Create: binghome.py (Flask App)
+# --------------------------------------------------
+cat > binghome.py << 'EOF'
+import os
+import requests
+from flask import Flask, render_template, send_from_directory
+from bs4 import BeautifulSoup
 
-print_info "Installing pyaudio..."
-pip install pyaudio || print_warning "pyaudio installation failed"
+app = Flask(__name__)
 
-# Install remaining requirements
-if [[ -f requirements.txt ]]; then
-    print_info "Installing remaining packages from requirements.txt..."
-    pip install -r requirements.txt --no-deps || print_warning "Some packages may have failed"
+BING_URL = "https://www.bing.com"
+IMAGE_DIR = os.path.join(app.static_folder, "images")
+os.makedirs(IMAGE_DIR, exist_ok=True)
+
+def get_bing_wallpaper():
+    try:
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0 Safari/537.36'
+        }
+        r = requests.get(f"{BING_URL}/", headers=headers, timeout=10)
+        r.raise_for_status()
+        soup = BeautifulSoup(r.text, 'html.parser')
+
+        # Try background image in body style
+        bg_image = None
+        body = soup.find('body', style=True)
+        if body:
+            style = body['style']
+            start = style.find('url(') + 4
+            end = style.find(')', start)
+            if start != -1 and end != -1:
+                bg_image = BING_URL + style[start:end].strip("'\"")
+
+        # Fallback: og:image
+        if not bg_image:
+            meta = soup.find('meta', {'property': 'og:image'})
+            if meta and meta.get('content'):
+                img_url = meta['content']
+                if img_url.startswith("//"):
+                    img_url = "https:" + img_url
+                elif img_url.startswith("/"):
+                    img_url = BING_URL + img_url
+                bg_image = img_url
+
+        if bg_image:
+            img_name = os.path.basename(bg_image.split('?')[0])
+            img_path = os.path.join(IMAGE_DIR, img_name)
+
+            if not os.path.exists(img_path):
+                img_data = requests.get(bg_image, headers=headers, timeout=10).content
+                with open(img_path, 'wb') as f:
+                    f.write(img_data)
+
+            return f"/static/images/{img_name}", "Today's Bing Wallpaper"
+    except Exception as e:
+        print(f"[ERROR] Failed to fetch wallpaper: {e}")
     
-    # Try again without --no-deps for missing dependencies
-    print_info "Installing any missing dependencies..."
-    pip install -r requirements.txt || print_warning "Some dependencies may be missing"
-else
-    print_warning "No requirements.txt found, installing basic packages..."
-    pip install flask requests psutil
-fi
+    return "/static/images/default.jpg", "Bing Wallpaper"
 
-# Install Docker
-print_info "Installing Docker..."
-if ! command -v docker &> /dev/null; then
-    curl -fsSL https://get.docker.com -o get-docker.sh
-    sudo sh get-docker.sh
-    sudo usermod -aG docker $USER
-    rm -f get-docker.sh
-fi
+@app.route("/")
+def index():
+    img_url, title = get_bing_wallpaper()
+    return render_template("index.html", img_url=img_url, title=title)
 
-sudo systemctl enable docker
-sudo systemctl start docker
+@app.route('/static/images/<filename>')
+def download_file(filename):
+    return send_from_directory(IMAGE_DIR, filename)
 
-# Setup Home Assistant
-print_info "Setting up Home Assistant..."
-mkdir -p /home/$USER/homeassistant
-
-# Stop existing container if it exists
-docker stop homeassistant 2>/dev/null || true
-docker rm homeassistant 2>/dev/null || true
-
-# Start Home Assistant
-docker run -d \
-    --name homeassistant \
-    --privileged \
-    --restart=unless-stopped \
-    -e TZ=Australia/Brisbane \
-    -v /home/$USER/homeassistant:/config \
-    --network=host \
-    ghcr.io/home-assistant/home-assistant:stable
-
-# Create systemd service
-print_info "Creating systemd service..."
-sudo tee /etc/systemd/system/${SERVICE_NAME}.service > /dev/null << EOF
-[Unit]
-Description=BingHome Smart Hub
-After=network.target
-
-[Service]
-Type=simple
-User=${SERVICE_USER}
-WorkingDirectory=${PROJECT_DIR}
-Environment=PATH=${PROJECT_DIR}/venv/bin
-ExecStart=${PROJECT_DIR}/venv/bin/python ${PROJECT_DIR}/app.py
-Restart=always
-RestartSec=10
-
-[Install]
-WantedBy=multi-user.target
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000, debug=False)
 EOF
 
-# Enable and start service
-sudo systemctl daemon-reload
-sudo systemctl enable ${SERVICE_NAME}.service
+# --------------------------------------------------
+# Create: templates/index.html
+# --------------------------------------------------
+cat > templates/index.html << 'EOF'
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
+    <title>Bing Home</title>
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            font-family: 'Segoe UI', Arial, sans-serif;
+        }
+        .background {
+            background: url("{{ img_url }}") no-repeat center center;
+            background-size: cover;
+            width: 100%;
+            height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
+            font-size: 2.2em;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="background">
+        {{ title }}
+    </div>
+</body>
+</html>
+EOF
 
-# Create start script
+# --------------------------------------------------
+# Create: start.sh
+# --------------------------------------------------
 cat > start.sh << 'EOF'
 #!/bin/bash
 cd "$(dirname "$0")"
 source venv/bin/activate
-echo "🏠 Starting BingHome Smart Hub..."
-echo "📱 Open http://localhost:5000 in your browser"
-python app.py
+python binghome.py
 EOF
-
 chmod +x start.sh
 
-# Test installation
-print_info "Testing installation..."
-sudo systemctl start ${SERVICE_NAME}.service
-sleep 3
+# --------------------------------------------------
+# Setup Auto-Start on Boot (Openbox + Chromium)
+# --------------------------------------------------
+echo "🔧 Setting up auto-start..."
 
-if systemctl is-active --quiet ${SERVICE_NAME}.service; then
-    print_success "Service is running!"
-else
-    print_warning "Service may not be running. Check logs with: journalctl -u ${SERVICE_NAME}.service -f"
+mkdir -p ~/.config/openbox
+
+cat > ~/.config/openbox/autostart << 'EOF'
+# Disable screensaver and power management
+xset s off
+xset s noblank
+xset -dpms
+unclutter -idle 0.1 &
+
+# Start Flask server
+cd /home/pi/binghome
+./start.sh &
+sleep 5
+
+# Launch browser in kiosk mode
+chromium-browser --kiosk \
+                 --no-first-run \
+                 --disable-infobars \
+                 --disable-session-crashed-bubble \
+                 --disable-restore-session-state \
+                 --disable-gpu \
+                 --disable-software-rasterizer \
+                 http://localhost:5000
+EOF
+
+chmod +x ~/.config/openbox/autostart
+
+# Add startx to .bash_profile if not exists
+if ! grep -q "startx" ~/.bash_profile 2>/dev/null; then
+    echo 'if [ -z "${SSH_CONNECTION}" ] && [ "$(tty)" = "/dev/tty1" ]; then startx; fi' >> ~/.bash_profile
 fi
 
-print_success "Installation completed!"
-echo ""
-echo "🎉 BingHome Smart Hub is ready!"
-echo ""
-echo "📱 Access points:"
-echo "   • BingHome: http://localhost:5000"
-echo "   • Home Assistant: http://localhost:8123"
-echo ""
-echo "🚀 Start manually: cd $PROJECT_DIR && ./start.sh"
-echo "📋 View logs: journalctl -u ${SERVICE_NAME}.service -f"
-echo ""
-echo "💡 You may need to reboot to join the gpio group: sudo reboot"
+# Disable screen blanking in config.txt
+if ! grep -q "hdmi_blanking=1" /boot/config.txt 2>/dev/null; then
+    echo "hdmi_blanking=1" | sudo tee -a /boot/config.txt
+fi
+
+# Final message
+echo "✅ Installation complete!"
+echo "🔁 Reboot to launch automatically: sudo reboot"
