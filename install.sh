@@ -1,13 +1,8 @@
 #!/bin/bash
-# binghome - Auto Installer for Raspberry Pi 5 (7" Screen)
+# binghome - Universal Installer (works for any user, any home dir)
 # Run with: curl -sSL https://your-link-here/install.sh | bash
 
-echo "🚀 Installing binghome on Raspberry Pi..."
-
-# Ensure we're on Pi OS
-if ! [ -f /etc/os-release ] || ! grep -q "Rasp" /etc/os-release; then
-    echo "⚠️  Warning: Not running on Raspberry Pi OS, continuing anyway..."
-fi
+echo "🚀 Installing binghome for user: $(whoami)"
 
 # Install system packages
 sudo apt update
@@ -15,11 +10,14 @@ sudo apt install -y git python3-pip python3-venv python3-flask \
                    python3-bs4 xserver-xorg x11-xserver-utils \
                    xinit openbox chromium-browser unclutter
 
-# Setup project directory
-cd /home/pi || exit
-rm -rf binghome
-mkdir -p binghome/templates binghome/static/images
-cd binghome || exit
+# Get user's home directory dynamically
+USER_HOME="$HOME"
+PROJECT_DIR="$USER_HOME/binghome"
+
+# Setup project
+rm -rf "$PROJECT_DIR"
+mkdir -p "$PROJECT_DIR/templates" "$PROJECT_DIR/static/images"
+cd "$PROJECT_DIR" || exit
 
 # Create virtual environment
 python3 -m venv venv
@@ -30,7 +28,7 @@ pip install --upgrade pip
 pip install flask requests beautifulsoup4
 
 # --------------------------------------------------
-# Create: binghome.py (Flask App)
+# Create: binghome.py
 # --------------------------------------------------
 cat > binghome.py << 'EOF'
 import os
@@ -53,7 +51,6 @@ def get_bing_wallpaper():
         r.raise_for_status()
         soup = BeautifulSoup(r.text, 'html.parser')
 
-        # Try background image in body style
         bg_image = None
         body = soup.find('body', style=True)
         if body:
@@ -63,7 +60,6 @@ def get_bing_wallpaper():
             if start != -1 and end != -1:
                 bg_image = BING_URL + style[start:end].strip("'\"")
 
-        # Fallback: og:image
         if not bg_image:
             meta = soup.find('meta', {'property': 'og:image'})
             if meta and meta.get('content'):
@@ -77,16 +73,13 @@ def get_bing_wallpaper():
         if bg_image:
             img_name = os.path.basename(bg_image.split('?')[0])
             img_path = os.path.join(IMAGE_DIR, img_name)
-
             if not os.path.exists(img_path):
                 img_data = requests.get(bg_image, headers=headers, timeout=10).content
                 with open(img_path, 'wb') as f:
                     f.write(img_data)
-
             return f"/static/images/{img_name}", "Today's Bing Wallpaper"
     except Exception as e:
-        print(f"[ERROR] Failed to fetch wallpaper: {e}")
-    
+        print(f"[ERROR] {e}")
     return "/static/images/default.jpg", "Bing Wallpaper"
 
 @app.route("/")
@@ -138,7 +131,7 @@ cat > templates/index.html << 'EOF'
 </head>
 <body>
     <div class="background">
-        {{ title }}
+        Today's Bing Wallpaper
     </div>
 </body>
 </html>
@@ -149,20 +142,21 @@ EOF
 # --------------------------------------------------
 cat > start.sh << 'EOF'
 #!/bin/bash
-cd "$(dirname "$0")"
+cd "\$(dirname "\$0")"
 source venv/bin/activate
 python binghome.py
 EOF
 chmod +x start.sh
 
 # --------------------------------------------------
-# Setup Auto-Start on Boot (Openbox + Chromium)
+# Setup Auto-Start (Openbox)
 # --------------------------------------------------
 echo "🔧 Setting up auto-start..."
 
-mkdir -p ~/.config/openbox
+CONFIG_DIR="$HOME/.config"
+mkdir -p "$CONFIG_DIR/openbox"
 
-cat > ~/.config/openbox/autostart << 'EOF'
+cat > "$CONFIG_DIR/openbox/autostart" << EOF
 # Disable screensaver and power management
 xset s off
 xset s noblank
@@ -170,33 +164,34 @@ xset -dpms
 unclutter -idle 0.1 &
 
 # Start Flask server
-cd /home/pi/binghome
+cd $PROJECT_DIR
 ./start.sh &
 sleep 5
 
 # Launch browser in kiosk mode
-chromium-browser --kiosk \
-                 --no-first-run \
-                 --disable-infobars \
-                 --disable-session-crashed-bubble \
-                 --disable-restore-session-state \
-                 --disable-gpu \
-                 --disable-software-rasterizer \
+chromium-browser --kiosk \\
+                 --no-first-run \\
+                 --disable-infobars \\
+                 --disable-session-crashed-bubble \\
+                 --disable-restore-session-state \\
+                 --disable-gpu \\
+                 --disable-software-rasterizer \\
                  http://localhost:5000
 EOF
 
-chmod +x ~/.config/openbox/autostart
+chmod +x "$CONFIG_DIR/openbox/autostart"
 
-# Add startx to .bash_profile if not exists
-if ! grep -q "startx" ~/.bash_profile 2>/dev/null; then
-    echo 'if [ -z "${SSH_CONNECTION}" ] && [ "$(tty)" = "/dev/tty1" ]; then startx; fi' >> ~/.bash_profile
+# Add startx to .bash_profile if not already present
+BASH_PROFILE="$HOME/.bash_profile"
+if [ ! -f "$BASH_PROFILE" ] || ! grep -q "startx" "$BASH_PROFILE"; then
+    echo 'if [ -z "${SSH_CONNECTION}" ] && [ "$(tty)" = "/dev/tty1" ]; then startx; fi' >> "$BASH_PROFILE"
 fi
 
-# Disable screen blanking in config.txt
-if ! grep -q "hdmi_blanking=1" /boot/config.txt 2>/dev/null; then
+# Disable screen blanking in config.txt (if accessible)
+if [ -w /boot/config.txt ] && ! grep -q "hdmi_blanking=1" /boot/config.txt; then
     echo "hdmi_blanking=1" | sudo tee -a /boot/config.txt
 fi
 
 # Final message
-echo "✅ Installation complete!"
-echo "🔁 Reboot to launch automatically: sudo reboot"
+echo "✅ binghome installed in $PROJECT_DIR"
+echo "🔁 Reboot to launch: sudo reboot"
