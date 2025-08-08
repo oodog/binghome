@@ -1,9 +1,10 @@
 import os
 import time
 import json
+import shutil
 import subprocess
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 from flask import Flask, render_template, request, jsonify
 import requests
@@ -65,7 +66,11 @@ DEFAULT_CONFIG = {
     "openai_model": "gpt-4o-mini",
     "ha_base_url": "http://localhost:8123",
     "ha_token": "",
-    "wake_word_enabled": False
+    "wake_word_enabled": False,
+
+    # Sensor behavior
+    "invert_gas": False,          # set True if your gas sensor outputs LOW when active
+    "invert_light": False         # set True if your light sensor outputs LOW when active
 }
 
 def load_config() -> Dict[str, Any]:
@@ -73,7 +78,7 @@ def load_config() -> Dict[str, Any]:
         try:
             with open(CONFIG_FILE, "r") as f:
                 data = json.load(f)
-            # Migrate defaults if new keys appear
+            # migrate defaults if new keys appear
             changed = False
             for k, v in DEFAULT_CONFIG.items():
                 if k not in data:
@@ -96,14 +101,16 @@ def save_config(cfg: Dict[str, Any]):
 CONFIG = load_config()
 
 # -------------------- Hardware config --------------------
-# DHT22 on GPIO4 (BCM)
-DHT_PIN_BCM = 4
+# Pins you specified
+DHT_PIN_BCM = 4          # DHT22 on GPIO4
+GAS_PIN = 17             # Digital gas sensor
+LIGHT_PIN = 27           # Digital light sensor
 
-# CircuitPython DHT device
+# CircuitPython DHT device + basic caching (reads every 2s)
 dht_device = None
+_last_dht = {"t": None, "h": None, "ts": 0.0}
 if adafruit_dht and board:
     try:
-        # board.D4 corresponds to BCM4
         dht_device = adafruit_dht.DHT22(board.D4, use_pulseio=False)
     except Exception as e:
         print(f"DHT init (CircuitPython) failed: {e}")
@@ -111,9 +118,6 @@ if adafruit_dht and board:
 
 # Legacy constants if the old lib is available
 DHT_SENSOR = Adafruit_DHT.DHT22 if Adafruit_DHT else None
-
-GAS_PIN = 17
-LIGHT_PIN = 27
 
 I2C_BUS = 1
 TPA2016_ADDR = 0x58
@@ -129,12 +133,16 @@ if SMBus:
     except Exception:
         audio_available = False
 
+# GPIO init
 if GPIO:
     try:
         GPIO.setmode(GPIO.BCM)
-        GPIO.setup(GAS_PIN, GPIO.IN)
-        GPIO.setup(LIGHT_PIN, GPIO.IN)
-    except Exception:
+        # Most “digital” breakout boards need a pull-down so HIGH means “active”.
+        # If your board is wired with an external resistor differently, flip in Settings.
+        GPIO.setup(GAS_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+        GPIO.setup(LIGHT_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+    except Exception as e:
+        print(f"GPIO init: {e}")
         GPIO = None
 
 # -------------------- Bing wallpaper --------------------
@@ -181,7 +189,7 @@ def get_bing_wallpaper():
         print(f"[BING] {e}")
     return "/static/images/default.jpg", "Bing Wallpaper"
 
-# -------------------- Simple volume via I2C amp --------------------
+# -------------------- Volume (I2C amp) --------------------
 class VolumeController:
     def __init__(self):
         self.current_volume = 50
@@ -226,57 +234,83 @@ class VolumeController:
 volume_controller = VolumeController()
 
 # -------------------- Sensors --------------------
+def _read_dht_cached():
+    """Read DHT at most every 2 seconds; CircuitPython raises RuntimeError frequently."""
+    now = time.time()
+    if now - _last_dht["ts"] < 2.0:
+        return _last_dht["t"], _last_dht["h"]
+
+    t = h = None
+    if dht_device:
+        try:
+            t = dht_device.temperature
+            h = dht_device.humidity
+        except RuntimeError:
+            pass
+        except Exception as e:
+            print(f"DHT read (CircuitPython) error: {e}")
+    elif Adafruit_DHT and DHT_SENSOR:
+        try:
+            h, t = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN_BCM)
+        except Exception as e:
+            print(f"DHT read (legacy) error: {e}")
+
+    if t is not None or h is not None:
+        _last_dht.update({"t": t, "h": h, "ts": now})
+    else:
+        # keep old values, just advance ts to avoid hammering
+        _last_dht["ts"] = now
+    return _last_dht["t"], _last_dht["h"]
+
 def get_sensor_data():
+    t, h = _read_dht_cached()
+    gas = light = None
+
+    if GPIO:
+        try:
+            gas_raw = GPIO.input(GAS_PIN) == GPIO.HIGH
+            light_raw = GPIO.input(LIGHT_PIN) == GPIO.HIGH
+            gas = (not gas_raw) if CONFIG.get("invert_gas") else gas_raw
+            light = (not light_raw) if CONFIG.get("invert_light") else light_raw
+        except Exception as e:
+            print(f"GPIO read: {e}")
+
     data = {
         "timestamp": time.time(),
-        "temperature": None,
-        "humidity": None,
-        "gas_detected": False,
-        "light_detected": False,
+        "temperature": round(float(t), 1) if t is not None else None,
+        "humidity": round(float(h), 1) if h is not None else None,
+        "gas_detected": bool(gas) if gas is not None else False,
+        "light_detected": bool(light) if light is not None else False,
         "hardware": {
             "gpio": bool(GPIO),
             "dht": bool(dht_device) or bool(DHT_SENSOR),
             "i2c_audio": audio_available,
         },
     }
-
-    # --- DHT (prefer CircuitPython)
-    if dht_device:
-        try:
-            t = dht_device.temperature
-            h = dht_device.humidity
-            if t is not None:
-                data["temperature"] = round(float(t), 1)
-            if h is not None:
-                data["humidity"] = round(float(h), 1)
-        except RuntimeError:
-            # Normal transient error; ignore silently
-            pass
-        except Exception as e:
-            print(f"DHT read (CircuitPython) error: {e}")
-
-    # Fallback: legacy Adafruit_DHT C-extension
-    elif Adafruit_DHT and DHT_SENSOR:
-        try:
-            h, t = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN_BCM)
-            if h is not None and t is not None:
-                data["temperature"] = round(float(t), 1)
-                data["humidity"] = round(float(h), 1)
-        except Exception as e:
-            print(f"DHT read (legacy) error: {e}")
-
-    # Digital sensors
-    if GPIO:
-        try:
-            data["gas_detected"] = GPIO.input(GAS_PIN) == GPIO.HIGH
-            data["light_detected"] = GPIO.input(LIGHT_PIN) == GPIO.HIGH
-        except Exception as e:
-            print(f"GPIO read: {e}")
-
     return data
 
-# -------------------- Wi-Fi helpers --------------------
-def get_wifi_networks():
+# -------------------- Wi-Fi helpers (NetworkManager first) --------------------
+def _have(cmd: str) -> bool:
+    return shutil.which(cmd) is not None
+
+def get_wifi_networks() -> list[str]:
+    """Return a list of SSIDs."""
+    # Prefer nmcli (no sudo if PolicyKit allows it)
+    if _have("nmcli"):
+        try:
+            # Ask NM to rescan; ignore failures
+            subprocess.run(["nmcli", "device", "wifi", "rescan"], timeout=10)
+            out = subprocess.check_output(
+                ["nmcli", "-t", "-f", "SSID", "device", "wifi", "list"],
+                text=True, timeout=10
+            )
+            nets = [ln.strip() for ln in out.splitlines() if ln.strip()]
+            # De-duplicate and remove hidden
+            return sorted(set([n for n in nets if n and n != "--"]))
+        except Exception as e:
+            print(f"nmcli scan: {e}")
+
+    # Fallback to iwlist (usually needs sudo)
     try:
         result = subprocess.run(
             ["sudo", "iwlist", "wlan0", "scan"],
@@ -290,10 +324,25 @@ def get_wifi_networks():
                     networks.append(essid)
         return sorted(set(networks))
     except Exception as e:
-        print(f"WiFi scan: {e}")
+        print(f"iwlist scan: {e}")
         return []
 
-def connect_wifi(ssid, password):
+def connect_wifi(ssid: str, password: str) -> tuple[bool, str]:
+    """Connect to a Wi-Fi network by SSID/password."""
+    if _have("nmcli"):
+        try:
+            cmd = ["nmcli", "device", "wifi", "connect", ssid]
+            if password:
+                cmd += ["password", password]
+            # This will create (or reuse) a connection profile
+            r = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
+            if r.returncode == 0:
+                return True, "OK"
+            return False, r.stderr.strip() or r.stdout.strip() or "Failed"
+        except Exception as e:
+            return False, str(e)
+
+    # Fallback to wpa_supplicant (requires sudo; may need NOPASSWD rules)
     try:
         cfg = f'network={{\n    ssid="{ssid}"\n    psk="{password}"\n}}\n'
         tmp = "/tmp/wpa_temp.conf"
@@ -302,10 +351,9 @@ def connect_wifi(ssid, password):
         subprocess.run(["sudo", "wpa_supplicant", "-B", "-i", "wlan0", "-c", tmp],
                        capture_output=True, text=True, timeout=20)
         subprocess.run(["sudo", "dhclient", "wlan0"], timeout=15)
-        return True
+        return True, "OK"
     except Exception as e:
-        print(f"WiFi connect: {e}")
-        return False
+        return False, str(e)
 
 # -------------------- Home Assistant helpers --------------------
 def ha_headers():
@@ -317,7 +365,6 @@ def ha_headers():
     }
 
 def ha_call(service_domain, service, payload):
-    """Call HA: POST /api/services/<domain>/<service>"""
     if not CONFIG.get("ha_base_url") or not CONFIG.get("ha_token"):
         return False, "Home Assistant not configured"
     try:
@@ -327,14 +374,10 @@ def ha_call(service_domain, service, payload):
     except Exception as e:
         return False, str(e)
 
-# Basic intent mapping
+# -------------------- Intent handling (voice) --------------------
 def handle_intent_text(text: str):
-    """
-    Simple fallback NLU. If OpenAI is configured, we call it for structured intent.
-    """
     text_l = text.lower()
 
-    # Fallback rules (common commands)
     if "turn on" in text_l or "switch on" in text_l:
         if "light" in text_l:
             return ha_call("light", "turn_on", {"entity_id": "light.living_room"})
@@ -353,15 +396,13 @@ def handle_intent_text(text: str):
             return ha_call("climate", "set_temperature",
                            {"entity_id": "climate.home", "temperature": temp})
 
-    # LLM for structured intent
     if CONFIG.get("provider") == "openai" and CONFIG.get("openai_api_key") and OPENAI_AVAILABLE:
         try:
             client = OpenAI(api_key=CONFIG["openai_api_key"])
             system = (
-                "You convert user voice commands into Home Assistant service calls. "
+                "Convert user voice commands into Home Assistant service calls. "
                 "Return pure JSON with keys: domain, service, payload (object). "
-                "Use plausible entity_id values inferred from the text (e.g., 'light.living_room'). "
-                "If unclear, include 'question' asking a short clarification."
+                "If unclear, include 'question' asking for a short clarification."
             )
             msg = [{"role": "system", "content": system},
                    {"role": "user", "content": text}]
@@ -457,7 +498,9 @@ def api_config():
         "openai_model": data.get("openai_model", CONFIG["openai_model"]),
         "ha_base_url": data.get("ha_base_url", CONFIG["ha_base_url"]),
         "ha_token": data.get("ha_token", CONFIG["ha_token"]),
-        "wake_word_enabled": bool(data.get("wake_word_enabled", CONFIG["wake_word_enabled"]))
+        "wake_word_enabled": bool(data.get("wake_word_enabled", CONFIG["wake_word_enabled"])),
+        "invert_gas": bool(data.get("invert_gas", CONFIG["invert_gas"])),
+        "invert_light": bool(data.get("invert_light", CONFIG["invert_light"])),
     })
     save_config(CONFIG)
     return jsonify({"success": True})
@@ -494,7 +537,7 @@ def api_volume_set():
 def api_volume_mute():
     return jsonify({"success": True, "volume": volume_controller.current_volume, "muted": volume_controller.mute_toggle()})
 
-# -------------------- API: WiFi --------------------
+# -------------------- API: Wi-Fi --------------------
 @app.route("/api/wifi_scan")
 def api_wifi_scan():
     return jsonify({"networks": get_wifi_networks()})
@@ -506,8 +549,9 @@ def api_wifi_connect():
     password = data.get("password") or ""
     if not ssid:
         return jsonify({"success": False, "error": "SSID required"}), 400
-    ok = connect_wifi(ssid, password)
-    return jsonify({"success": ok})
+    ok, info = connect_wifi(ssid, password)
+    code = 200 if ok else 500
+    return jsonify({"success": ok, "info": info}), code
 
 # -------------------- API: HA service passthrough --------------------
 @app.route("/api/ha/service", methods=["POST"])
@@ -524,13 +568,6 @@ def api_ha_service():
 # -------------------- API: Voice (push-to-talk) --------------------
 @app.route("/api/voice", methods=["POST"])
 def api_voice():
-    """
-    Accepts:
-      - JSON with 'text' (if browser already recognized speech)
-      - OR multipart/form-data with file 'audio' (webm/opus) for server transcription
-    Returns: { success, text, result }
-    """
-    # Text path (browser recognized already)
     if request.is_json:
         text = (request.get_json() or {}).get("text", "").strip()
         if not text:
@@ -538,7 +575,6 @@ def api_voice():
         ok, info = handle_intent_text(text)
         return jsonify({"success": ok, "text": text, "result": info}), 200
 
-    # Server transcription path (OpenAI Whisper)
     if "audio" not in request.files:
         return jsonify({"success": False, "error": "No audio file"}), 400
 
