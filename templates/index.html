@@ -1,239 +1,1049 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-<title>BingHome</title>
-<style>
-  :root{
-    --accent:#107C10; /* Xbox green */
-    --accent2:#005FB8; /* MS blue */
-    --glass: rgba(0,0,0,.35);
-    --glass2: rgba(255,255,255,.08);
-  }
-  html,body{height:100%;margin:0;font-family:Segoe UI,Arial,sans-serif;background:#0a0a0a;color:#fff;overflow:hidden}
-  .bg{
-    position:fixed; inset:0;
-    background:url('{{ img_url }}') center/cover no-repeat;
-    filter:brightness(.65) saturate(1.1);
-  }
-  .scrim{position:fixed; inset:0; background:linear-gradient(180deg, rgba(0,0,0,.35), rgba(0,0,0,.65))}
-  .wrap{position:relative; z-index:2; height:100%; display:flex; flex-direction:column}
-  .topbar{display:flex; justify-content:space-between; align-items:center; padding:18px 24px}
-  .brand{font-size:22px; font-weight:600; letter-spacing:.3px}
-  .brand span{opacity:.8; font-weight:400}
-  .barbtn a{color:#fff; text-decoration:none; padding:10px 16px; border-radius:12px; background:var(--glass); border:1px solid rgba(255,255,255,.15)}
-  .grid{
-    flex:1; display:grid; gap:14px; padding:14px 24px 24px;
-    grid-template-columns: repeat(12, 1fr);
-    grid-auto-rows: 110px;
-  }
-  .tile{
-    position:relative;
-    background: var(--glass);
-    border:1px solid rgba(255,255,255,.18);
-    border-radius:18px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 10px 30px rgba(0,0,0,.25) inset, 0 0 0 1px rgba(255,255,255,.04);
-    overflow:hidden;
-    cursor:pointer;
-    transition:transform .15s ease, box-shadow .15s ease, background .15s ease;
-  }
-  .tile:hover{ transform: translateY(-2px); background: rgba(0,0,0,.42) }
-  .tile .hdr{display:flex; align-items:center; gap:10px; padding:14px 16px; font-weight:600}
-  .badge{font-size:12px; opacity:.8}
-  .big{font-size:36px; font-weight:700; padding:0 16px 12px}
-  .row{display:flex; gap:8px; padding:0 16px 14px; flex-wrap:wrap}
-  .chip{padding:8px 12px; border-radius:10px; background:var(--glass2); border:1px solid rgba(255,255,255,.12); font-size:14px}
-  .accent{outline:2px solid var(--accent); box-shadow:0 0 0 2px rgba(16,124,16,.3) inset}
-  .accent2{outline:2px solid var(--accent2); box-shadow:0 0 0 2px rgba(0,95,184,.28) inset}
-  .tile:active{transform:translateY(0)}
-  /* sizes reminiscent of Xbox dashboard */
-  .w6{grid-column: span 6}
-  .w4{grid-column: span 4}
-  .w3{grid-column: span 3}
-  .w2{grid-column: span 2}
-  .h2{grid-row: span 2}
-  .footer{padding:10px 18px; opacity:.75}
-  /* voice mic */
-  .mic{
-    position:fixed; right:24px; bottom:24px; z-index:10;
-    width:70px; height:70px; border-radius:50%;
-    background: radial-gradient(120px 120px at 50% 50%, rgba(16,124,16,.5), rgba(0,0,0,.6));
-    border:1px solid rgba(255,255,255,.2);
-    display:flex; align-items:center; justify-content:center;
-    backdrop-filter: blur(6px);
-    cursor:pointer; transition: transform .12s ease;
-  }
-  .mic:hover{ transform: scale(1.05) }
-  .pulse{ animation: p 1.4s ease-in-out infinite }
-  @keyframes p { 0%,100%{transform:scale(1)} 50%{transform:scale(1.06)} }
-  /* responsive */
-  @media (max-width: 1100px){ .grid{grid-template-columns: repeat(8,1fr)} }
-  @media (max-width: 760px){ .grid{grid-template-columns: repeat(4,1fr); grid-auto-rows: 95px} .big{font-size:28px}}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home Hub</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+            width: 100vw;
+        }
+
+        /* Top Status Bar */
+        .status-bar {
+            background: rgba(0, 0, 0, 0.3);
+            backdrop-filter: blur(10px);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 8px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 60px;
+            position: relative;
+            z-index: 100;
+        }
+
+        .status-left, .status-right {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .sensor-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 14px;
+        }
+
+        .sensor-icon {
+            width: 16px;
+            height: 16px;
+            opacity: 0.8;
+        }
+
+        .datetime {
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        /* Main Content Area */
+        .main-container {
+            display: flex;
+            height: calc(100vh - 60px);
+        }
+
+        /* News Sidebar */
+        .news-sidebar {
+            width: 300px;
+            background: rgba(0, 0, 0, 0.2);
+            backdrop-filter: blur(5px);
+            border-right: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            overflow: hidden;
+        }
+
+        .news-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: #00d4ff;
+        }
+
+        .news-scroll {
+            height: calc(100% - 60px);
+            overflow: hidden;
+        }
+
+        .news-item {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 15px;
+            border-left: 3px solid #00d4ff;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .news-item:hover {
+            background: rgba(255, 255, 255, 0.1);
+            transform: translateX(5px);
+        }
+
+        .news-item h4 {
+            font-size: 14px;
+            line-height: 1.4;
+            margin-bottom: 5px;
+        }
+
+        .news-time {
+            font-size: 12px;
+            opacity: 0.6;
+        }
+
+        /* App Grid */
+        .app-grid {
+            flex: 1;
+            padding: 40px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-gap: 30px;
+            align-content: start;
+        }
+
+        .app-tile {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 20px;
+            padding: 25px 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+            min-height: 160px;
+        }
+
+        .app-tile:hover {
+            transform: translateY(-5px);
+            background: rgba(255, 255, 255, 0.15);
+            box-shadow: 0 20px 40px rgba(0, 212, 255, 0.3);
+        }
+
+        .app-tile::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: -100%;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+            transition: left 0.5s;
+        }
+
+        .app-tile:hover::before {
+            left: 100%;
+        }
+
+        .app-icon {
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 15px;
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            background: linear-gradient(135deg, var(--icon-color-1), var(--icon-color-2));
+            box-shadow: 0 8px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .app-title {
+            font-size: 16px;
+            font-weight: 500;
+            margin-bottom: 5px;
+        }
+
+        .app-subtitle {
+            font-size: 12px;
+            opacity: 0.7;
+        }
+
+        /* App-specific colors */
+        .youtube { --icon-color-1: #ff0000; --icon-color-2: #cc0000; }
+        .netflix { --icon-color-1: #e50914; --icon-color-2: #b20710; }
+        .prime { --icon-color-1: #00a8e1; --icon-color-2: #0073aa; }
+        .xbox { --icon-color-1: #107c10; --icon-color-2: #0e6b0e; }
+        .settings { --icon-color-1: #666666; --icon-color-2: #444444; }
+        .assistant { --icon-color-1: #00d4ff; --icon-color-2: #0099cc; }
+        .home-assistant { --icon-color-1: #41bdf5; --icon-color-2: #2196f3; }
+        .music { --icon-color-1: #1db954; --icon-color-2: #1aa34a; }
+
+        /* Voice Assistant */
+        .voice-assistant {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            width: 70px;
+            height: 70px;
+            background: linear-gradient(135deg, #00d4ff, #0099cc);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 10px 30px rgba(0, 212, 255, 0.4);
+            z-index: 1000;
+        }
+
+        .voice-assistant:hover {
+            transform: scale(1.1);
+            box-shadow: 0 15px 40px rgba(0, 212, 255, 0.6);
+        }
+
+        .voice-assistant.listening {
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0.7); }
+            70% { box-shadow: 0 0 0 20px rgba(0, 212, 255, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(0, 212, 255, 0); }
+        }
+
+        /* Navigation Bar */
+        .nav-bar {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            z-index: 1000;
+        }
+
+        .nav-button {
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-size: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .nav-button:hover {
+            background: rgba(0, 212, 255, 0.8);
+            transform: translateY(-2px);
+        }
+
+        .nav-button.active {
+            background: rgba(0, 212, 255, 0.6);
+        }
+
+        /* Adjust main container to account for nav bar */
+        .main-container {
+            height: calc(100vh - 60px - 60px); /* Status bar + nav bar */
+        }
+
+        /* Enhanced Settings Modal */
+        .settings-section {
+            margin-bottom: 30px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 15px;
+            padding: 20px;
+        }
+
+        .settings-section h3 {
+            color: #00d4ff;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+
+        .setting-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .setting-item:last-child {
+            border-bottom: none;
+        }
+
+        .setting-control {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .toggle-switch {
+            position: relative;
+            width: 50px;
+            height: 25px;
+            background: #666;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+
+        .toggle-switch.active {
+            background: #00d4ff;
+        }
+
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            width: 21px;
+            height: 21px;
+            background: white;
+            border-radius: 50%;
+            transition: transform 0.3s;
+        }
+
+        .toggle-switch.active::after {
+            transform: translateX(25px);
+        }
+
+        .volume-slider {
+            width: 150px;
+            height: 6px;
+            border-radius: 3px;
+            background: #666;
+            outline: none;
+            appearance: none;
+        }
+
+        .volume-slider::-webkit-slider-thumb {
+            appearance: none;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #00d4ff;
+            cursor: pointer;
+        }
+
+        .wifi-network {
+            padding: 12px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .wifi-network:hover {
+            background: rgba(255, 255, 255, 0.2);
+        }
+
+        .wifi-network.connected {
+            background: rgba(0, 212, 255, 0.3);
+            border: 1px solid rgba(0, 212, 255, 0.5);
+        }
+
+        .language-select {
+            width: 200px;
+            padding: 8px;
+            background: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            border-radius: 8px;
+            color: white;
+            font-size: 14px;
+        }
+
+        .language-select option {
+            background: #1a1a2e;
+            color: white;
+        }
+
+        /* Error boundary styling */
+        .error-boundary {
+            background: rgba(255, 68, 68, 0.1);
+            border: 1px solid rgba(255, 68, 68, 0.3);
+            border-radius: 10px;
+            padding: 15px;
+            margin: 10px 0;
+            color: #ff6b6b;
+            font-size: 14px;
+        }
+
+        /* Connection status indicator */
+        .connection-status {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            padding: 8px 15px;
+            border-radius: 20px;
+            font-size: 12px;
+            z-index: 1001;
+            transition: all 0.3s ease;
+        }
+
+        .connection-status.online {
+            background: rgba(68, 255, 68, 0.8);
+            color: #000;
+        }
+
+        .connection-status.offline {
+            background: rgba(255, 68, 68, 0.8);
+            color: #fff;
+        }
+        .swipe-indicator {
+            position: fixed;
+            top: 50%;
+            left: 20px;
+            transform: translateY(-50%);
+            background: rgba(0, 212, 255, 0.8);
+            color: white;
+            padding: 10px 15px;
+            border-radius: 25px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+            z-index: 1001;
+            pointer-events: none;
+        }
+
+        .swipe-indicator.show {
+            opacity: 1;
+        }
+
+        .back-button {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            width: 50px;
+            height: 50px;
+            background: rgba(0, 0, 0, 0.5);
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 1002;
+            font-size: 20px;
+        }
+
+        .back-button:hover {
+            background: rgba(0, 212, 255, 0.8);
+        }
+
+        .back-button.show {
+            display: flex;
+        }
+
+        /* Touch feedback */
+        .app-tile:active {
+            transform: scale(0.95);
+        }
+        @keyframes scroll {
+            0% { transform: translateY(0); }
+            100% { transform: translateY(-100%); }
+        }
+
+        .auto-scroll {
+            animation: scroll 30s linear infinite;
+        }
+
+        /* Modal for settings */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(10px);
+            z-index: 2000;
+        }
+
+        .modal-content {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(20, 20, 40, 0.95);
+            border-radius: 20px;
+            padding: 40px;
+            width: 90%;
+            max-width: 600px;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+        }
+
+        .close {
+            position: absolute;
+            top: 15px;
+            right: 20px;
+            font-size: 30px;
+            cursor: pointer;
+            color: #666;
+        }
+
+        .close:hover {
+            color: #fff;
+        }
+    </style>
 </head>
 <body>
-<div class="bg"></div>
-<div class="scrim"></div>
-
-<div class="wrap">
-  <div class="topbar">
-    <div class="brand">Bing<span>Home</span></div>
-    <div class="barbtn">
-      <a href="/settings">Settings</a>
-    </div>
-  </div>
-
-  <div class="grid">
-    <!-- Hero tile: date/time + weather placeholder (hook up later) -->
-    <div class="tile h2 w6 accent" onclick="window.location='/settings/system_status'">
-      <div class="hdr">📊 System</div>
-      <div class="big" id="clock">--:--</div>
-      <div class="row">
-        <div class="chip" id="chipTemp">Temp: --</div>
-        <div class="chip" id="chipHum">Humidity: --</div>
-        <div class="chip">CPU/Memory</div>
-      </div>
-    </div>
-
-    <!-- Home Assistant quick actions -->
-    <div class="tile h2 w3 accent2" onclick="haQuick('light','turn_on',{'entity_id':'light.living_room'})">
-      <div class="hdr">💡 Lights</div>
-      <div class="big">Living Room On</div>
-      <div class="row"><div class="chip">Tap to toggle</div></div>
-    </div>
-
-    <div class="tile h2 w3" onclick="haQuick('light','turn_off',{'entity_id':'light.living_room'})">
-      <div class="hdr">🌙 Lights</div>
-      <div class="big">All Off</div>
-      <div class="row"><div class="chip">Goodnight</div></div>
-    </div>
-
-    <div class="tile w4 h2" onclick="haQuick('scene','turn_on',{'entity_id':'scene.movie_time'})">
-      <div class="hdr">🎬 Scene</div>
-      <div class="big">Movie Time</div>
-      <div class="row"><div class="chip">Dim + TV + Strip</div></div>
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-left">
+            <div class="sensor-item">
+                <span class="sensor-icon">🌡️</span>
+                <span id="temperature">22.5°C</span>
+            </div>
+            <div class="sensor-item">
+                <span class="sensor-icon">💧</span>
+                <span id="humidity">45%</span>
+            </div>
+            <div class="sensor-item">
+                <span class="sensor-icon">💨</span>
+                <span id="gas-status">Safe</span>
+            </div>
+            <div class="sensor-item">
+                <span class="sensor-icon">💡</span>
+                <span id="light-level">Normal</span>
+            </div>
+            <div class="sensor-item">
+                <span class="sensor-icon">🔊</span>
+                <span id="audio-status">Active</span>
+            </div>
+            <div class="sensor-item">
+                <span class="sensor-icon">📶</span>
+                <span id="wifi-strength">85%</span>
+            </div>
+        </div>
+        <div class="status-right">
+            <div class="datetime">
+                <span id="current-time">14:30</span>
+                <span id="current-date">Mon, Jul 21</span>
+            </div>
+        </div>
     </div>
 
-    <div class="tile w4 h2" onclick="haQuick('climate','set_temperature',{'entity_id':'climate.home','temperature':23})">
-      <div class="hdr">❄️ Climate</div>
-      <div class="big">Set 23°C</div>
-      <div class="row"><div class="chip">Cooling</div></div>
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- News Sidebar -->
+        <div class="news-sidebar">
+            <h3 class="news-title">Latest News</h3>
+            <div class="news-scroll">
+                <div id="news-container" class="auto-scroll">
+                    <div class="news-item">
+                        <h4>Raspberry Pi launches new model A with enhanced AI capabilities</h4>
+                        <div class="news-time">2 hours ago</div>
+                    </div>
+                    <div class="news-item">
+                        <h4>Global tech stocks soar in market rally following AI breakthrough</h4>
+                        <div class="news-time">4 hours ago</div>
+                    </div>
+                    <div class="news-item">
+                        <h4>New breakthrough in quantum computing announced by major tech company</h4>
+                        <div class="news-time">6 hours ago</div>
+                    </div>
+                    <div class="news-item">
+                        <h4>Smart home adoption reaches all-time high in 2025</h4>
+                        <div class="news-time">8 hours ago</div>
+                    </div>
+                    <div class="news-item">
+                        <h4>Revolutionary battery technology promises 10x longer life</h4>
+                        <div class="news-time">10 hours ago</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- App Grid -->
+        <div class="app-grid">
+            <div class="app-tile youtube" onclick="openApp('youtube')">
+                <div class="app-icon">🎥</div>
+                <div class="app-title">YouTube</div>
+                <div class="app-subtitle">Watch videos</div>
+            </div>
+
+            <div class="app-tile netflix" onclick="openApp('netflix')">
+                <div class="app-icon">📽️</div>
+                <div class="app-title">Netflix</div>
+                <div class="app-subtitle">Stream movies</div>
+            </div>
+
+            <div class="app-tile prime" onclick="openApp('prime')">
+                <div class="app-icon">📺</div>
+                <div class="app-title">Prime Video</div>
+                <div class="app-subtitle">Amazon Prime</div>
+            </div>
+
+            <div class="app-tile xbox" onclick="openApp('xbox')">
+                <div class="app-icon">🎮</div>
+                <div class="app-title">Xbox Cloud</div>
+                <div class="app-subtitle">Cloud gaming</div>
+            </div>
+
+            <div class="app-tile music" onclick="openApp('music')">
+                <div class="app-icon">🎵</div>
+                <div class="app-title">Spotify</div>
+                <div class="app-subtitle">Music streaming</div>
+            </div>
+
+            <div class="app-tile home-assistant" onclick="openApp('home-assistant')">
+                <div class="app-icon">🏠</div>
+                <div class="app-title">Home Assistant</div>
+                <div class="app-subtitle">Smart home control</div>
+            </div>
+
+            <div class="app-tile assistant" onclick="openApp('assistant')">
+                <div class="app-icon">🤖</div>
+                <div class="app-title">AI Assistant</div>
+                <div class="app-subtitle">ChatGPT powered</div>
+            </div>
+
+            <div class="app-tile settings" onclick="openSettings()">
+                <div class="app-icon">⚙️</div>
+                <div class="app-title">Settings</div>
+                <div class="app-subtitle">System config</div>
+            </div>
+        </div>
     </div>
 
-    <div class="tile w4 h2" onclick="window.location='/settings/wifi'">
-      <div class="hdr">📶 Network</div>
-      <div class="big">Wi-Fi</div>
-      <div class="row"><div class="chip">Scan & Connect</div></div>
+    <!-- Connection Status Indicator -->
+    <div class="connection-status online" id="connection-status">Online</div>
+
+    <!-- Navigation Bar -->
+    <div class="nav-bar">
+        <button class="nav-button active" onclick="showHome()" id="home-btn">
+            🏠 Home
+        </button>
+        <button class="nav-button" onclick="showSettings()" id="settings-btn">
+            ⚙️ Settings
+        </button>
+        <button class="nav-button" onclick="showAssistant()" id="assistant-btn">
+            🤖 Assistant
+        </button>
+        <button class="nav-button" onclick="goBack()" id="back-btn-nav">
+            ⬅️ Back
+        </button>
     </div>
 
-    <!-- Sensors summary -->
-    <div class="tile w3" onclick="refreshSensors()">
-      <div class="hdr">🌡️ Temperature</div>
-      <div class="big" id="tTemp">--°C</div>
+    <!-- Back Button (Legacy) -->
+    <div class="back-button" id="back-btn" onclick="goHome()" style="display: none;">
+        ⬅️
     </div>
 
-    <div class="tile w3" onclick="refreshSensors()">
-      <div class="hdr">💧 Humidity</div>
-      <div class="big" id="tHum">--%</div>
+    <!-- Swipe Indicator -->
+    <div class="swipe-indicator" id="swipe-indicator">
+        Swipe right to go back
     </div>
 
-    <div class="tile w3" onclick="refreshSensors()">
-      <div class="hdr">🟢 Gas</div>
-      <div class="big" id="tGas">--</div>
+    <!-- Voice Assistant Button -->
+    <div class="voice-assistant" onclick="toggleVoiceAssistant()" id="voice-btn">
+        <span style="font-size: 30px;">🎤</span>
     </div>
 
-    <div class="tile w3" onclick="refreshSensors()">
-      <div class="hdr">🔆 Light</div>
-      <div class="big" id="tLight">--</div>
+    <!-- Enhanced Settings Modal -->
+    <div id="settings-modal" class="modal">
+        <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+            <span class="close" onclick="closeSettings()">&times;</span>
+            <h2 style="margin-bottom: 30px; color: #00d4ff;">⚙️ System Settings</h2>
+            
+            <!-- Audio Settings -->
+            <div class="settings-section">
+                <h3>🔊 Audio Settings</h3>
+                <div class="setting-item">
+                    <span>Master Volume</span>
+                    <div class="setting-control">
+                        <input type="range" class="volume-slider" id="volume-slider" min="0" max="63" value="30">
+                        <span id="volume-display">30</span>
+                    </div>
+                </div>
+                <div class="setting-item">
+                    <span>Audio Amplifier</span>
+                    <div class="setting-control">
+                        <div class="toggle-switch" id="audio-toggle" onclick="toggleAudio()"></div>
+                        <span id="audio-status-text">Active</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Wi-Fi Settings -->
+            <div class="settings-section">
+                <h3>📶 Wi-Fi Networks</h3>
+                <div class="setting-item">
+                    <span>Auto-connect</span>
+                    <div class="toggle-switch active" id="wifi-auto-toggle" onclick="toggleWifiAuto()"></div>
+                </div>
+                <div style="margin-top: 15px;">
+                    <button onclick="scanWifiNetworks()" style="background: #00d4ff; color: white; border: none; padding: 8px 15px; border-radius: 5px; cursor: pointer; margin-bottom: 15px;">🔍 Scan Networks</button>
+                    <div id="wifi-list" style="max-height: 200px; overflow-y: auto;">
+                        <div class="wifi-network connected">
+                            <div>
+                                <strong>Current Network</strong>
+                                <div style="font-size: 12px; opacity: 0.7;">Connected</div>
+                            </div>
+                            <span>🔒 85%</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Language & Region -->
+            <div class="settings-section">
+                <h3>🌍 Language & Region</h3>
+                <div class="setting-item">
+                    <span>Interface Language</span>
+                    <select class="language-select" id="language-select" onchange="changeLanguage()">
+                        <option value="en-US">English (US)</option>
+                        <option value="en-UK">English (UK)</option>
+                        <option value="es">Español</option>
+                        <option value="fr">Français</option>
+                        <option value="de">Deutsch</option>
+                        <option value="it">Italiano</option>
+                        <option value="pt">Português</option>
+                        <option value="ja">日本語</option>
+                        <option value="zh">中文</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <span>Time Format</span>
+                    <div class="setting-control">
+                        <div class="toggle-switch" id="time-format-toggle" onclick="toggleTimeFormat()"></div>
+                        <span id="time-format-text">24 Hour</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Display Settings -->
+            <div class="settings-section">
+                <h3>🖥️ Display Settings</h3>
+                <div class="setting-item">
+                    <span>Auto-brightness</span>
+                    <div class="toggle-switch active" id="brightness-toggle" onclick="toggleAutoBrightness()"></div>
+                </div>
+                <div class="setting-item">
+                    <span>Screen Timeout</span>
+                    <select style="width: 120px; padding: 5px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: white;" id="screen-timeout">
+                        <option value="never">Never</option>
+                        <option value="30">30 min</option>
+                        <option value="60">1 hour</option>
+                        <option value="120">2 hours</option>
+                    </select>
+                </div>
+                <div class="setting-item">
+                    <span>News Auto-scroll</span>
+                    <div class="toggle-switch active" id="news-scroll-toggle" onclick="toggleNewsScroll()"></div>
+                </div>
+            </div>
+
+            <!-- System Settings -->
+            <div class="settings-section">
+                <h3>🔧 System Settings</h3>
+                <div class="setting-item">
+                    <span>Auto-start on boot</span>
+                    <div class="toggle-switch active" id="autostart-toggle" onclick="toggleAutostart()"></div>
+                </div>
+                <div class="setting-item">
+                    <span>Debug Mode</span>
+                    <div class="toggle-switch" id="debug-toggle" onclick="toggleDebug()"></div>
+                </div>
+                <div class="setting-item">
+                    <span>System Info</span>
+                    <div class="setting-control">
+                        <button onclick="showSystemInfo()" style="background: #666; color: white; border: none; padding: 5px 10px; border-radius: 3px; cursor: pointer;">View</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Sensor Settings -->
+            <div class="settings-section">
+                <h3>📡 Sensor Settings</h3>
+                <div class="setting-item">
+                    <span>Temperature Sensor (DHT22)</span>
+                    <div class="toggle-switch active" id="temp-sensor-toggle" onclick="toggleTempSensor()"></div>
+                </div>
+                <div class="setting-item">
+                    <span>Gas Sensor</span>
+                    <div class="toggle-switch active" id="gas-sensor-toggle" onclick="toggleGasSensor()"></div>
+                </div>
+                <div class="setting-item">
+                    <span>Light Sensor</span>
+                    <div class="toggle-switch active" id="light-sensor-toggle" onclick="toggleLightSensor()"></div>
+                </div>
+                <div class="setting-item">
+                    <span>Sensor Update Rate</span>
+                    <select style="width: 120px; padding: 5px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 5px; color: white;" id="sensor-rate">
+                        <option value="10">10 sec</option>
+                        <option value="30" selected>30 sec</option>
+                        <option value="60">1 min</option>
+                        <option value="300">5 min</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 15px; margin-top: 30px; justify-content: center;">
+                <button onclick="saveSettings()" style="background: #00d4ff; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px;">💾 Save Settings</button>
+                <button onclick="resetSettings()" style="background: #ff4444; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px;">🔄 Reset to Default</button>
+                <button onclick="closeSettings()" style="background: #666; color: white; border: none; padding: 12px 24px; border-radius: 8px; cursor: pointer; font-size: 16px;">❌ Cancel</button>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <div class="footer">Tap mic to speak. Try: “turn on living room lights” or “set temperature to 23”.</div>
-</div>
+    <script>
+        // Update date and time
+        function updateDateTime() {
+            const now = new Date();
+            const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
+            const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+            
+            document.getElementById('current-time').textContent = now.toLocaleTimeString('en-US', timeOptions);
+            document.getElementById('current-date').textContent = now.toLocaleDateString('en-US', dateOptions);
+        }
 
-<!-- Voice button -->
-<div class="mic pulse" id="micBtn" title="Hold to talk">🎤</div>
+        // Update sensor data with better error handling
+        function updateSensorData() {
+            fetch('/api/sensor_data')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    // Safely update each element
+                    if (data.temperature !== undefined) {
+                        document.getElementById('temperature').textContent = data.temperature + '°C';
+                    }
+                    if (data.humidity !== undefined) {
+                        document.getElementById('humidity').textContent = data.humidity + '%';
+                    }
+                    if (data.gas !== undefined) {
+                        const gasElement = document.getElementById('gas-status');
+                        gasElement.textContent = data.gas;
+                        gasElement.style.color = data.gas === 'Alert' ? '#ff4444' : '#44ff44';
+                    }
+                    if (data.light !== undefined) {
+                        const lightElement = document.getElementById('light-level');
+                        lightElement.textContent = data.light;
+                        lightElement.style.color = data.light === 'Bright' ? '#ffff44' : '#888888';
+                    }
+                    if (data.audio !== undefined) {
+                        const audioElement = document.getElementById('audio-status');
+                        audioElement.textContent = data.audio;
+                        audioElement.style.color = data.audio === 'Active' ? '#44ff44' : '#888888';
+                    }
+                    if (data.wifi !== undefined) {
+                        document.getElementById('wifi-strength').textContent = data.wifi + '%';
+                    }
+                })
+                .catch(error => {
+                    console.log('Sensor data fetch failed:', error);
+                    // Don't crash the page, just log the error
+                });
+        }
 
-<script>
-  // clock + sensor chips
-  function tick(){
-    const d=new Date(), hh=d.getHours().toString().padStart(2,'0'), mm=d.getMinutes().toString().padStart(2,'0');
-    document.getElementById('clock').textContent=`${hh}:${mm}`;
-  }
-  setInterval(tick,1000); tick();
+        // Update news with better error handling
+        function updateNews() {
+            fetch('/api/news')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (Array.isArray(data) && data.length > 0) {
+                        const container = document.getElementById('news-container');
+                        container.innerHTML = '';
+                        data.forEach(item => {
+                            if (item.title && item.time) {
+                                const newsItem = document.createElement('div');
+                                newsItem.className = 'news-item';
+                                newsItem.innerHTML = `
+                                    <h4>${item.title}</h4>
+                                    <div class="news-time">${item.time}</div>
+                                `;
+                                container.appendChild(newsItem);
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.log('News fetch failed:', error);
+                    // Keep existing news instead of crashing
+                });
+        }
 
-  async function refreshSensors(){
-    try{
-      const r=await fetch('/api/sensor_data'); const j=await r.json();
-      document.getElementById('chipTemp').textContent = 'Temp: ' + (j.temperature!=null? j.temperature+'°C':'--');
-      document.getElementById('chipHum').textContent = 'Humidity: ' + (j.humidity!=null? j.humidity+'%':'--');
-      document.getElementById('tTemp').textContent = (j.temperature!=null? j.temperature+'°C':'--');
-      document.getElementById('tHum').textContent = (j.humidity!=null? j.humidity+'%':'--');
-      document.getElementById('tGas').textContent = j.gas_detected? 'DETECTED':'Clear';
-      document.getElementById('tLight').textContent = j.light_detected? 'BRIGHT':'Dark';
-    }catch(e){ console.log(e); }
-  }
-  refreshSensors(); setInterval(refreshSensors,15000);
+        // App functions
+        function openApp(appName) {
+            const urls = {
+                'youtube': 'https://youtube.com',
+                'netflix': 'https://netflix.com',
+                'prime': 'https://primevideo.com',
+                'xbox': 'https://xbox.com/play',
+                'music': 'https://open.spotify.com',
+                'home-assistant': 'http://localhost:8123',
+                'assistant': '/assistant'
+            };
+            
+            if (urls[appName]) {
+                window.open(urls[appName], '_blank');
+            }
+        }
 
-  // HA quick action buttons
-  async function haQuick(domain, service, payload){
-    try{
-      const r = await fetch('/api/ha/service',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain,service,payload})});
-      const j = await r.json();
-      if(!j.success) alert('HA error: ' + (j.info||'unknown'));
-    }catch(e){ alert('HA error'); }
-  }
+        function openSettings() {
+            document.getElementById('settings-modal').style.display = 'block';
+            
+            // Scan for WiFi networks with error handling
+            fetch('/api/wifi_scan')
+                .then(response => {
+                    if (!response.ok) throw new Error('WiFi scan failed');
+                    return response.json();
+                })
+                .then(data => {
+                    const wifiList = document.getElementById('wifi-list');
+                    wifiList.innerHTML = '';
+                    if (Array.isArray(data)) {
+                        data.forEach(network => {
+                            if (network.ssid) {
+                                const div = document.createElement('div');
+                                div.style.cssText = 'padding: 10px; background: rgba(255,255,255,0.1); border-radius: 8px; margin-bottom: 10px; cursor: pointer;';
+                                div.innerHTML = `<strong>${network.ssid}</strong> <span style="float: right;">🔒 ${network.signal || '?'}%</span>`;
+                                wifiList.appendChild(div);
+                            }
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.log('WiFi scan failed:', error);
+                    // Show fallback message instead of crashing
+                    const wifiList = document.getElementById('wifi-list');
+                    wifiList.innerHTML = '<div style="padding: 10px; color: #888;">WiFi scan unavailable</div>';
+                });
+        }
 
-  // Push-to-talk (press & hold)
-  let mediaRecorder, chunks=[];
-  const mic = document.getElementById('micBtn');
-  let holding=false, startHold=0;
+        function closeSettings() {
+            document.getElementById('settings-modal').style.display = 'none';
+        }
 
-  async function setupStream(){
-    try{
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaRecorder = new MediaRecorder(stream, { mimeType: 'audio/webm' });
-      mediaRecorder.ondataavailable = e => { if (e.data.size>0) chunks.push(e.data); };
-      mediaRecorder.onstop = sendAudio;
-    }catch(e){ alert('Mic not available: ' + e.message); }
-  }
-  setupStream();
+        function toggleVoiceAssistant() {
+            const btn = document.getElementById('voice-btn');
+            btn.classList.toggle('listening');
+            
+            if (btn.classList.contains('listening')) {
+                // Start voice recognition
+                startVoiceRecognition();
+            } else {
+                // Stop voice recognition
+                stopVoiceRecognition();
+            }
+        }
 
-  mic.addEventListener('mousedown', startRec);
-  mic.addEventListener('touchstart', startRec);
-  mic.addEventListener('mouseup', stopRec);
-  mic.addEventListener('mouseleave', cancelIfHolding);
-  mic.addEventListener('touchend', stopRec);
+        function startVoiceRecognition() {
+            // Implement voice recognition here
+            console.log('Voice recognition started');
+            
+            // Simulate voice processing
+            setTimeout(() => {
+                document.getElementById('voice-btn').classList.remove('listening');
+            }, 3000);
+        }
 
-  function startRec(e){
-    e.preventDefault(); if(!mediaRecorder) return;
-    holding=true; startHold=Date.now(); chunks=[];
-    try{ mediaRecorder.start(); mic.classList.add('pulse'); }catch(_){}
-  }
-  function stopRec(e){
-    e.preventDefault();
-    if(!holding) return;
-    holding=false;
-    try{ mediaRecorder.stop(); }catch(_){}
-  }
-  function cancelIfHolding(){ if(holding){ holding=false; try{ mediaRecorder.stop(); }catch(_){} } }
+        function stopVoiceRecognition() {
+            console.log('Voice recognition stopped');
+        }
 
-  async function sendAudio(){
-    if(chunks.length===0) return;
-    const blob = new Blob(chunks, {type:'audio/webm'});
-    const fd = new FormData(); fd.append('audio', blob, 'voice.webm');
-    try{
-      const r = await fetch('/api/voice', { method:'POST', body: fd });
-      const j = await r.json();
-      if(!j.success) {
-        console.log(j);
-        alert(j.error || j.result || 'Didn’t catch that.');
-      }
-    }catch(e){ alert('Voice failed'); }
-    chunks=[];
-  }
-</script>
+        // Safer initialization with error boundaries
+        function safeInit() {
+            try {
+                updateDateTime();
+            } catch (e) {
+                console.error('DateTime update failed:', e);
+            }
+            
+            try {
+                updateSensorData();
+            } catch (e) {
+                console.error('Sensor update failed:', e);
+            }
+            
+            try {
+                updateNews();
+            } catch (e) {
+                console.error('News update failed:', e);
+            }
+        }
+
+        // Error-wrapped interval functions
+        function safeUpdateDateTime() {
+            try {
+                updateDateTime();
+            } catch (e) {
+                console.error('DateTime interval update failed:', e);
+            }
+        }
+
+        function safeUpdateSensorData() {
+            try {
+                updateSensorData();
+            } catch (e) {
+                console.error('Sensor interval update failed:', e);
+            }
+        }
+
+        function safeUpdateNews() {
+            try {
+                updateNews();
+            } catch (e) {
+                console.error('News interval update failed:', e);
+            }
+        }
+
+        // Initialize safely
+        safeInit();
+
+        // Update intervals with error protection
+        setInterval(safeUpdateDateTime, 60000);      // Update every minute
+        setInterval(safeUpdateSensorData, 30000);    // Update sensor data every 30 seconds
+        setInterval(safeUpdateNews, 300000);         // Update news every 5 minutes
+
+        // Close modal when clicking outside
+        window.onclick = function(event) {
+            const modal = document.getElementById('settings-modal');
+            if (event.target === modal) {
+                modal.style.display = 'none';
+            }
+        }
+    </script>
 </body>
 </html>
