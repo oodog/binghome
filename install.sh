@@ -5,7 +5,6 @@ set -euo pipefail
 # Config
 # ==========================
 REPO="https://github.com/oodog/binghome.git"
-BRANCH="main"   # change to "master" if that's your default
 APP_DIR="$HOME/binghome"
 SERVICE="binghome"
 UPDATE_SERVICE="binghome-updater"
@@ -13,7 +12,17 @@ UPDATE_TIMER="binghome-updater.timer"
 
 echo "🚀 Installing BingHome as $(whoami)"
 echo "📁 Target directory: $APP_DIR"
-echo "🌿 Branch: $BRANCH"
+
+# ==========================
+# Detect default branch (main/master)
+# ==========================
+echo "🔎 Detecting default branch..."
+DEFAULT_BRANCH=$(git ls-remote --symref "$REPO" HEAD 2>/dev/null | awk -F'[:\t ]+' '/^ref:/ {print $3; exit}')
+if [ -z "${DEFAULT_BRANCH:-}" ]; then
+  # fallback
+  DEFAULT_BRANCH="main"
+fi
+echo "🌿 Detected default branch: $DEFAULT_BRANCH"
 
 # ==========================
 # System packages
@@ -24,7 +33,7 @@ sudo apt install -y \
   git curl ca-certificates \
   python3 python3-venv python3-pip \
   wireless-tools network-manager \
-  i2c-tools \
+  i2c-tools libgpiod2 \
   chromium-browser xserver-xorg x11-xserver-utils xinit openbox unclutter
 
 # ==========================
@@ -32,7 +41,12 @@ sudo apt install -y \
 # ==========================
 echo "⬇️  Cloning repository..."
 rm -rf "$APP_DIR"
-git clone --branch "$BRANCH" "$REPO" "$APP_DIR"
+git clone --branch "$DEFAULT_BRANCH" "$REPO" "$APP_DIR" || {
+  echo "⚠️  Branch clone failed; cloning default and switching…"
+  git clone "$REPO" "$APP_DIR"
+  cd "$APP_DIR"
+  git checkout "$DEFAULT_BRANCH" || true
+}
 cd "$APP_DIR"
 
 # ==========================

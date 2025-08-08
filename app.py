@@ -11,18 +11,31 @@ from bs4 import BeautifulSoup
 
 # ---------- Optional hardware ----------
 GPIO = None
-Adafruit_DHT = None
 SMBus = None
+
+# Prefer CircuitPython DHT on Pi 5
+adafruit_dht = None
+board = None
+try:
+    import adafruit_dht as _adafruit_dht
+    import board as _board
+    adafruit_dht = _adafruit_dht
+    board = _board
+except Exception:
+    pass
+
+# Legacy Adafruit_DHT fallback (C extension) – only used if present
+Adafruit_DHT = None
+if adafruit_dht is None:
+    try:
+        import Adafruit_DHT as _Adafruit_DHT
+        Adafruit_DHT = _Adafruit_DHT
+    except Exception:
+        pass
 
 try:
     import RPi.GPIO as _GPIO
     GPIO = _GPIO
-except Exception:
-    pass
-
-try:
-    import Adafruit_DHT as _Adafruit_DHT
-    Adafruit_DHT = _Adafruit_DHT
 except Exception:
     pass
 
@@ -60,7 +73,7 @@ def load_config() -> Dict[str, Any]:
         try:
             with open(CONFIG_FILE, "r") as f:
                 data = json.load(f)
-            # migrate defaults if new keys appear
+            # Migrate defaults if new keys appear
             changed = False
             for k, v in DEFAULT_CONFIG.items():
                 if k not in data:
@@ -83,8 +96,22 @@ def save_config(cfg: Dict[str, Any]):
 CONFIG = load_config()
 
 # -------------------- Hardware config --------------------
+# DHT22 on GPIO4 (BCM)
+DHT_PIN_BCM = 4
+
+# CircuitPython DHT device
+dht_device = None
+if adafruit_dht and board:
+    try:
+        # board.D4 corresponds to BCM4
+        dht_device = adafruit_dht.DHT22(board.D4, use_pulseio=False)
+    except Exception as e:
+        print(f"DHT init (CircuitPython) failed: {e}")
+        dht_device = None
+
+# Legacy constants if the old lib is available
 DHT_SENSOR = Adafruit_DHT.DHT22 if Adafruit_DHT else None
-DHT_PIN = 4
+
 GAS_PIN = 17
 LIGHT_PIN = 27
 
@@ -208,24 +235,44 @@ def get_sensor_data():
         "light_detected": False,
         "hardware": {
             "gpio": bool(GPIO),
-            "dht": bool(Adafruit_DHT),
+            "dht": bool(dht_device) or bool(DHT_SENSOR),
             "i2c_audio": audio_available,
         },
     }
-    if Adafruit_DHT and DHT_SENSOR:
+
+    # --- DHT (prefer CircuitPython)
+    if dht_device:
         try:
-            h, t = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN)
+            t = dht_device.temperature
+            h = dht_device.humidity
+            if t is not None:
+                data["temperature"] = round(float(t), 1)
+            if h is not None:
+                data["humidity"] = round(float(h), 1)
+        except RuntimeError:
+            # Normal transient error; ignore silently
+            pass
+        except Exception as e:
+            print(f"DHT read (CircuitPython) error: {e}")
+
+    # Fallback: legacy Adafruit_DHT C-extension
+    elif Adafruit_DHT and DHT_SENSOR:
+        try:
+            h, t = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN_BCM)
             if h is not None and t is not None:
                 data["temperature"] = round(float(t), 1)
                 data["humidity"] = round(float(h), 1)
         except Exception as e:
-            print(f"DHT22: {e}")
+            print(f"DHT read (legacy) error: {e}")
+
+    # Digital sensors
     if GPIO:
         try:
             data["gas_detected"] = GPIO.input(GAS_PIN) == GPIO.HIGH
             data["light_detected"] = GPIO.input(LIGHT_PIN) == GPIO.HIGH
         except Exception as e:
             print(f"GPIO read: {e}")
+
     return data
 
 # -------------------- Wi-Fi helpers --------------------
@@ -283,32 +330,22 @@ def ha_call(service_domain, service, payload):
 # Basic intent mapping
 def handle_intent_text(text: str):
     """
-    Ultra-simple NLU for demo. If OpenAI key present, we’ll use LLM to parse structured intent.
-    Otherwise some keyword rules as fallback.
+    Simple fallback NLU. If OpenAI is configured, we call it for structured intent.
     """
     text_l = text.lower()
 
-    # Fallback rules
+    # Fallback rules (common commands)
     if "turn on" in text_l or "switch on" in text_l:
-        # crude entity guess
-        entity = None
         if "light" in text_l:
-            entity = "light.living_room"
-            domain = "light"
-            return ha_call(domain, "turn_on", {"entity_id": entity})
+            return ha_call("light", "turn_on", {"entity_id": "light.living_room"})
         if "fan" in text_l:
-            entity = "fan.living_room"
-            domain = "fan"
-            return ha_call(domain, "turn_on", {"entity_id": entity})
+            return ha_call("fan", "turn_on", {"entity_id": "fan.living_room"})
     if "turn off" in text_l or "switch off" in text_l:
         if "light" in text_l:
-            entity = "light.living_room"
-            return ha_call("light", "turn_off", {"entity_id": entity})
+            return ha_call("light", "turn_off", {"entity_id": "light.living_room"})
         if "fan" in text_l:
-            entity = "fan.living_room"
-            return ha_call("fan", "turn_off", {"entity_id": entity})
+            return ha_call("fan", "turn_off", {"entity_id": "fan.living_room"})
     if "set" in text_l and "temperature" in text_l:
-        # naive temp extractor
         import re
         m = re.search(r"(\d{2})", text_l)
         if m:
@@ -316,15 +353,15 @@ def handle_intent_text(text: str):
             return ha_call("climate", "set_temperature",
                            {"entity_id": "climate.home", "temperature": temp})
 
-    # Try LLM for structured intent when available
+    # LLM for structured intent
     if CONFIG.get("provider") == "openai" and CONFIG.get("openai_api_key") and OPENAI_AVAILABLE:
         try:
             client = OpenAI(api_key=CONFIG["openai_api_key"])
             system = (
                 "You convert user voice commands into Home Assistant service calls. "
                 "Return pure JSON with keys: domain, service, payload (object). "
-                "Use entity_id values the user likely has, or infer from text (e.g., 'light.living_room'). "
-                "If unclear, include 'question' key asking a short clarification."
+                "Use plausible entity_id values inferred from the text (e.g., 'light.living_room'). "
+                "If unclear, include 'question' asking a short clarification."
             )
             msg = [{"role": "system", "content": system},
                    {"role": "user", "content": text}]
@@ -334,7 +371,6 @@ def handle_intent_text(text: str):
                 temperature=0
             )
             content = resp.choices[0].message.content.strip()
-            # attempt JSON extraction
             import json as _json, re as _re
             match = _re.search(r"\{.*\}", content, _re.S)
             if not match:
@@ -490,19 +526,19 @@ def api_ha_service():
 def api_voice():
     """
     Accepts:
-      - multipart/form-data with file 'audio' (webm/opus)
-      - OR JSON with 'text' (if browser did speech already)
+      - JSON with 'text' (if browser already recognized speech)
+      - OR multipart/form-data with file 'audio' (webm/opus) for server transcription
     Returns: { success, text, result }
     """
-    # If text already provided (e.g., browser did recognition), just handle it
+    # Text path (browser recognized already)
     if request.is_json:
         text = (request.get_json() or {}).get("text", "").strip()
         if not text:
             return jsonify({"success": False, "error": "No text provided"}), 400
         ok, info = handle_intent_text(text)
-        return jsonify({"success": ok, "text": text, "result": info}), (200 if ok else 200)
+        return jsonify({"success": ok, "text": text, "result": info}), 200
 
-    # Otherwise transcribe server-side with OpenAI Whisper
+    # Server transcription path (OpenAI Whisper)
     if "audio" not in request.files:
         return jsonify({"success": False, "error": "No audio file"}), 400
 
@@ -512,7 +548,6 @@ def api_voice():
     try:
         client = OpenAI(api_key=CONFIG["openai_api_key"])
         f = request.files["audio"]
-        # Save temp and send to Whisper
         tmp = APP_DIR / "tmp_voice.webm"
         f.save(tmp)
         with open(tmp, "rb") as af:
@@ -521,7 +556,7 @@ def api_voice():
         if not text:
             return jsonify({"success": False, "error": "Empty transcription"}), 200
         ok, info = handle_intent_text(text)
-        return jsonify({"success": ok, "text": text, "result": info}), (200 if ok else 200)
+        return jsonify({"success": ok, "text": text, "result": info}), 200
     except Exception as e:
         return jsonify({"success": False, "error": f"Transcription failed: {e}"}), 200
 
