@@ -1,509 +1,129 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>BingHome - Settings</title>
-    <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #1e1e1e 0%, #2d2d2d 100%);
-            color: #ffffff;
-            min-height: 100vh;
-            touch-action: manipulation;
-        }
-
-        .header {
-            background: rgba(0, 0, 0, 0.3);
-            padding: 20px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .header h1 {
-            font-size: 2rem;
-            font-weight: 300;
-        }
-
-        .nav-buttons {
-            display: flex;
-            gap: 15px;
-        }
-
-        .nav-btn {
-            background: rgba(255, 255, 255, 0.1);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            color: #ffffff;
-            padding: 12px 24px;
-            border-radius: 25px;
-            cursor: pointer;
-            font-size: 16px;
-            transition: all 0.3s ease;
-            text-decoration: none;
-            display: inline-block;
-        }
-
-        .nav-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
-            transform: translateY(-2px);
-        }
-
-        .back-btn {
-            background: rgba(0, 120, 215, 0.8);
-        }
-
-        .back-btn:hover {
-            background: rgba(0, 120, 215, 1);
-        }
-
-        .container {
-            padding: 30px;
-            max-width: 1000px;
-            margin: 0 auto;
-        }
-
-        .settings-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 30px;
-            margin-top: 30px;
-        }
-
-        .settings-card {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
-            border-radius: 15px;
-            padding: 25px;
-            backdrop-filter: blur(10px);
-            transition: all 0.3s ease;
-        }
-
-        .settings-card:hover {
-            background: rgba(255, 255, 255, 0.08);
-            transform: translateY(-5px);
-        }
-
-        .settings-card h3 {
-            font-size: 1.4rem;
-            margin-bottom: 15px;
-            color: #00d4ff;
-        }
-
-        .settings-item {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 15px 0;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-        }
-
-        .settings-item:last-child {
-            border-bottom: none;
-        }
-
-        .settings-label {
-            font-size: 1rem;
-            color: #ffffff;
-        }
-
-        .settings-value {
-            font-size: 1rem;
-            color: #00d4ff;
-            font-weight: 500;
-        }
-
-        .volume-control {
-            display: flex;
-            align-items: center;
-            gap: 15px;
-            margin-top: 15px;
-        }
-
-        .volume-btn {
-            background: rgba(0, 120, 215, 0.8);
-            border: none;
-            color: white;
-            width: 50px;
-            height: 50px;
-            border-radius: 50%;
-            font-size: 20px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .volume-btn:hover {
-            background: rgba(0, 120, 215, 1);
-            transform: scale(1.1);
-        }
-
-        .volume-slider {
-            flex: 1;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.2);
-            border-radius: 4px;
-            outline: none;
-            appearance: none;
-        }
-
-        .volume-slider::-webkit-slider-thumb {
-            appearance: none;
-            width: 20px;
-            height: 20px;
-            background: #00d4ff;
-            border-radius: 50%;
-            cursor: pointer;
-        }
-
-        .volume-display {
-            font-size: 1.2rem;
-            font-weight: bold;
-            min-width: 50px;
-            text-align: center;
-        }
-
-        .menu-link {
-            display: block;
-            background: rgba(0, 120, 215, 0.1);
-            border: 1px solid rgba(0, 120, 215, 0.3);
-            color: #ffffff;
-            padding: 20px;
-            border-radius: 10px;
-            text-decoration: none;
-            margin-bottom: 15px;
-            transition: all 0.3s ease;
-            font-size: 1.1rem;
-        }
-
-        .menu-link:hover {
-            background: rgba(0, 120, 215, 0.2);
-            transform: translateX(10px);
-        }
-
-        .sensor-status {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        .status-dot {
-            width: 12px;
-            height: 12px;
-            border-radius: 50%;
-            background: #ff4444;
-        }
-
-        .status-dot.active {
-            background: #44ff44;
-            box-shadow: 0 0 10px rgba(68, 255, 68, 0.5);
-        }
-
-        /* Responsive design */
-        @media (max-width: 768px) {
-            .settings-grid {
-                grid-template-columns: 1fr;
-            }
-            
-            .header {
-                flex-direction: column;
-                gap: 15px;
-            }
-            
-            .nav-buttons {
-                width: 100%;
-                justify-content: center;
-            }
-        }
-
-        /* Touch gestures for navigation */
-        .gesture-area {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 50px;
-            height: 100vh;
-            z-index: 1000;
-            background: transparent;
-            cursor: pointer;
-        }
-    </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BingHome - Settings</title>
+<style>
+  body{font-family:Segoe UI,Arial;background:linear-gradient(135deg,#1e1e1e,#2d2d2d);color:#fff;margin:0;min-height:100vh}
+  .header{display:flex;justify-content:space-between;align-items:center;padding:18px 24px;background:rgba(0,0,0,.3);backdrop-filter:blur(10px);border-bottom:1px solid rgba(255,255,255,.12)}
+  .container{max-width:1100px;margin:0 auto;padding:24px}
+  .grid{display:grid;gap:22px;grid-template-columns:repeat(auto-fit,minmax(320px,1fr))}
+  .card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);border-radius:14px;padding:18px;backdrop-filter:blur(8px)}
+  .card h3{margin:0 0 10px;color:#00d4ff}
+  label{display:block;margin:10px 0 6px;opacity:.9}
+  input,select{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff}
+  .row{display:flex;gap:10px}
+  .btn{background:#0078d7;border:none;color:#fff;padding:10px 16px;border-radius:10px;cursor:pointer}
+  .btn:disabled{opacity:.6}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:8px;background:#ff4444}
+  .dot.ok{background:#44ff44; box-shadow:0 0 8px rgba(68,255,68,.5)}
+  .status{opacity:.85}
+</style>
 </head>
 <body>
-    <!-- Gesture area for swipe back -->
-    <div class="gesture-area" id="gestureArea"></div>
-
-    <div class="header">
-        <h1>Settings</h1>
-        <div class="nav-buttons">
-            <a href="/back" class="nav-btn back-btn">← Back</a>
-            <a href="/" class="nav-btn">🏠 Home</a>
-        </div>
+  <div class="header">
+    <h2>Settings</h2>
+    <div>
+      <a class="btn" href="/">Home</a>
     </div>
+  </div>
 
-    <div class="container">
-        <div class="settings-grid">
-            <!-- System Status Card -->
-            <div class="settings-card">
-                <h3>🔧 System</h3>
-                <a href="/settings/system_status" class="menu-link">
-                    System Status & Monitoring
-                </a>
-                <div class="settings-item">
-                    <span class="settings-label">Temperature</span>
-                    <span class="settings-value">
-                        {% if sensor_data.temperature %}
-                            {{ sensor_data.temperature }}°C
-                        {% else %}
-                            --°C
-                        {% endif %}
-                    </span>
-                </div>
-                <div class="settings-item">
-                    <span class="settings-label">Humidity</span>
-                    <span class="settings-value">
-                        {% if sensor_data.humidity %}
-                            {{ sensor_data.humidity }}%
-                        {% else %}
-                            --%
-                        {% endif %}
-                    </span>
-                </div>
-            </div>
+  <div class="container">
+    <div class="grid">
+      <div class="card">
+        <h3>Voice & Assistant</h3>
+        <label>Provider</label>
+        <select id="provider">
+          <option value="openai" {% if cfg.provider=='openai' %}selected{% endif %}>OpenAI (ChatGPT)</option>
+          <option value="bing" {% if cfg.provider=='bing' %}selected{% endif %}>Bing (stub)</option>
+        </select>
 
-            <!-- Audio Control Card -->
-            <div class="settings-card">
-                <h3>🔊 Audio</h3>
-                <div class="settings-item">
-                    <span class="settings-label">Audio Amplifier</span>
-                    <div class="sensor-status">
-                        <div class="status-dot {% if audio_available %}active{% endif %}"></div>
-                        <span class="settings-value">
-                            {% if audio_available %}Connected{% else %}Disconnected{% endif %}
-                        </span>
-                    </div>
-                </div>
-                {% if audio_available %}
-                <div class="volume-control">
-                    <button class="volume-btn" onclick="changeVolume(-5)">-</button>
-                    <input type="range" class="volume-slider" id="volumeSlider" 
-                           min="0" max="100" value="{{ current_volume }}" 
-                           onchange="setVolume(this.value)">
-                    <button class="volume-btn" onclick="changeVolume(5)">+</button>
-                    <div class="volume-display" id="volumeDisplay">{{ current_volume }}%</div>
-                </div>
-                <div style="margin-top: 15px;">
-                    <button class="nav-btn" onclick="toggleMute()">🔇 Mute</button>
-                </div>
-                {% endif %}
-            </div>
+        <label>OpenAI API Key</label>
+        <input type="password" id="openai_api_key" placeholder="sk-..." value="{{ cfg.openai_api_key }}"/>
 
-            <!-- Network Card -->
-            <div class="settings-card">
-                <h3>📶 Network</h3>
-                <a href="/settings/wifi" class="menu-link">
-                    WiFi Connection Settings
-                </a>
-                <div class="settings-item">
-                    <span class="settings-label">Gas Sensor</span>
-                    <div class="sensor-status">
-                        <div class="status-dot {% if sensor_data.gas_detected %}active{% endif %}"></div>
-                        <span class="settings-value">
-                            {% if sensor_data.gas_detected %}Detected{% else %}Clear{% endif %}
-                        </span>
-                    </div>
-                </div>
-                <div class="settings-item">
-                    <span class="settings-label">Light Sensor</span>
-                    <div class="sensor-status">
-                        <div class="status-dot {% if sensor_data.light_detected %}active{% endif %}"></div>
-                        <span class="settings-value">
-                            {% if sensor_data.light_detected %}Bright{% else %}Dark{% endif %}
-                        </span>
-                    </div>
-                </div>
-            </div>
+        <label>Model</label>
+        <input id="openai_model" value="{{ cfg.openai_model }}"/>
 
-            <!-- Quick Actions Card -->
-            <div class="settings-card">
-                <h3>⚡ Quick Actions</h3>
-                <button class="menu-link" onclick="refreshSensors()" style="border: none; width: 100%;">
-                    🔄 Refresh Sensor Data
-                </button>
-                <button class="menu-link" onclick="restartSystem()" style="border: none; width: 100%;">
-                    🔄 Restart System
-                </button>
-                <button class="menu-link" onclick="shutdownSystem()" style="border: none; width: 100%;">
-                    ⏻ Shutdown System
-                </button>
-            </div>
+        <label style="display:flex;align-items:center;gap:8px;margin-top:12px">
+          <input type="checkbox" id="wake_word" {% if cfg.wake_word_enabled %}checked{% endif %}/>
+          Enable wake word (coming soon)
+        </label>
+
+        <div style="margin-top:12px">
+          <button class="btn" onclick="saveConfig()">Save</button>
+          <span class="status" id="saveStatus"></span>
         </div>
+      </div>
+
+      <div class="card">
+        <h3>Home Assistant</h3>
+        <label>Base URL</label>
+        <input id="ha_base_url" placeholder="http://localhost:8123" value="{{ cfg.ha_base_url }}"/>
+
+        <label>Long-Lived Access Token</label>
+        <input type="password" id="ha_token" placeholder="HA token" value="{{ cfg.ha_token }}"/>
+
+        <div style="margin-top:12px">
+          <button class="btn" onclick="testHA()">Test Connection</button>
+          <span id="haStatus" class="status"><span class="dot" id="haDot"></span>Not tested</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Audio</h3>
+        <div>Amplifier: <span class="status"><span class="dot {% if audio_available %}ok{% endif %}"></span>{% if audio_available %}Connected{% else %}Not detected{% endif %}</span></div>
+        <div style="margin-top:10px;">
+          <label>Volume</label>
+          <div class="row">
+            <button class="btn" onclick="vol(-5)">-</button>
+            <input id="vol" type="range" min="0" max="100" value="{{ current_volume }}" oninput="setVol(this.value)" />
+            <button class="btn" onclick="vol(5)">+</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h3>Sensors</h3>
+        <div class="status">Temp: {{ sensor_data.temperature if sensor_data.temperature != None else '--' }}°C</div>
+        <div class="status">Humidity: {{ sensor_data.humidity if sensor_data.humidity != None else '--' }}%</div>
+        <div class="status">Gas: {{ 'Detected' if sensor_data.gas_detected else 'Clear' }}</div>
+        <div class="status">Light: {{ 'Bright' if sensor_data.light_detected else 'Dark' }}</div>
+      </div>
     </div>
+  </div>
 
-    <script>
-        let currentVolume = {{ current_volume }};
-        let startX = 0;
-        let startTime = 0;
+<script>
+async function saveConfig(){
+  const body={
+    provider: document.getElementById('provider').value,
+    openai_api_key: document.getElementById('openai_api_key').value,
+    openai_model: document.getElementById('openai_model').value,
+    ha_base_url: document.getElementById('ha_base_url').value,
+    ha_token: document.getElementById('ha_token').value,
+    wake_word_enabled: document.getElementById('wake_word').checked
+  };
+  document.getElementById('saveStatus').textContent='Saving…';
+  const r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  const j=await r.json();
+  document.getElementById('saveStatus').textContent = j.success? 'Saved ✅':'Failed ❌';
+}
 
-        // Volume control functions
-        async function changeVolume(delta) {
-            try {
-                const endpoint = delta > 0 ? '/api/volume/up' : '/api/volume/down';
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ step: Math.abs(delta) })
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    currentVolume = data.volume;
-                    updateVolumeDisplay();
-                }
-            } catch (error) {
-                console.error('Volume control error:', error);
-            }
-        }
+async function testHA(){
+  const r=await fetch('/api/ha/service',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({domain:'homeassistant',service:'reload_core_config',payload:{}})});
+  const ok = r.ok;
+  document.getElementById('haDot').className = 'dot ' + (ok? 'ok':'');
+  document.getElementById('haStatus').lastChild.textContent = ok? 'Connected':'Failed';
+}
 
-        async function setVolume(volume) {
-            try {
-                const response = await fetch('/api/volume/set', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ volume: parseInt(volume) })
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    currentVolume = data.volume;
-                    updateVolumeDisplay();
-                }
-            } catch (error) {
-                console.error('Volume control error:', error);
-            }
-        }
-
-        async function toggleMute() {
-            try {
-                const response = await fetch('/api/volume/mute', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' }
-                });
-                
-                const data = await response.json();
-                if (data.success) {
-                    currentVolume = data.volume;
-                    updateVolumeDisplay();
-                    
-                    // Update button text
-                    event.target.textContent = data.muted ? '🔊 Unmute' : '🔇 Mute';
-                }
-            } catch (error) {
-                console.error('Mute toggle error:', error);
-            }
-        }
-
-        function updateVolumeDisplay() {
-            const slider = document.getElementById('volumeSlider');
-            const display = document.getElementById('volumeDisplay');
-            
-            if (slider) slider.value = currentVolume;
-            if (display) display.textContent = currentVolume + '%';
-        }
-
-        // Sensor refresh
-        async function refreshSensors() {
-            try {
-                const response = await fetch('/api/sensor_data');
-                const data = await response.json();
-                
-                // Refresh the page to show updated data
-                location.reload();
-            } catch (error) {
-                console.error('Sensor refresh error:', error);
-            }
-        }
-
-        // System control functions
-        async function restartSystem() {
-            if (confirm('Are you sure you want to restart the system?')) {
-                // In a real implementation, you'd call an API endpoint
-                alert('Restart command would be executed');
-            }
-        }
-
-        async function shutdownSystem() {
-            if (confirm('Are you sure you want to shutdown the system?')) {
-                // In a real implementation, you'd call an API endpoint
-                alert('Shutdown command would be executed');
-            }
-        }
-
-        // Gesture navigation
-        document.getElementById('gestureArea').addEventListener('touchstart', function(e) {
-            startX = e.touches[0].clientX;
-            startTime = Date.now();
-        });
-
-        document.getElementById('gestureArea').addEventListener('touchend', function(e) {
-            const endX = e.changedTouches[0].clientX;
-            const endTime = Date.now();
-            const deltaX = endX - startX;
-            const deltaTime = endTime - startTime;
-            
-            // Swipe right gesture (swipe from left edge)
-            if (deltaX > 50 && deltaTime < 300 && startX < 50) {
-                window.location.href = '/back';
-            }
-        });
-
-        // Pinch to home gesture (simplified - just double tap)
-        let lastTap = 0;
-        document.addEventListener('touchend', function(e) {
-            const currentTime = new Date().getTime();
-            const tapLength = currentTime - lastTap;
-            
-            if (tapLength < 500 && tapLength > 0 && e.touches.length === 0) {
-                // Double tap detected - go home
-                if (e.target.tagName !== 'BUTTON' && e.target.tagName !== 'A') {
-                    window.location.href = '/';
-                }
-            }
-            lastTap = currentTime;
-        });
-
-        // Keyboard shortcuts
-        document.addEventListener('keydown', function(e) {
-            switch(e.key) {
-                case 'Escape':
-                case 'Backspace':
-                    e.preventDefault();
-                    window.location.href = '/back';
-                    break;
-                case 'Home':
-                    e.preventDefault();
-                    window.location.href = '/';
-                    break;
-                case 'ArrowUp':
-                    e.preventDefault();
-                    changeVolume(5);
-                    break;
-                case 'ArrowDown':
-                    e.preventDefault();
-                    changeVolume(-5);
-                    break;
-            }
-        });
-    </script>
+async function vol(delta){
+  const ep = delta>0? '/api/volume/up':'/api/volume/down';
+  const r = await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({step:Math.abs(delta)})});
+  const j = await r.json();
+  document.getElementById('vol').value = j.volume;
+}
+async function setVol(v){
+  await fetch('/api/volume/set',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({volume:parseInt(v)})});
+}
+</script>
 </body>
 </html>

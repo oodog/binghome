@@ -6,7 +6,7 @@ beautifulsoup4==4.12.2
 
 # Hardware interfaces
 RPi.GPIO==0.7.1
-smbus==1.1.post2
+smbus2==0.4.2
 Adafruit-DHT==1.4.0
 
 # HTTP requests and APIs
