@@ -7,7 +7,7 @@ A modern smart home control interface designed for Raspberry Pi with touchscreen
 ## ✨ Features
 
 ### 🎮 **Modern Interface**
-- Xbox/iPhone-style dark theme with animated tiles
+- Xbox dark theme with animated tiles
 - Touch-optimized navigation with swipe gestures
 - Auto-scrolling news feed with Bing News integration
 - Real-time sensor data display in status bar
