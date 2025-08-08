@@ -1,197 +1,254 @@
 #!/bin/bash
-# binghome - Universal Installer (works for any user, any home dir)
-# Run with: curl -sSL https://your-link-here/install.sh | bash
+set -euo pipefail
 
-echo "🚀 Installing binghome for user: $(whoami)"
+# ==========================
+# Config
+# ==========================
+REPO="https://github.com/oodog/binghome.git"
+BRANCH="main"   # change to "master" if that's your default
+APP_DIR="$HOME/binghome"
+SERVICE="binghome"
+UPDATE_SERVICE="binghome-updater"
+UPDATE_TIMER="binghome-updater.timer"
 
-# Install system packages
+echo "🚀 Installing BingHome as $(whoami)"
+echo "📁 Target directory: $APP_DIR"
+echo "🌿 Branch: $BRANCH"
+
+# ==========================
+# System packages
+# ==========================
+echo "📦 Installing system dependencies..."
 sudo apt update
-sudo apt install -y git python3-pip python3-venv python3-flask \
-                   python3-bs4 xserver-xorg x11-xserver-utils \
-                   xinit openbox chromium-browser unclutter
+sudo apt install -y \
+  git curl ca-certificates \
+  python3 python3-venv python3-pip \
+  wireless-tools network-manager \
+  i2c-tools \
+  chromium-browser xserver-xorg x11-xserver-utils xinit openbox unclutter
 
-# Get user's home directory dynamically
-USER_HOME="$HOME"
-PROJECT_DIR="$USER_HOME/binghome"
+# ==========================
+# Get code
+# ==========================
+echo "⬇️  Cloning repository..."
+rm -rf "$APP_DIR"
+git clone --branch "$BRANCH" "$REPO" "$APP_DIR"
+cd "$APP_DIR"
 
-# Setup project
-rm -rf "$PROJECT_DIR"
-mkdir -p "$PROJECT_DIR/templates" "$PROJECT_DIR/static/images"
-cd "$PROJECT_DIR" || exit
-
-# Create virtual environment
+# ==========================
+# Python venv + deps
+# ==========================
+echo "🐍 Setting up Python venv..."
 python3 -m venv venv
+# shellcheck disable=SC1091
 source venv/bin/activate
-
-# Upgrade pip and install Python deps
 pip install --upgrade pip
-pip install flask requests beautifulsoup4
+if [ -f requirements.txt ]; then
+  pip install -r requirements.txt
+fi
 
-# --------------------------------------------------
-# Create: binghome.py
-# --------------------------------------------------
-cat > binghome.py << 'EOF'
-import os
-import requests
-from flask import Flask, render_template, send_from_directory
-from bs4 import BeautifulSoup
+# ==========================
+# Ensure minimal app assets
+# ==========================
+mkdir -p templates static/images
 
-app = Flask(__name__)
+# Default tiny image (1x1) so the app always has a fallback
+if [ ! -f static/images/default.jpg ]; then
+  echo "🖼  Adding default fallback image..."
+  base64 -d > static/images/default.jpg <<'EOF'
+/9j/4AAQSkZJRgABAQAAAQABAAD/2wCEAAkGBxAQEA8QDxAPDw8QDw8PDw8PDw8PDw8QFREWFhUR
+ExUYHSggGBolGxUVITEhJSkrLi4uFx8zODMtNygtLisBCgoKDg0OGxAQGy0fHyUtLSstLS0tLS0t
+LS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLS0tLf/AABEIAKAAoAMBIgACEQEDEQH/
+xAAXAAEBAQEAAAAAAAAAAAAAAAAABgUH/8QAHhABAAEDBQAAAAAAAAAAAAAAAQIAAwQREiExQbH/
+xAAWAQEBAQAAAAAAAAAAAAAAAAADAgH/xAAWEQEBAQAAAAAAAAAAAAAAAAABAgH/2gAMAwEAAhED
+EQA/AK8AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAP/Z
+EOF
+fi
 
-BING_URL = "https://www.bing.com"
-IMAGE_DIR = os.path.join(app.static_folder, "images")
-os.makedirs(IMAGE_DIR, exist_ok=True)
+# ==========================
+# systemd service
+# ==========================
+echo "🧩 Creating systemd service..."
+SERVICE_FILE="/etc/systemd/system/${SERVICE}.service"
+sudo tee "$SERVICE_FILE" >/dev/null <<EOF
+[Unit]
+Description=BingHome Smart Hub
+After=network-online.target
+Wants=network-online.target
 
-def get_bing_wallpaper():
-    try:
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/110.0 Safari/537.36'
-        }
-        r = requests.get(f"{BING_URL}/", headers=headers, timeout=10)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, 'html.parser')
+[Service]
+Type=simple
+User=${USER}
+WorkingDirectory=${APP_DIR}
+Environment=PYTHONUNBUFFERED=1
+Environment=FLASK_ENV=production
+ExecStart=${APP_DIR}/venv/bin/python ${APP_DIR}/app.py
+Restart=always
+RestartSec=5
 
-        bg_image = None
-        body = soup.find('body', style=True)
-        if body:
-            style = body['style']
-            start = style.find('url(') + 4
-            end = style.find(')', start)
-            if start != -1 and end != -1:
-                bg_image = BING_URL + style[start:end].strip("'\"")
-
-        if not bg_image:
-            meta = soup.find('meta', {'property': 'og:image'})
-            if meta and meta.get('content'):
-                img_url = meta['content']
-                if img_url.startswith("//"):
-                    img_url = "https:" + img_url
-                elif img_url.startswith("/"):
-                    img_url = BING_URL + img_url
-                bg_image = img_url
-
-        if bg_image:
-            img_name = os.path.basename(bg_image.split('?')[0])
-            img_path = os.path.join(IMAGE_DIR, img_name)
-            if not os.path.exists(img_path):
-                img_data = requests.get(bg_image, headers=headers, timeout=10).content
-                with open(img_path, 'wb') as f:
-                    f.write(img_data)
-            return f"/static/images/{img_name}", "Today's Bing Wallpaper"
-    except Exception as e:
-        print(f"[ERROR] {e}")
-    return "/static/images/default.jpg", "Bing Wallpaper"
-
-@app.route("/")
-def index():
-    img_url, title = get_bing_wallpaper()
-    return render_template("index.html", img_url=img_url, title=title)
-
-@app.route('/static/images/<filename>')
-def download_file(filename):
-    return send_from_directory(IMAGE_DIR, filename)
-
-if __name__ == "__main__":
-    app.run(host="0.0.0.0", port=5000, debug=False)
+[Install]
+WantedBy=multi-user.target
 EOF
 
-# --------------------------------------------------
-# Create: templates/index.html
-# --------------------------------------------------
-cat > templates/index.html << 'EOF'
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no" />
-    <title>Bing Home</title>
-    <style>
-        html, body {
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            overflow: hidden;
-            font-family: 'Segoe UI', Arial, sans-serif;
-        }
-        .background {
-            background: url("{{ img_url }}") no-repeat center center;
-            background-size: cover;
-            width: 100%;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            text-shadow: 2px 2px 8px rgba(0,0,0,0.8);
-            font-size: 2.2em;
-            text-align: center;
-            padding: 20px;
-        }
-    </style>
-</head>
-<body>
-    <div class="background">
-        Today's Bing Wallpaper
-    </div>
-</body>
-</html>
+# ==========================
+# Auto-updater (hourly)
+# ==========================
+echo "🔁 Creating auto-update service + timer..."
+UPDATER_FILE="/etc/systemd/system/${UPDATE_SERVICE}.service"
+sudo tee "$UPDATER_FILE" >/dev/null <<EOF
+[Unit]
+Description=Update BingHome from Git and restart if changed
+
+[Service]
+Type=oneshot
+User=${USER}
+WorkingDirectory=${APP_DIR}
+ExecStart=${APP_DIR}/update.sh
 EOF
 
-# --------------------------------------------------
-# Create: start.sh
-# --------------------------------------------------
-cat > start.sh << 'EOF'
+TIMER_FILE="/etc/systemd/system/${UPDATE_TIMER}"
+sudo tee "$TIMER_FILE" >/dev/null <<EOF
+[Unit]
+Description=Run BingHome updater hourly
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+Unit=${UPDATE_SERVICE}.service
+
+[Install]
+WantedBy=timers.target
+EOF
+
+# Update helper used by the updater service
+cat > update.sh <<'EOF'
 #!/bin/bash
-cd "\$(dirname "\$0")"
+set -euo pipefail
+cd "$(dirname "$0")"
+
+if [ ! -d .git ]; then
+  echo "Not a git repo; skipping update."
+  exit 0
+fi
+
+# Make sure a remote tracking branch exists
+UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null || true)
+if [ -z "$UPSTREAM" ]; then
+  echo "No upstream set for current branch; skipping update."
+  exit 0
+fi
+
+git fetch --all --prune
+
+LOCAL=$(git rev-parse @)
+REMOTE=$(git rev-parse @{u})
+
+if [ "$LOCAL" != "$REMOTE" ]; then
+  echo "New version found; updating…"
+  git pull --rebase
+  if [ -f requirements.txt ]; then
+    ./venv/bin/pip install -r requirements.txt || true
+  fi
+  sudo systemctl restart binghome
+  echo "Updated and restarted."
+else
+  echo "No updates."
+fi
+EOF
+chmod +x update.sh
+
+# ==========================
+# Helper scripts
+# ==========================
+cat > start.sh <<'EOF'
+#!/bin/bash
+cd "$(dirname "$0")"
 source venv/bin/activate
-python binghome.py
+python app.py
 EOF
 chmod +x start.sh
 
-# --------------------------------------------------
-# Setup Auto-Start (Openbox)
-# --------------------------------------------------
-echo "🔧 Setting up auto-start..."
+cat > start_kiosk.sh <<'EOF'
+#!/bin/bash
+set -euo pipefail
 
-CONFIG_DIR="$HOME/.config"
-mkdir -p "$CONFIG_DIR/openbox"
+export DISPLAY=:0
 
-cat > "$CONFIG_DIR/openbox/autostart" << EOF
-# Disable screensaver and power management
+# Start the app service (if not already running)
+sudo systemctl start binghome
+
+# Wait until the health endpoint is up (max ~30s)
+for i in $(seq 1 30); do
+  if curl -s http://localhost:5000/api/health | grep -q healthy; then
+    break
+  fi
+  sleep 1
+done
+
+# Chromium kiosk
+xset s off || true
+xset s noblank || true
+xset -dpms || true
+unclutter -idle 0.5 -root &
+
+chromium-browser \
+  --kiosk \
+  --no-first-run \
+  --noerrdialogs \
+  --disable-infobars \
+  --disable-session-crashed-bubble \
+  --disable-restore-session-state \
+  --disable-gpu \
+  --no-sandbox \
+  --disable-dev-shm-usage \
+  --user-data-dir=/tmp/binghome_kiosk \
+  http://localhost:5000
+EOF
+chmod +x start_kiosk.sh
+
+# ==========================
+# Kiosk via Openbox autostart
+# ==========================
+echo "🖥  Configuring kiosk (Openbox autostart)..."
+mkdir -p "$HOME/.config/openbox"
+cat > "$HOME/.config/openbox/autostart" <<EOF
+# Disable screen blanking / power saving
 xset s off
 xset s noblank
 xset -dpms
-unclutter -idle 0.1 &
 
-# Start Flask server
-cd $PROJECT_DIR
-./start.sh &
-sleep 5
+# Hide mouse cursor after idle
+unclutter -idle 0.5 -root &
 
-# Launch browser in kiosk mode
-chromium-browser --kiosk \\
-                 --no-first-run \\
-                 --disable-infobars \\
-                 --disable-session-crashed-bubble \\
-                 --disable-restore-session-state \\
-                 --disable-gpu \\
-                 --disable-software-rasterizer \\
-                 http://localhost:5000
+# Start the kiosk launcher
+cd $APP_DIR
+./start_kiosk.sh &
 EOF
+chmod +x "$HOME/.config/openbox/autostart"
 
-chmod +x "$CONFIG_DIR/openbox/autostart"
-
-# Add startx to .bash_profile if not already present
-BASH_PROFILE="$HOME/.bash_profile"
-if [ ! -f "$BASH_PROFILE" ] || ! grep -q "startx" "$BASH_PROFILE"; then
-    echo 'if [ -z "${SSH_CONNECTION}" ] && [ "$(tty)" = "/dev/tty1" ]; then startx; fi' >> "$BASH_PROFILE"
+# ==========================
+# Auto-start X on tty1
+# ==========================
+echo "🪄 Enabling auto-start of X on tty1..."
+if ! grep -q "startx" "$HOME/.bash_profile" 2>/dev/null; then
+  {
+    echo ''
+    echo '# Auto-start X (Openbox) on local console'
+    echo 'if [ -z "$SSH_CONNECTION" ] && [ "$(tty)" = "/dev/tty1" ]; then'
+    echo '  startx'
+    echo 'fi'
+  } >> "$HOME/.bash_profile"
 fi
 
-# Disable screen blanking in config.txt (if accessible)
-if [ -w /boot/config.txt ] && ! grep -q "hdmi_blanking=1" /boot/config.txt; then
-    echo "hdmi_blanking=1" | sudo tee -a /boot/config.txt
-fi
+# ==========================
+# Enable and start services
+# ==========================
+echo "🔧 Enabling services..."
+sudo systemctl daemon-reload
+sudo systemctl enable "$SERVICE" "$UPDATE_TIMER"
+sudo systemctl start "$SERVICE" "$UPDATE_TIMER"
 
-# Final message
-echo "✅ binghome installed in $PROJECT_DIR"
-echo "🔁 Reboot to launch: sudo reboot"
+echo "✅ Install complete."
+echo "➡️  Reboot recommended: sudo reboot"
+echo "💡 Tip: For fastest kiosk boot, set 'Console Autologin' and Splash via 'sudo raspi-config'."
