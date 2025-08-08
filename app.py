@@ -4,7 +4,7 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 from flask import Flask, render_template, request, jsonify
 import requests
@@ -14,7 +14,7 @@ from bs4 import BeautifulSoup
 GPIO = None
 SMBus = None
 
-# Prefer CircuitPython DHT on Pi 5
+# Prefer CircuitPython DHT on Pi 5 (no C compile)
 adafruit_dht = None
 board = None
 try:
@@ -61,7 +61,7 @@ CONFIG_FILE = APP_DIR / "settings.json"
 
 # -------------------- Config helpers --------------------
 DEFAULT_CONFIG = {
-    "provider": "openai",         # "openai" or "bing" (bing stubbed)
+    "provider": "openai",         # "openai" or "bing" (bing is stubbed)
     "openai_api_key": "",
     "openai_model": "gpt-4o-mini",
     "ha_base_url": "http://localhost:8123",
@@ -69,8 +69,8 @@ DEFAULT_CONFIG = {
     "wake_word_enabled": False,
 
     # Sensor behavior
-    "invert_gas": False,          # set True if your gas sensor outputs LOW when active
-    "invert_light": False         # set True if your light sensor outputs LOW when active
+    "invert_gas": False,          # set True if your gas sensor is active-LOW
+    "invert_light": False         # set True if your light sensor is active-LOW
 }
 
 def load_config() -> Dict[str, Any]:
@@ -101,12 +101,12 @@ def save_config(cfg: Dict[str, Any]):
 CONFIG = load_config()
 
 # -------------------- Hardware config --------------------
-# Pins you specified
+# Pins
 DHT_PIN_BCM = 4          # DHT22 on GPIO4
-GAS_PIN = 17             # Digital gas sensor
-LIGHT_PIN = 27           # Digital light sensor
+GAS_PIN = 17             # Digital gas sensor on GPIO17
+LIGHT_PIN = 27           # Digital light sensor on GPIO27
 
-# CircuitPython DHT device + basic caching (reads every 2s)
+# CircuitPython DHT + simple cache (avoid hammering, tolerate transient errors)
 dht_device = None
 _last_dht = {"t": None, "h": None, "ts": 0.0}
 if adafruit_dht and board:
@@ -137,8 +137,7 @@ if SMBus:
 if GPIO:
     try:
         GPIO.setmode(GPIO.BCM)
-        # Most “digital” breakout boards need a pull-down so HIGH means “active”.
-        # If your board is wired with an external resistor differently, flip in Settings.
+        # Pull-downs so HIGH means active by default (invert via settings if needed)
         GPIO.setup(GAS_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         GPIO.setup(LIGHT_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
     except Exception as e:
@@ -235,7 +234,7 @@ volume_controller = VolumeController()
 
 # -------------------- Sensors --------------------
 def _read_dht_cached():
-    """Read DHT at most every 2 seconds; CircuitPython raises RuntimeError frequently."""
+    """Read DHT at most every 2 seconds; tolerate transient errors."""
     now = time.time()
     if now - _last_dht["ts"] < 2.0:
         return _last_dht["t"], _last_dht["h"]
@@ -258,7 +257,6 @@ def _read_dht_cached():
     if t is not None or h is not None:
         _last_dht.update({"t": t, "h": h, "ts": now})
     else:
-        # keep old values, just advance ts to avoid hammering
         _last_dht["ts"] = now
     return _last_dht["t"], _last_dht["h"]
 
@@ -289,28 +287,25 @@ def get_sensor_data():
     }
     return data
 
-# -------------------- Wi-Fi helpers (NetworkManager first) --------------------
+# -------------------- Wi-Fi (NetworkManager first, iwlist fallback) --------------------
 def _have(cmd: str) -> bool:
     return shutil.which(cmd) is not None
 
-def get_wifi_networks() -> list[str]:
-    """Return a list of SSIDs."""
-    # Prefer nmcli (no sudo if PolicyKit allows it)
+def get_wifi_networks():
+    # Prefer nmcli
     if _have("nmcli"):
         try:
-            # Ask NM to rescan; ignore failures
             subprocess.run(["nmcli", "device", "wifi", "rescan"], timeout=10)
             out = subprocess.check_output(
                 ["nmcli", "-t", "-f", "SSID", "device", "wifi", "list"],
                 text=True, timeout=10
             )
-            nets = [ln.strip() for ln in out.splitlines() if ln.strip()]
-            # De-duplicate and remove hidden
-            return sorted(set([n for n in nets if n and n != "--"]))
+            nets = [ln.strip() for ln in out.splitlines() if ln.strip() and ln.strip() != "--"]
+            return sorted(set(nets))
         except Exception as e:
             print(f"nmcli scan: {e}")
 
-    # Fallback to iwlist (usually needs sudo)
+    # Fallback to iwlist (needs sudo typically)
     try:
         result = subprocess.run(
             ["sudo", "iwlist", "wlan0", "scan"],
@@ -327,14 +322,12 @@ def get_wifi_networks() -> list[str]:
         print(f"iwlist scan: {e}")
         return []
 
-def connect_wifi(ssid: str, password: str) -> tuple[bool, str]:
-    """Connect to a Wi-Fi network by SSID/password."""
+def connect_wifi(ssid: str, password: str):
     if _have("nmcli"):
         try:
             cmd = ["nmcli", "device", "wifi", "connect", ssid]
             if password:
                 cmd += ["password", password]
-            # This will create (or reuse) a connection profile
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
             if r.returncode == 0:
                 return True, "OK"
@@ -342,7 +335,7 @@ def connect_wifi(ssid: str, password: str) -> tuple[bool, str]:
         except Exception as e:
             return False, str(e)
 
-    # Fallback to wpa_supplicant (requires sudo; may need NOPASSWD rules)
+    # Fallback
     try:
         cfg = f'network={{\n    ssid="{ssid}"\n    psk="{password}"\n}}\n'
         tmp = "/tmp/wpa_temp.conf"
@@ -376,33 +369,35 @@ def ha_call(service_domain, service, payload):
 
 # -------------------- Intent handling (voice) --------------------
 def handle_intent_text(text: str):
-    text_l = text.lower()
+    tl = text.lower()
 
-    if "turn on" in text_l or "switch on" in text_l:
-        if "light" in text_l:
+    # simple fallbacks
+    if "turn on" in tl or "switch on" in tl:
+        if "light" in tl:
             return ha_call("light", "turn_on", {"entity_id": "light.living_room"})
-        if "fan" in text_l:
+        if "fan" in tl:
             return ha_call("fan", "turn_on", {"entity_id": "fan.living_room"})
-    if "turn off" in text_l or "switch off" in text_l:
-        if "light" in text_l:
+    if "turn off" in tl or "switch off" in tl:
+        if "light" in tl:
             return ha_call("light", "turn_off", {"entity_id": "light.living_room"})
-        if "fan" in text_l:
+        if "fan" in tl:
             return ha_call("fan", "turn_off", {"entity_id": "fan.living_room"})
-    if "set" in text_l and "temperature" in text_l:
+    if "set" in tl and "temperature" in tl:
         import re
-        m = re.search(r"(\d{2})", text_l)
+        m = re.search(r"(\d{2})", tl)
         if m:
             temp = int(m.group(1))
             return ha_call("climate", "set_temperature",
                            {"entity_id": "climate.home", "temperature": temp})
 
+    # LLM path
     if CONFIG.get("provider") == "openai" and CONFIG.get("openai_api_key") and OPENAI_AVAILABLE:
         try:
             client = OpenAI(api_key=CONFIG["openai_api_key"])
             system = (
                 "Convert user voice commands into Home Assistant service calls. "
                 "Return pure JSON with keys: domain, service, payload (object). "
-                "If unclear, include 'question' asking for a short clarification."
+                "If unclear, include 'question' with a short clarification request."
             )
             msg = [{"role": "system", "content": system},
                    {"role": "user", "content": text}]
@@ -505,7 +500,7 @@ def api_config():
     save_config(CONFIG)
     return jsonify({"success": True})
 
-# -------------------- API: sensors/health --------------------
+# -------------------- API: sensors/health/news --------------------
 @app.route("/api/sensor_data")
 def api_sensor_data():
     return jsonify(get_sensor_data())
@@ -513,6 +508,11 @@ def api_sensor_data():
 @app.route("/api/health")
 def api_health():
     return jsonify({"status": "healthy", "timestamp": time.time(), "audio_available": audio_available})
+
+@app.route("/api/news")
+def api_news():
+    """Temporary stub so the dashboard stops 404-ing. Wire to Bing later."""
+    return jsonify([])
 
 # -------------------- API: volume --------------------
 @app.route("/api/volume/up", methods=["POST"])
@@ -553,7 +553,7 @@ def api_wifi_connect():
     code = 200 if ok else 500
     return jsonify({"success": ok, "info": info}), code
 
-# -------------------- API: HA service passthrough --------------------
+# -------------------- API: Home Assistant passthrough --------------------
 @app.route("/api/ha/service", methods=["POST"])
 def api_ha_service():
     data = request.get_json(silent=True) or {}
@@ -568,6 +568,7 @@ def api_ha_service():
 # -------------------- API: Voice (push-to-talk) --------------------
 @app.route("/api/voice", methods=["POST"])
 def api_voice():
+    # JSON path (browser speech already produced text)
     if request.is_json:
         text = (request.get_json() or {}).get("text", "").strip()
         if not text:
@@ -575,6 +576,7 @@ def api_voice():
         ok, info = handle_intent_text(text)
         return jsonify({"success": ok, "text": text, "result": info}), 200
 
+    # multipart audio path (server transcribes via Whisper)
     if "audio" not in request.files:
         return jsonify({"success": False, "error": "No audio file"}), 400
 
