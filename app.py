@@ -4,7 +4,7 @@ import json
 import shutil
 import subprocess
 from pathlib import Path
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 
 from flask import Flask, render_template, request, jsonify
 import requests
@@ -54,23 +54,43 @@ try:
 except Exception:
     pass
 
+# ---------- Feature modules ----------
+from core import media
+from core import news as news_mod
+from core import weather as weather_mod
+from core import timers as timers_mod
+
 # ---------- App ----------
 app = Flask(__name__)
 APP_DIR = Path(__file__).resolve().parent
+DATA_DIR = APP_DIR / "data"
 CONFIG_FILE = APP_DIR / "settings.json"
+DATA_DIR.mkdir(exist_ok=True)
 
 # -------------------- Config helpers --------------------
 DEFAULT_CONFIG = {
-    "provider": "openai",         # "openai" or "bing" (bing is stubbed)
+    "provider": "openai",
     "openai_api_key": "",
     "openai_model": "gpt-4o-mini",
+
     "ha_base_url": "http://localhost:8123",
     "ha_token": "",
-    "wake_word_enabled": False,
 
-    # Sensor behavior
-    "invert_gas": False,          # set True if your gas sensor is active-LOW
-    "invert_light": False         # set True if your light sensor is active-LOW
+    # Location for weather
+    "lat": None,     # e.g., -27.4698
+    "lon": None,     # e.g., 153.0251
+    "timezone": "auto",
+
+    # Wake word (browser-based UI piece; offline later)
+    "wake_word_enabled": True,
+    "wake_word_phrase": "hey bing",
+
+    # Sensors
+    "invert_gas": False,
+    "invert_light": False,
+
+    # Voice entity aliases
+    "voice_aliases": {}
 }
 
 def load_config() -> Dict[str, Any]:
@@ -78,7 +98,6 @@ def load_config() -> Dict[str, Any]:
         try:
             with open(CONFIG_FILE, "r") as f:
                 data = json.load(f)
-            # migrate defaults if new keys appear
             changed = False
             for k, v in DEFAULT_CONFIG.items():
                 if k not in data:
@@ -101,7 +120,6 @@ def save_config(cfg: Dict[str, Any]):
 CONFIG = load_config()
 
 # -------------------- Hardware config --------------------
-# Pins
 DHT_PIN_BCM = 4          # DHT22 on GPIO4
 GAS_PIN = 17             # Digital gas sensor on GPIO17
 LIGHT_PIN = 27           # Digital light sensor on GPIO27
@@ -133,11 +151,9 @@ if SMBus:
     except Exception:
         audio_available = False
 
-# GPIO init
 if GPIO:
     try:
         GPIO.setmode(GPIO.BCM)
-        # Pull-downs so HIGH means active by default (invert via settings if needed)
         GPIO.setup(GAS_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
         GPIO.setup(LIGHT_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
     except Exception as e:
@@ -234,7 +250,6 @@ volume_controller = VolumeController()
 
 # -------------------- Sensors --------------------
 def _read_dht_cached():
-    """Read DHT at most every 2 seconds; tolerate transient errors."""
     now = time.time()
     if now - _last_dht["ts"] < 2.0:
         return _last_dht["t"], _last_dht["h"]
@@ -273,7 +288,7 @@ def get_sensor_data():
         except Exception as e:
             print(f"GPIO read: {e}")
 
-    data = {
+    return {
         "timestamp": time.time(),
         "temperature": round(float(t), 1) if t is not None else None,
         "humidity": round(float(h), 1) if h is not None else None,
@@ -285,14 +300,12 @@ def get_sensor_data():
             "i2c_audio": audio_available,
         },
     }
-    return data
 
-# -------------------- Wi-Fi (NetworkManager first, iwlist fallback) --------------------
+# -------------------- Wi-Fi (NM first, iwlist fallback) --------------------
 def _have(cmd: str) -> bool:
     return shutil.which(cmd) is not None
 
-def get_wifi_networks():
-    # Prefer nmcli
+def get_wifi_networks() -> List[str]:
     if _have("nmcli"):
         try:
             subprocess.run(["nmcli", "device", "wifi", "rescan"], timeout=10)
@@ -304,8 +317,6 @@ def get_wifi_networks():
             return sorted(set(nets))
         except Exception as e:
             print(f"nmcli scan: {e}")
-
-    # Fallback to iwlist (needs sudo typically)
     try:
         result = subprocess.run(
             ["sudo", "iwlist", "wlan0", "scan"],
@@ -326,21 +337,16 @@ def connect_wifi(ssid: str, password: str):
     if _have("nmcli"):
         try:
             cmd = ["nmcli", "device", "wifi", "connect", ssid]
-            if password:
-                cmd += ["password", password]
+            if password: cmd += ["password", password]
             r = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
-            if r.returncode == 0:
-                return True, "OK"
+            if r.returncode == 0: return True, "OK"
             return False, r.stderr.strip() or r.stdout.strip() or "Failed"
         except Exception as e:
             return False, str(e)
-
-    # Fallback
     try:
         cfg = f'network={{\n    ssid="{ssid}"\n    psk="{password}"\n}}\n'
         tmp = "/tmp/wpa_temp.conf"
-        with open(tmp, "w") as f:
-            f.write(cfg)
+        with open(tmp, "w") as f: f.write(cfg)
         subprocess.run(["sudo", "wpa_supplicant", "-B", "-i", "wlan0", "-c", tmp],
                        capture_output=True, text=True, timeout=20)
         subprocess.run(["sudo", "dhclient", "wlan0"], timeout=15)
@@ -352,10 +358,7 @@ def connect_wifi(ssid: str, password: str):
 def ha_headers():
     if not CONFIG.get("ha_token"):
         return None
-    return {
-        "Authorization": f"Bearer {CONFIG['ha_token']}",
-        "Content-Type": "application/json"
-    }
+    return {"Authorization": f"Bearer {CONFIG['ha_token']}", "Content-Type": "application/json"}
 
 def ha_call(service_domain, service, payload):
     if not CONFIG.get("ha_base_url") or not CONFIG.get("ha_token"):
@@ -369,19 +372,43 @@ def ha_call(service_domain, service, payload):
 
 # -------------------- Intent handling (voice) --------------------
 def handle_intent_text(text: str):
-    tl = text.lower()
+    tl = (text or "").strip().lower()
 
-    # simple fallbacks
+    # Teach alias: "remember that <alias> is <entity_id>"
+    if tl.startswith("remember that "):
+        try:
+            rest = tl[len("remember that "):]
+            if " is " in rest:
+                alias, entity = rest.split(" is ", 1)
+                alias = alias.strip().lower()
+                entity = entity.strip()
+                if alias and entity:
+                    CONFIG.setdefault("voice_aliases", {})[alias] = entity
+                    save_config(CONFIG)
+                    return True, f"Saved alias: '{alias}' -> {entity}"
+        except Exception as e:
+            return False, f"Teach failed: {e}"
+
+    def resolve_entity(words: List[str]) -> Optional[str]:
+        aliases = CONFIG.get("voice_aliases", {})
+        for k, v in aliases.items():
+            if k in tl:
+                return v
+        for w in words:
+            if "." in w and w.split(".", 1)[0] in {"light","fan","switch","climate","cover","media_player"}:
+                return w
+        return None
+
+    words = tl.split()
+
     if "turn on" in tl or "switch on" in tl:
-        if "light" in tl:
-            return ha_call("light", "turn_on", {"entity_id": "light.living_room"})
-        if "fan" in tl:
-            return ha_call("fan", "turn_on", {"entity_id": "fan.living_room"})
+        ent = resolve_entity(words) or "light.living_room"
+        return ha_call(ent.split(".", 1)[0], "turn_on", {"entity_id": ent})
+
     if "turn off" in tl or "switch off" in tl:
-        if "light" in tl:
-            return ha_call("light", "turn_off", {"entity_id": "light.living_room"})
-        if "fan" in tl:
-            return ha_call("fan", "turn_off", {"entity_id": "fan.living_room"})
+        ent = resolve_entity(words) or "light.living_room"
+        return ha_call(ent.split(".", 1)[0], "turn_off", {"entity_id": ent})
+
     if "set" in tl and "temperature" in tl:
         import re
         m = re.search(r"(\d{2})", tl)
@@ -390,21 +417,22 @@ def handle_intent_text(text: str):
             return ha_call("climate", "set_temperature",
                            {"entity_id": "climate.home", "temperature": temp})
 
-    # LLM path
     if CONFIG.get("provider") == "openai" and CONFIG.get("openai_api_key") and OPENAI_AVAILABLE:
         try:
+            aliases = CONFIG.get("voice_aliases", {})
+            alias_text = "; ".join([f"{k} -> {v}" for k, v in aliases.items()]) or "none"
             client = OpenAI(api_key=CONFIG["openai_api_key"])
             system = (
                 "Convert user voice commands into Home Assistant service calls. "
                 "Return pure JSON with keys: domain, service, payload (object). "
-                "If unclear, include 'question' with a short clarification request."
+                "If unclear, include 'question' with a short clarification request. "
+                f"Known voice aliases: {alias_text}."
             )
             msg = [{"role": "system", "content": system},
                    {"role": "user", "content": text}]
             resp = client.chat.completions.create(
                 model=CONFIG.get("openai_model", "gpt-4o-mini"),
-                messages=msg,
-                temperature=0
+                messages=msg, temperature=0
             )
             content = resp.choices[0].message.content.strip()
             import json as _json, re as _re
@@ -414,8 +442,7 @@ def handle_intent_text(text: str):
             data = _json.loads(match.group(0))
             if "question" in data:
                 return False, data["question"]
-            domain = data["domain"]
-            service = data["service"]
+            domain = data["domain"]; service = data["service"]
             payload = data.get("payload", {})
             return ha_call(domain, service, payload)
         except Exception as e:
@@ -449,29 +476,19 @@ def system_status():
         if os.path.exists("/sys/class/thermal/thermal_zone0/temp"):
             with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
                 system_info["cpu_temp"] = round(float(f.read()) / 1000.0, 1)
-
         mem_total = mem_avail = None
         with open("/proc/meminfo", "r") as f:
             for line in f:
-                if line.startswith("MemTotal:"):
-                    mem_total = int(line.split()[1])
-                if line.startswith("MemAvailable:"):
-                    mem_avail = int(line.split()[1])
+                if line.startswith("MemTotal:"): mem_total = int(line.split()[1])
+                if line.startswith("MemAvailable:"): mem_avail = int(line.split()[1])
         if mem_total and mem_avail:
-            system_info["memory_used_percent"] = round(
-                (mem_total - mem_avail) / mem_total * 100, 1
-            )
-
+            system_info["memory_used_percent"] = round((mem_total - mem_avail) / mem_total * 100, 1)
         disk = subprocess.run(["df", "-h", "/"], capture_output=True, text=True).stdout
         parts = disk.splitlines()[1].split()
         system_info["disk_used_percent"] = int(parts[4].strip("%"))
-
-        system_info["uptime"] = subprocess.run(
-            ["uptime", "-p"], capture_output=True, text=True
-        ).stdout.strip()
+        system_info["uptime"] = subprocess.run(["uptime", "-p"], capture_output=True, text=True).stdout.strip()
     except Exception as e:
         print(f"Sysinfo: {e}")
-
     return render_template("system_status.html",
                            system_info=system_info,
                            sensor_data=get_sensor_data())
@@ -494,13 +511,19 @@ def api_config():
         "ha_base_url": data.get("ha_base_url", CONFIG["ha_base_url"]),
         "ha_token": data.get("ha_token", CONFIG["ha_token"]),
         "wake_word_enabled": bool(data.get("wake_word_enabled", CONFIG["wake_word_enabled"])),
+        "wake_word_phrase": data.get("wake_word_phrase", CONFIG["wake_word_phrase"]),
         "invert_gas": bool(data.get("invert_gas", CONFIG["invert_gas"])),
         "invert_light": bool(data.get("invert_light", CONFIG["invert_light"])),
+        "lat": data.get("lat", CONFIG.get("lat")),
+        "lon": data.get("lon", CONFIG.get("lon")),
+        "timezone": data.get("timezone", CONFIG.get("timezone", "auto")),
     })
+    if "voice_aliases" in data and isinstance(data["voice_aliases"], dict):
+        CONFIG["voice_aliases"].update({str(k).lower(): str(v) for k, v in data["voice_aliases"].items()})
     save_config(CONFIG)
     return jsonify({"success": True})
 
-# -------------------- API: sensors/health/news --------------------
+# -------------------- API: sensors/health/news/weather --------------------
 @app.route("/api/sensor_data")
 def api_sensor_data():
     return jsonify(get_sensor_data())
@@ -511,8 +534,18 @@ def api_health():
 
 @app.route("/api/news")
 def api_news():
-    """Temporary stub so the dashboard stops 404-ing. Wire to Bing later."""
-    return jsonify([])
+    return jsonify(news_mod.get_news())
+
+@app.route("/api/weather")
+def api_weather():
+    lat = CONFIG.get("lat"); lon = CONFIG.get("lon"); tz = CONFIG.get("timezone") or "auto"
+    if lat is None or lon is None:
+        return jsonify({"success": False, "error": "Set lat/lon in Settings or via /api/config"}), 400
+    try:
+        data = weather_mod.get_weather(float(lat), float(lon), tz=tz)
+        return jsonify({"success": True, "data": data})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
 
 # -------------------- API: volume --------------------
 @app.route("/api/volume/up", methods=["POST"])
@@ -545,30 +578,51 @@ def api_wifi_scan():
 @app.route("/api/wifi_connect", methods=["POST"])
 def api_wifi_connect():
     data = request.get_json(silent=True) or {}
-    ssid = data.get("ssid")
-    password = data.get("password") or ""
+    ssid = data.get("ssid"); password = data.get("password") or ""
     if not ssid:
         return jsonify({"success": False, "error": "SSID required"}), 400
     ok, info = connect_wifi(ssid, password)
     code = 200 if ok else 500
     return jsonify({"success": ok, "info": info}), code
 
-# -------------------- API: Home Assistant passthrough --------------------
+# -------------------- API: Home Assistant passthrough & discovery --------------------
 @app.route("/api/ha/service", methods=["POST"])
 def api_ha_service():
     data = request.get_json(silent=True) or {}
-    domain = data.get("domain")
-    service = data.get("service")
-    payload = data.get("payload", {})
+    domain = data.get("domain"); service = data.get("service"); payload = data.get("payload", {})
     if not domain or not service:
         return jsonify({"success": False, "error": "domain and service required"}), 400
     ok, info = ha_call(domain, service, payload)
     return jsonify({"success": ok, "info": info}), (200 if ok else 500)
 
+@app.route("/api/ha/entities")
+def api_ha_entities():
+    if not CONFIG.get("ha_base_url") or not CONFIG.get("ha_token"):
+        return jsonify({"success": False, "error": "Home Assistant not configured"}), 400
+    try:
+        url = f"{CONFIG['ha_base_url'].rstrip('/')}/api/states"
+        r = requests.get(url, headers=ha_headers(), timeout=10); r.raise_for_status()
+        items = r.json()
+        out = [{"entity_id": it.get("entity_id"),
+                "name": (it.get("attributes", {}) or {}).get("friendly_name")} for it in items]
+        return jsonify({"success": True, "entities": out})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/voice_alias", methods=["POST"])
+def api_voice_alias():
+    data = request.get_json(silent=True) or {}
+    alias = (data.get("alias") or "").strip().lower()
+    entity_id = (data.get("entity_id") or "").strip()
+    if not alias or not entity_id:
+        return jsonify({"success": False, "error": "alias and entity_id required"}), 400
+    CONFIG.setdefault("voice_aliases", {})[alias] = entity_id
+    save_config(CONFIG)
+    return jsonify({"success": True, "aliases": CONFIG["voice_aliases"]})
+
 # -------------------- API: Voice (push-to-talk) --------------------
 @app.route("/api/voice", methods=["POST"])
 def api_voice():
-    # JSON path (browser speech already produced text)
     if request.is_json:
         text = (request.get_json() or {}).get("text", "").strip()
         if not text:
@@ -576,7 +630,6 @@ def api_voice():
         ok, info = handle_intent_text(text)
         return jsonify({"success": ok, "text": text, "result": info}), 200
 
-    # multipart audio path (server transcribes via Whisper)
     if "audio" not in request.files:
         return jsonify({"success": False, "error": "No audio file"}), 400
 
@@ -598,10 +651,71 @@ def api_voice():
     except Exception as e:
         return jsonify({"success": False, "error": f"Transcription failed: {e}"}), 200
 
+# -------------------- API: Media --------------------
+@app.route("/api/media/play", methods=["POST"])
+def api_media_play():
+    data = request.get_json(silent=True) or {}
+    url = (data.get("url") or data.get("query") or "").strip()
+    if not url:
+        return jsonify({"success": False, "error": "Provide 'url' or 'query'"}), 400
+    try:
+        media.play(url)
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+@app.route("/api/media/pause", methods=["POST"])
+def api_media_pause():
+    media.pause(None)
+    return jsonify({"success": True})
+
+@app.route("/api/media/stop", methods=["POST"])
+def api_media_stop():
+    media.stop()
+    return jsonify({"success": True})
+
+@app.route("/api/media/volume", methods=["POST"])
+def api_media_volume():
+    data = request.get_json(silent=True) or {}
+    v = data.get("volume")
+    if v is None:
+        return jsonify({"success": True, "volume": media.status().get("volume")})
+    media.set_volume(int(v))
+    return jsonify({"success": True, "volume": int(v)})
+
+@app.route("/api/media/status")
+def api_media_status():
+    return jsonify(media.status())
+
+# -------------------- API: Timers/Alarms --------------------
+TIMER_API = None
+
+@app.route("/api/timers", methods=["GET", "POST"])
+def api_timers():
+    if request.method == "GET":
+        return jsonify({"success": True, "timers": TIMER_API.list()})
+    data = request.get_json(silent=True) or {}
+    label = (data.get("label") or "Timer").strip()
+    if "seconds" in data:
+        item = TIMER_API.create_in(int(data["seconds"]), label)
+        return jsonify({"success": True, "timer": item})
+    if "at" in data:
+        item = TIMER_API.create_at(str(data["at"]), label or "Alarm")
+        return jsonify({"success": True, "timer": item})
+    return jsonify({"success": False, "error": "Provide 'seconds' or 'at'"}), 400
+
+@app.route("/api/timers/<tid>", methods=["DELETE"])
+def api_timers_delete(tid):
+    ok = TIMER_API.delete(tid)
+    return jsonify({"success": ok})
+
 # -------------------- Main --------------------
 if __name__ == "__main__":
+    # init timers with media chime
+    TIMER_API = timers_mod.init(DATA_DIR, play_func=media.play)
+
     try:
-        if audio_available and i2c_bus:
+        if audio_available and 'i2c_bus' in globals() and i2c_bus:
             try:
                 i2c_bus.write_byte_data(TPA2016_ADDR, TPA2016_AGC_CONTROL, 0x05)
             except Exception as e:

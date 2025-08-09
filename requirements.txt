@@ -15,3 +15,6 @@ adafruit-blinka==8.51.0
 
 # Voice/LLM (optional feature; safe to keep)
 openai==1.35.14
+
+#APScheduler for timers
+APScheduler==3.10.4

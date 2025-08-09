@@ -9,6 +9,7 @@ APP_DIR="$HOME/binghome"
 SERVICE="binghome"
 UPDATE_SERVICE="binghome-updater"
 UPDATE_TIMER="binghome-updater.timer"
+TZ_DEFAULT="Australia/Brisbane"
 
 echo "🚀 Installing BingHome as $(whoami)"
 echo "📁 Target directory: $APP_DIR"
@@ -18,10 +19,7 @@ echo "📁 Target directory: $APP_DIR"
 # ==========================
 echo "🔎 Detecting default branch..."
 DEFAULT_BRANCH=$(git ls-remote --symref "$REPO" HEAD 2>/dev/null | awk -F'[:\t ]+' '/^ref:/ {print $3; exit}')
-if [ -z "${DEFAULT_BRANCH:-}" ]; then
-  # fallback
-  DEFAULT_BRANCH="main"
-fi
+DEFAULT_BRANCH=${DEFAULT_BRANCH:-main}
 echo "🌿 Detected default branch: $DEFAULT_BRANCH"
 
 # ==========================
@@ -30,11 +28,23 @@ echo "🌿 Detected default branch: $DEFAULT_BRANCH"
 echo "📦 Installing system dependencies..."
 sudo apt update
 sudo apt install -y \
-  git curl ca-certificates \
+  git curl ca-certificates jq \
   python3 python3-venv python3-pip \
   wireless-tools network-manager \
-  i2c-tools libgpiod2 \
-  chromium-browser xserver-xorg x11-xserver-utils xinit openbox unclutter
+  i2c-tools libgpiod2 gpiod \
+  chromium-browser xserver-xorg x11-xserver-utils xinit openbox unclutter \
+  xdotool \
+  mpv yt-dlp              # NEW: media playback
+
+
+# Set timezone (best effort)
+if [ -n "${TZ_DEFAULT}" ]; then
+  sudo timedatectl set-timezone "${TZ_DEFAULT}" || true
+fi
+
+# Make sure NetworkManager is running (for Wi-Fi control)
+sudo systemctl enable --now NetworkManager || true
+sudo usermod -aG netdev "$USER" || true
 
 # ==========================
 # Get code
@@ -81,7 +91,7 @@ EOF
 fi
 
 # ==========================
-# systemd service
+# systemd service for BingHome
 # ==========================
 echo "🧩 Creating systemd service..."
 SERVICE_FILE="/etc/systemd/system/${SERVICE}.service"
@@ -146,7 +156,6 @@ if [ ! -d .git ]; then
   exit 0
 fi
 
-# Make sure a remote tracking branch exists
 UPSTREAM=$(git rev-parse --abbrev-ref --symbolic-full-name "@{u}" 2>/dev/null || true)
 if [ -z "$UPSTREAM" ]; then
   echo "No upstream set for current branch; skipping update."
@@ -192,7 +201,7 @@ export DISPLAY=:0
 # Start the app service (if not already running)
 sudo systemctl start binghome
 
-# Wait until the health endpoint is up (max ~30s)
+# Wait for health endpoint (max ~30s)
 for i in $(seq 1 30); do
   if curl -s http://localhost:5000/api/health | grep -q healthy; then
     break
@@ -256,6 +265,78 @@ if ! grep -q "startx" "$HOME/.bash_profile" 2>/dev/null; then
 fi
 
 # ==========================
+# Home Assistant (Docker) + systemd
+# ==========================
+echo "🏠 Installing Home Assistant (Container)..."
+
+# Install Docker + compose plugin if needed
+if ! command -v docker >/dev/null 2>&1; then
+  curl -fsSL https://get.docker.com | sh
+  sudo usermod -aG docker "$USER"
+fi
+if ! docker compose version >/dev/null 2>&1; then
+  sudo apt install -y docker-compose-plugin
+fi
+
+HA_DIR="$HOME/homeassistant"
+mkdir -p "$HA_DIR"
+
+cat > "$HA_DIR/docker-compose.yml" <<EOF
+services:
+  homeassistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    container_name: homeassistant
+    environment:
+      - TZ=${TZ_DEFAULT}
+    volumes:
+      - ./config:/config
+      - /etc/localtime:/etc/localtime:ro
+    network_mode: host
+    restart: unless-stopped
+EOF
+
+sudo tee /etc/systemd/system/homeassistant.service >/dev/null <<EOF
+[Unit]
+Description=Home Assistant (Docker Compose)
+After=network-online.target docker.service
+Wants=network-online.target docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=${HA_DIR}
+ExecStart=/usr/bin/docker compose up -d
+ExecStop=/usr/bin/docker compose down
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo systemctl daemon-reload
+sudo systemctl enable homeassistant
+sudo systemctl start homeassistant
+echo "✅ Home Assistant starting at http://localhost:8123 (first boot may take a few minutes)"
+
+# ==========================
+# Polkit rule (optional) for nmcli Wi-Fi control without sudo
+# ==========================
+echo "🛡  Adding polkit rule to allow nmcli Wi-Fi operations for 'netdev' group..."
+sudo tee /etc/polkit-1/rules.d/10-nmcli-wifi.rules >/dev/null <<'EOF'
+polkit.addRule(function(action, subject) {
+  if (subject.isInGroup("netdev") &&
+      (action.id == "org.freedesktop.NetworkManager.enable-disable-wifi" ||
+       action.id == "org.freedesktop.NetworkManager.wifi.scan" ||
+       action.id == "org.freedesktop.NetworkManager.network-control" ||
+       action.id == "org.freedesktop.NetworkManager.settings.modify.system" ||
+       action.id == "org.freedesktop.NetworkManager.settings.modify.own")) {
+    return polkit.Result.YES;
+  }
+});
+EOF
+sudo systemctl restart polkit || true
+sudo systemctl restart NetworkManager || true
+
+# ==========================
 # Enable and start services
 # ==========================
 echo "🔧 Enabling services..."
@@ -263,6 +344,9 @@ sudo systemctl daemon-reload
 sudo systemctl enable "$SERVICE" "$UPDATE_TIMER"
 sudo systemctl start "$SERVICE" "$UPDATE_TIMER"
 
+echo ""
 echo "✅ Install complete."
-echo "➡️  Reboot recommended: sudo reboot"
-echo "💡 Tip: For fastest kiosk boot, set 'Console Autologin' and Splash via 'sudo raspi-config'."
+echo "➡️  REBOOT recommended: sudo reboot"
+echo "💡 After reboot: Pi should auto-login to console, start X, run Openbox, and launch Chromium in kiosk pointed at BingHome."
+echo "💡 HA is running via Docker (host mode) on http://localhost:8123"
+echo "💡 If Wi-Fi scan still says 'unavailable': sudo rfkill unblock all && sudo nmcli radio wifi on && sudo ip link set wlan0 up"
