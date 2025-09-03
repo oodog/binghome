@@ -1,377 +1,1133 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Smart Home Hub</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BingHome - Smart Home Control</title>
     <style>
-        * { margin:0; padding:0; box-sizing:border-box; }
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #0a0a0a;
+            --bg-secondary: #1a1a1a;
+            --bg-tile: #242424;
+            --accent: #00ff88;
+            --accent-dim: #00cc66;
+            --text-primary: #ffffff;
+            --text-secondary: #a0a0a0;
+            --danger: #ff4444;
+            --warning: #ffaa00;
+            --success: #00ff88;
+            --glass: rgba(255, 255, 255, 0.05);
+            --border: rgba(255, 255, 255, 0.1);
+        }
+
         body {
-            font-family:'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 50%, #16213e 100%);
-            color:white; overflow:hidden; height:100vh; width:100vw;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow-x: hidden;
+            position: relative;
+            min-height: 100vh;
         }
-        /* Top Status Bar */
+
+        /* Animated background */
+        .bg-animation {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a2e 50%, #0a0a0a 100%);
+            animation: gradient 15s ease infinite;
+        }
+
+        @keyframes gradient {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        /* Header */
+        .header {
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid var(--border);
+            padding: 15px 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            background: linear-gradient(135deg, var(--accent) 0%, #00ffff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            cursor: pointer;
+        }
+
+        /* Status Bar */
         .status-bar {
-            background: rgba(0,0,0,0.3);
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 15px;
+            background: var(--glass);
+            border-radius: 20px;
+            border: 1px solid var(--border);
+            transition: all 0.3s ease;
+        }
+
+        .status-item:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0, 255, 136, 0.2);
+        }
+
+        .settings-button {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .settings-button:hover {
+            background: var(--accent);
+            color: var(--bg-primary);
+            transform: rotate(90deg);
+        }
+
+        /* Container */
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 30px;
+        }
+
+        /* Dashboard Grid */
+        .dashboard-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 25px;
+            margin-bottom: 30px;
+        }
+
+        /* Tiles */
+        .tile {
+            background: var(--glass);
             backdrop-filter: blur(10px);
-            border-bottom: 1px solid rgba(255,255,255,0.1);
-            padding: 8px 20px; display:flex; justify-content:space-between; align-items:center;
-            height:60px; position:relative; z-index:100;
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 25px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
         }
-        .status-left, .status-right { display:flex; align-items:center; gap:20px; }
-        .sensor-item {
-            display:flex; align-items:center; gap:8px;
-            background: rgba(255,255,255,0.1);
-            padding:4px 12px; border-radius:20px; font-size:14px;
-        }
-        .sensor-icon { width:16px; height:16px; opacity:.8; }
-        .datetime { font-size:18px; font-weight:500; display:flex; gap:8px; align-items:center; }
-        /* NEW: settings button */
-        .settings-btn {
-            display:inline-flex; align-items:center; gap:8px;
-            background: rgba(255,255,255,0.1);
-            border: 1px solid rgba(255,255,255,0.2);
-            color:#fff; text-decoration:none; padding:8px 14px; border-radius:12px;
-            transition: all .2s ease;
-        }
-        .settings-btn:hover { background: rgba(0,212,255,0.25); transform: translateY(-1px); }
 
-        /* Main */
-        .main-container { display:flex; height: calc(100vh - 60px - 60px); } /* minus status & nav */
-        .news-sidebar {
-            width:300px; background: rgba(0,0,0,0.2); backdrop-filter: blur(5px);
-            border-right:1px solid rgba(255,255,255,0.1);
-            padding:20px; overflow:hidden;
+        .tile:hover {
+            transform: translateY(-5px) scale(1.02);
+            box-shadow: 0 15px 40px rgba(0, 255, 136, 0.15);
+            border-color: var(--accent-dim);
         }
-        .news-title { font-size:18px; font-weight:600; margin-bottom:20px; color:#00d4ff; }
-        .news-scroll { height: calc(100% - 60px); overflow:hidden; }
-        .news-item{
-            background: rgba(255,255,255,0.05); border-radius:10px; padding:15px; margin-bottom:15px;
-            border-left:3px solid #00d4ff; transition:.3s ease; cursor:pointer;
-        }
-        .news-item:hover { background: rgba(255,255,255,0.1); transform: translateX(5px); }
-        .news-item h4 { font-size:14px; line-height:1.4; margin-bottom:5px; }
-        .news-time { font-size:12px; opacity:.6; }
 
-        .app-grid {
-            flex:1; padding:40px;
-            display:grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            grid-gap:30px; align-content:start;
+        .tile-icon {
+            width: 50px;
+            height: 50px;
+            margin-bottom: 15px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dim) 100%);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
         }
-        .app-tile{
-            background: rgba(255,255,255,0.08); border-radius:20px; padding:25px 15px;
-            text-align:center; cursor:pointer; transition:.3s ease; backdrop-filter: blur(10px);
-            border:1px solid rgba(255,255,255,0.1); position:relative; overflow:hidden; min-height:160px;
-        }
-        .app-tile:hover{ transform: translateY(-5px); background: rgba(255,255,255,0.15); box-shadow:0 20px 40px rgba(0,212,255,0.3); }
-        .app-tile::before{
-            content:''; position:absolute; top:0; left:-100%; width:100%; height:100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
-            transition:left .5s;
-        }
-        .app-tile:hover::before{ left:100%; }
 
-        .app-icon{
-            width:60px; height:60px; margin:0 auto 15px; border-radius:12px;
-            display:flex; align-items:center; justify-content:center; font-size:28px;
-            background: linear-gradient(135deg, var(--icon-color-1), var(--icon-color-2));
-            box-shadow: 0 8px 20px rgba(0,0,0,0.3);
+        .tile-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 10px;
         }
-        .app-title{ font-size:16px; font-weight:500; margin-bottom:5px; }
-        .app-subtitle{ font-size:12px; opacity:.7; }
 
-        /* App colors */
-        .youtube{ --icon-color-1:#ff0000; --icon-color-2:#cc0000; }
-        .netflix{ --icon-color-1:#e50914; --icon-color-2:#b20710; }
-        .prime{ --icon-color-1:#00a8e1; --icon-color-2:#0073aa; }
-        .xbox{ --icon-color-1:#107c10; --icon-color-2:#0e6b0e; }
-        .settings{ --icon-color-1:#666; --icon-color-2:#444; }
-        .assistant{ --icon-color-1:#00d4ff; --icon-color-2:#0099cc; }
-        .home-assistant{ --icon-color-1:#41bdf5; --icon-color-2:#2196f3; }
-        .music{ --icon-color-1:#1db954; --icon-color-2:#1aa34a; }
-
-        /* Voice button */
-        .voice-assistant{
-            position:fixed; right:30px; bottom:90px; width:70px; height:70px; z-index:1000;
-            background: linear-gradient(135deg, #00d4ff, #0099cc); border-radius:50%;
-            display:flex; align-items:center; justify-content:center; cursor:pointer; transition:.3s ease;
-            box-shadow: 0 10px 30px rgba(0,212,255,0.4);
+        .tile-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: var(--accent);
+            margin-bottom: 5px;
         }
-        .voice-assistant:hover{ transform: scale(1.07); box-shadow: 0 15px 40px rgba(0,212,255,0.6); }
-        .voice-assistant.listening{ animation: pulse 1.5s infinite; }
-        @keyframes pulse{ 0%{box-shadow:0 0 0 0 rgba(0,212,255,.7)} 70%{box-shadow:0 0 0 20px rgba(0,212,255,0)} 100%{box-shadow:0 0 0 0 rgba(0,212,255,0)} }
 
-        /* Bottom nav */
-        .nav-bar{
-            position:fixed; left:0; right:0; bottom:0; z-index:1000;
-            background: rgba(0,0,0,0.8); backdrop-filter: blur(10px);
-            border-top:1px solid rgba(255,255,255,0.1);
-            padding:10px 20px; display:flex; justify-content:center; gap:20px;
+        .tile-subtitle {
+            font-size: 14px;
+            color: var(--text-secondary);
         }
-        .nav-button{
-            background: rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2);
-            color:white; padding:12px 24px; border-radius:25px; cursor:pointer; transition:.2s;
-            font-size:14px; display:flex; align-items:center; gap:8px;
-        }
-        .nav-button:hover{ background: rgba(0,212,255,0.8); transform: translateY(-2px); }
-        .nav-button.active{ background: rgba(0,212,255,0.6); }
 
-        /* Extra UI */
-        .connection-status{ position:fixed; top:70px; right:20px; padding:8px 15px; border-radius:20px; font-size:12px; z-index:1001; transition:.3s }
-        .connection-status.online{ background: rgba(68,255,68,.8); color:#000 }
-        .connection-status.offline{ background: rgba(255,68,68,.8); color:#fff }
-        .swipe-indicator{
-            position:fixed; top:50%; left:20px; transform: translateY(-50%);
-            background: rgba(0,212,255,.8); color:white; padding:10px 15px; border-radius:25px; font-size:14px;
-            opacity:0; transition: opacity .3s ease; z-index:1001; pointer-events:none;
+        /* Voice Control */
+        .voice-control {
+            grid-column: span 2;
+            background: linear-gradient(135deg, var(--glass), rgba(0, 255, 136, 0.05));
         }
-        .swipe-indicator.show{ opacity:1; }
 
-        /* Touch feedback */
-        .app-tile:active{ transform: scale(.95); }
-        @keyframes scroll{ 0%{transform: translateY(0)} 100%{transform: translateY(-100%)} }
-        .auto-scroll{ animation: scroll 30s linear infinite; }
-
-        /* Modal (kept from your version) */
-        .modal{ display:none; position:fixed; inset:0; background: rgba(0,0,0,.8); backdrop-filter: blur(10px); z-index:2000; }
-        .modal-content{
-            position:absolute; top:50%; left:50%; transform: translate(-50%,-50%);
-            background: rgba(20,20,40,.95); border-radius:20px; padding:40px; width:90%; max-width:800px;
-            border:1px solid rgba(255,255,255,.2); max-height:90vh; overflow-y:auto;
+        .voice-button {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+            border: none;
+            color: var(--bg-primary);
+            font-size: 32px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin: 20px auto;
+            display: block;
         }
-        .close{ position:absolute; top:15px; right:20px; font-size:30px; cursor:pointer; color:#666 }
-        .close:hover{ color:#fff }
+
+        .voice-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 0 30px var(--accent);
+        }
+
+        .voice-button.listening {
+            animation: pulse 1s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+
+        /* Settings Modal */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.9);
+            backdrop-filter: blur(10px);
+            z-index: 1000;
+        }
+
+        .modal.active {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-content {
+            background: var(--bg-secondary);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 600px;
+            width: 90%;
+            max-height: 80vh;
+            overflow-y: auto;
+            animation: slideUp 0.3s ease;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(50px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        .modal-header {
+            font-size: 24px;
+            margin-bottom: 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .close-button {
+            width: 30px;
+            height: 30px;
+            border-radius: 50%;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.3s ease;
+        }
+
+        .close-button:hover {
+            background: var(--danger);
+            transform: rotate(90deg);
+        }
+
+        /* Settings Sections */
+        .settings-section {
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .settings-section:last-child {
+            border-bottom: none;
+        }
+
+        .section-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--accent);
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.2);
+        }
+
+        .form-select {
+            width: 100%;
+            padding: 12px;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        .form-hint {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        .button {
+            padding: 12px 24px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-dim));
+            border: none;
+            border-radius: 10px;
+            color: var(--bg-primary);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-right: 10px;
+        }
+
+        .button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(0, 255, 136, 0.3);
+        }
+
+        .button-secondary {
+            background: var(--glass);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .button-secondary:hover {
+            background: var(--border);
+        }
+
+        .oauth-button {
+            width: 100%;
+            padding: 15px;
+            background: linear-gradient(135deg, #1a73e8, #4285f4);
+            border: none;
+            border-radius: 10px;
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .oauth-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 5px 20px rgba(26, 115, 232, 0.3);
+        }
+
+        /* Status indicators */
+        .status-indicator {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            margin-left: 10px;
+        }
+
+        .status-indicator.connected {
+            background: var(--success);
+            animation: blink 2s ease infinite;
+        }
+
+        .status-indicator.disconnected {
+            background: var(--danger);
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Voice Mode Badge */
+        .voice-mode-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: var(--glass);
+            border: 1px solid var(--accent);
+            border-radius: 15px;
+            font-size: 12px;
+            color: var(--accent);
+            margin-left: 10px;
+        }
+
+        /* News Feed */
+        .news-feed {
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 25px;
+            margin-bottom: 30px;
+        }
+
+        .news-title {
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+
+        .news-item {
+            padding: 15px;
+            margin-bottom: 10px;
+            background: var(--bg-tile);
+            border-radius: 10px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .news-item:hover {
+            background: var(--glass);
+            transform: translateX(5px);
+        }
+
+        /* Notification */
+        .notification {
+            position: fixed;
+            top: 100px;
+            right: 30px;
+            padding: 15px 20px;
+            background: var(--glass);
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            animation: slideIn 0.3s ease;
+            z-index: 200;
+        }
+
+        @keyframes slideIn {
+            from {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+
+        .notification.success {
+            border-color: var(--success);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .notification.error {
+            border-color: var(--danger);
+            background: rgba(255, 68, 68, 0.1);
+        }
+
+        /* Loading spinner */
+        .loader {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--glass);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 20px auto;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header {
+                flex-direction: column;
+                gap: 15px;
+            }
+
+            .dashboard-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .voice-control {
+                grid-column: span 1;
+            }
+        }
     </style>
 </head>
 <body>
-    <!-- Status Bar -->
-    <div class="status-bar">
-        <div class="status-left">
-            <div class="sensor-item"><span class="sensor-icon">🌡️</span><span id="temperature">22.5°C</span></div>
-            <div class="sensor-item"><span class="sensor-icon">💧</span><span id="humidity">45%</span></div>
-            <div class="sensor-item"><span class="sensor-icon">💨</span><span id="gas-status">Safe</span></div>
-            <div class="sensor-item"><span class="sensor-icon">💡</span><span id="light-level">Normal</span></div>
-            <div class="sensor-item"><span class="sensor-icon">🔊</span><span id="audio-status">Active</span></div>
-            <div class="sensor-item"><span class="sensor-icon">📶</span><span id="wifi-strength">85%</span></div>
-        </div>
-        <div class="status-right">
-            <div class="datetime">
-                <span id="current-time">14:30</span>
-                <span id="current-date">Mon, Jul 21</span>
+    <!-- Background -->
+    <div class="bg-animation"></div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="logo" onclick="location.reload()">🏠 BingHome</div>
+        <div class="status-bar">
+            <div class="status-item">
+                <span>🌡️</span>
+                <span id="temp">--</span>
+                <span>°C</span>
             </div>
-            <!-- NEW: dedicated settings button -->
-            <a class="settings-btn" href="/settings" title="Open Settings">⚙️ Settings</a>
+            <div class="status-item">
+                <span>💧</span>
+                <span id="humidity">--</span>
+                <span>%</span>
+            </div>
+            <div class="status-item">
+                <span>💨</span>
+                <span id="gas">Safe</span>
+            </div>
+            <div class="status-item">
+                <span>💡</span>
+                <span id="light">--</span>
+            </div>
+            <button class="settings-button" onclick="openSettings()">⚙️</button>
         </div>
-    </div>
+    </header>
 
     <!-- Main Container -->
-    <div class="main-container">
-        <!-- News Sidebar -->
-        <div class="news-sidebar">
-            <h3 class="news-title">Latest News</h3>
-            <div class="news-scroll">
-                <div id="news-container" class="auto-scroll">
-                    <!-- fallback demo items; replaced by /api/news if you add it -->
-                    <div class="news-item"><h4>Raspberry Pi launches new model A with enhanced AI capabilities</h4><div class="news-time">2 hours ago</div></div>
-                    <div class="news-item"><h4>Global tech stocks soar in market rally following AI breakthrough</h4><div class="news-time">4 hours ago</div></div>
-                    <div class="news-item"><h4>New breakthrough in quantum computing announced by major tech company</h4><div class="news-time">6 hours ago</div></div>
-                    <div class="news-item"><h4>Smart home adoption reaches all-time high in 2025</h4><div class="news-time">8 hours ago</div></div>
-                    <div class="news-item"><h4>Revolutionary battery technology promises 10x longer life</h4><div class="news-time">10 hours ago</div></div>
+    <div class="container">
+        <!-- Dashboard Grid -->
+        <div class="dashboard-grid">
+            <!-- Voice Control -->
+            <div class="tile voice-control">
+                <div class="tile-icon">🎤</div>
+                <div class="tile-title">
+                    Voice Assistant
+                    <span class="voice-mode-badge" id="voiceMode">Loading...</span>
                 </div>
+                <div class="tile-subtitle">Say "Hey Bing" to activate</div>
+                <button class="voice-button" id="voiceBtn">🎙️</button>
+                <div class="tile-subtitle" id="voiceStatus">Initializing...</div>
+            </div>
+
+            <!-- Climate Control -->
+            <div class="tile" onclick="toggleClimate()">
+                <div class="tile-icon">🌡️</div>
+                <div class="tile-title">Climate</div>
+                <div class="tile-value" id="climateTemp">22°C</div>
+                <div class="tile-subtitle">Living Room</div>
+            </div>
+
+            <!-- Lighting -->
+            <div class="tile" onclick="toggleLights()">
+                <div class="tile-icon">💡</div>
+                <div class="tile-title">Lighting</div>
+                <div class="tile-value" id="lightStatus">ON</div>
+                <div class="tile-subtitle">Smart control</div>
+            </div>
+
+            <!-- Security -->
+            <div class="tile" onclick="openSecurity()">
+                <div class="tile-icon">🔒</div>
+                <div class="tile-title">Security</div>
+                <div class="tile-value">Active</div>
+                <div class="tile-subtitle">All sensors online</div>
+            </div>
+
+            <!-- Media -->
+            <div class="tile" onclick="openMedia()">
+                <div class="tile-icon">📺</div>
+                <div class="tile-title">Entertainment</div>
+                <div class="tile-subtitle">Voice controlled media</div>
+            </div>
+
+            <!-- Energy -->
+            <div class="tile" onclick="openEnergy()">
+                <div class="tile-icon">⚡</div>
+                <div class="tile-title">Energy</div>
+                <div class="tile-value">2.4 kW</div>
+                <div class="tile-subtitle">Current usage</div>
             </div>
         </div>
 
-        <!-- App Grid -->
-        <div class="app-grid">
-            <div class="app-tile youtube" onclick="openApp('youtube')"><div class="app-icon">🎥</div><div class="app-title">YouTube</div><div class="app-subtitle">Watch videos</div></div>
-            <div class="app-tile netflix" onclick="openApp('netflix')"><div class="app-icon">📽️</div><div class="app-title">Netflix</div><div class="app-subtitle">Stream movies</div></div>
-            <div class="app-tile prime" onclick="openApp('prime')"><div class="app-icon">📺</div><div class="app-title">Prime Video</div><div class="app-subtitle">Amazon Prime</div></div>
-            <div class="app-tile xbox" onclick="openApp('xbox')"><div class="app-icon">🎮</div><div class="app-title">Xbox Cloud</div><div class="app-subtitle">Cloud gaming</div></div>
-            <div class="app-tile music" onclick="openApp('music')"><div class="app-icon">🎵</div><div class="app-title">Spotify</div><div class="app-subtitle">Music streaming</div></div>
-            <div class="app-tile home-assistant" onclick="openApp('home-assistant')"><div class="app-icon">🏠</div><div class="app-title">Home Assistant</div><div class="app-subtitle">Smart home control</div></div>
-            <div class="app-tile assistant" onclick="openApp('assistant')"><div class="app-icon">🤖</div><div class="app-title">AI Assistant</div><div class="app-subtitle">ChatGPT powered</div></div>
-            <div class="app-tile settings" onclick="openSettings()"><div class="app-icon">⚙️</div><div class="app-title">Settings</div><div class="app-subtitle">System config</div></div>
+        <!-- News Feed -->
+        <div class="news-feed">
+            <div class="news-title">📰 Latest News</div>
+            <div id="newsContainer">
+                <div class="loader"></div>
+            </div>
         </div>
     </div>
 
-    <!-- Connection Status -->
-    <div class="connection-status online" id="connection-status">Online</div>
-
-    <!-- Bottom Navigation -->
-    <div class="nav-bar">
-        <button class="nav-button active" onclick="showHome()" id="home-btn">🏠 Home</button>
-        <button class="nav-button" onclick="showSettings()" id="settings-btn">⚙️ Settings</button>
-        <button class="nav-button" onclick="showAssistant()" id="assistant-btn">🤖 Assistant</button>
-        <button class="nav-button" onclick="goBack()" id="back-btn-nav">⬅️ Back</button>
-    </div>
-
-    <!-- Swipe Indicator -->
-    <div class="swipe-indicator" id="swipe-indicator">Swipe right to go back</div>
-
-    <!-- Voice Assistant Button (push to talk toggle) -->
-    <div class="voice-assistant" onclick="toggleVoiceAssistant()" id="voice-btn" title="Tap to speak / stop">
-        <span style="font-size:30px;">🎤</span>
-    </div>
-
-    <!-- Settings Modal (your existing modal kept) -->
-    <div id="settings-modal" class="modal">
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal">
         <div class="modal-content">
-            <span class="close" onclick="closeSettings()">&times;</span>
-            <h2 style="margin-bottom: 30px; color: #00d4ff;">⚙️ System Settings</h2>
-            <!-- keep your existing sections here ... -->
-            <p style="opacity:.75">For full settings, use the top-right <b>Settings</b> button (opens /settings).</p>
+            <div class="modal-header">
+                <span>Settings</span>
+                <button class="close-button" onclick="closeSettings()">✕</button>
+            </div>
+
+            <!-- API Keys Section -->
+            <div class="settings-section">
+                <div class="section-title">🔑 API Configuration</div>
+                
+                <!-- OpenAI/ChatGPT -->
+                <div class="form-group">
+                    <label class="form-label">
+                        OpenAI API Key
+                        <span class="status-indicator" id="openaiStatus"></span>
+                    </label>
+                    <input type="password" class="form-input" id="openaiKey" placeholder="sk-...">
+                    <div class="form-hint">For ChatGPT voice responses</div>
+                    
+                    <div style="margin-top: 10px;">
+                        <button class="oauth-button" onclick="loginWithOpenAI()">
+                            <span>🔐</span>
+                            <span>Sign in with ChatGPT</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Bing API -->
+                <div class="form-group">
+                    <label class="form-label">
+                        Bing API Key
+                        <span class="status-indicator" id="bingStatus"></span>
+                    </label>
+                    <input type="password" class="form-input" id="bingKey" placeholder="Your Bing News API key">
+                    <div class="form-hint">For news feed (optional)</div>
+                </div>
+
+                <!-- Home Assistant -->
+                <div class="form-group">
+                    <label class="form-label">
+                        Home Assistant URL
+                        <span class="status-indicator" id="haStatus"></span>
+                    </label>
+                    <input type="text" class="form-input" id="haUrl" placeholder="http://localhost:8123">
+                    <div class="form-hint">Your Home Assistant instance URL</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Home Assistant Token</label>
+                    <input type="password" class="form-input" id="haToken" placeholder="Long-lived access token">
+                    <div class="form-hint">Create in Home Assistant profile settings</div>
+                </div>
+            </div>
+
+            <!-- Voice Settings Section -->
+            <div class="settings-section">
+                <div class="section-title">🎤 Voice Recognition</div>
+                
+                <div class="form-group">
+                    <label class="form-label">Voice Mode</label>
+                    <select class="form-select" id="voiceModeSelect">
+                        <option value="auto">Auto (Fallback enabled)</option>
+                        <option value="vosk">Vosk (Offline, lightweight)</option>
+                        <option value="whisper">Whisper (Best quality)</option>
+                        <option value="speech_recognition">Google Speech</option>
+                    </select>
+                    <div class="form-hint">Auto mode tries local first, then cloud</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Wake Words</label>
+                    <input type="text" class="form-input" id="wakeWords" placeholder="hey bing, okay bing">
+                    <div class="form-hint">Comma-separated wake words</div>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">TTS Engine</label>
+                    <select class="form-select" id="ttsEngine">
+                        <option value="pyttsx3">Local TTS (pyttsx3)</option>
+                        <option value="gtts">Google TTS (Better quality)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Hardware Settings Section -->
+            <div class="settings-section">
+                <div class="section-title">🔧 Hardware Configuration</div>
+                
+                <div class="form-group">
+                    <label class="form-label">DHT22 GPIO Pin</label>
+                    <input type="number" class="form-input" id="dht22Pin" placeholder="4" min="0" max="27">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Gas Sensor GPIO Pin</label>
+                    <input type="number" class="form-input" id="gasPin" placeholder="17" min="0" max="27">
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label">Light Sensor GPIO Pin</label>
+                    <input type="number" class="form-input" id="lightPin" placeholder="27" min="0" max="27">
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div style="display: flex; gap: 10px; justify-content: flex-end;">
+                <button class="button button-secondary" onclick="testVoice()">Test Voice</button>
+                <button class="button button-secondary" onclick="resetSettings()">Reset</button>
+                <button class="button" onclick="saveSettings()">Save Settings</button>
+            </div>
         </div>
     </div>
 
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
     <script>
-        /* ---------------- Date/Time ---------------- */
-        function updateDateTime() {
-            const now = new Date();
-            const timeOptions = { hour: '2-digit', minute: '2-digit', hour12: false };
-            const dateOptions = { weekday: 'short', month: 'short', day: 'numeric' };
-            document.getElementById('current-time').textContent = now.toLocaleTimeString(undefined, timeOptions);
-            document.getElementById('current-date').textContent = now.toLocaleDateString(undefined, dateOptions);
+        // Global variables
+        const socket = io();
+        let currentSettings = {};
+        let isListening = false;
+        let recognition = null;
+        
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeApp();
+            loadSettings();
+            initVoiceControl();
+        });
+        
+        // Initialize app
+        function initializeApp() {
+            // Check for auth callback
+            const urlParams = new URLSearchParams(window.location.search);
+            const authStatus = urlParams.get('auth');
+            
+            if (authStatus === 'success') {
+                showNotification('Successfully connected to ChatGPT!', 'success');
+                window.history.replaceState({}, document.title, '/');
+            } else if (authStatus === 'failed') {
+                showNotification('ChatGPT authentication failed', 'error');
+                window.history.replaceState({}, document.title, '/');
+            }
+            
+            // Update time
+            setInterval(updateTime, 1000);
+            updateTime();
         }
-
-        /* ---------------- Sensors ---------------- */
-        function updateSensorData() {
-            fetch('/api/sensor_data')
-                .then(r => r.ok ? r.json() : Promise.reject(r.status))
-                .then(data => {
-                    if ('temperature' in data) document.getElementById('temperature').textContent = (data.temperature ?? '--') + '°C';
-                    if ('humidity' in data) document.getElementById('humidity').textContent = (data.humidity ?? '--') + '%';
-                    if ('gas_detected' in data) document.getElementById('gas-status').textContent = data.gas_detected ? 'Alert' : 'Safe';
-                    if ('light_detected' in data) document.getElementById('light-level').textContent = data.light_detected ? 'Bright' : 'Normal';
-                })
-                .catch(() => {});
-        }
-
-        /* ---------------- News (optional /api/news) ---------------- */
-        function updateNews() {
-            fetch('/api/news')
-                .then(r => r.ok ? r.json() : Promise.reject())
-                .then(items => {
-                    if (!Array.isArray(items)) return;
-                    const container = document.getElementById('news-container');
-                    container.innerHTML = '';
-                    items.forEach(it => {
-                        const el = document.createElement('div');
-                        el.className = 'news-item';
-                        el.innerHTML = `<h4>${it.title}</h4><div class="news-time">${it.time || ''}</div>`;
-                        container.appendChild(el);
-                    });
-                }).catch(()=>{});
-        }
-
-        /* ---------------- Apps ---------------- */
-        function openApp(name){
-            const urls = {
-                youtube:'https://youtube.com',
-                netflix:'https://netflix.com',
-                prime:'https://primevideo.com',
-                xbox:'https://xbox.com/play',
-                music:'https://open.spotify.com',
-                'home-assistant':'http://localhost:8123',
-                assistant:'/assistant'
-            };
-            if (urls[name]) window.open(urls[name], '_blank');
-        }
-        function openSettings(){ document.getElementById('settings-modal').style.display='block'; }
-        function closeSettings(){ document.getElementById('settings-modal').style.display='none'; }
-        function showHome(){ window.location.href = '/'; }
-        function showSettings(){ window.location.href = '/settings'; }
-        function showAssistant(){ window.location.href = '/assistant'; } // add this route later if you want
-        function goBack(){ history.back(); }
-
-        /* ---------------- Connection badge ---------------- */
-        function updateOnline(){
-            const el = document.getElementById('connection-status');
-            const on = navigator.onLine;
-            el.textContent = on ? 'Online' : 'Offline';
-            el.className = 'connection-status ' + (on ? 'online':'offline');
-        }
-        window.addEventListener('online', updateOnline);
-        window.addEventListener('offline', updateOnline);
-
-        /* ---------------- Voice: Home/Settings shortcuts ---------------- */
-        let recognizing = false, recognition;
-        function supportsWebSpeech(){
-            return 'webkitSpeechRecognition' in window || 'SpeechRecognition' in window;
-        }
-        function ensureRecognizer(){
-            if (!supportsWebSpeech()) return null;
-            const Ctor = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const rec = new Ctor();
-            rec.lang = 'en-US';
-            rec.interimResults = false;
-            rec.continuous = false;
-            return rec;
-        }
-        function toggleVoiceAssistant(){
-            const btn = document.getElementById('voice-btn');
-            if (recognizing){ recognition.stop(); recognizing=false; btn.classList.remove('listening'); return; }
-            recognition = ensureRecognizer();
-            if (recognition){
-                recognition.onstart = ()=>{ recognizing=true; btn.classList.add('listening'); };
-                recognition.onend = ()=>{ recognizing=false; btn.classList.remove('listening'); };
-                recognition.onerror = ()=>{ recognizing=false; btn.classList.remove('listening'); };
-                recognition.onresult = (ev)=>{
-                    const text = (ev.results[0] && ev.results[0][0] && ev.results[0][0].transcript || '').toLowerCase().trim();
-                    handleLocalVoice(text);
-                };
-                recognition.start();
+        
+        // Socket event handlers
+        socket.on('connect', function() {
+            console.log('Connected to BingHome server');
+            showNotification('Connected to server', 'success');
+        });
+        
+        socket.on('sensor_update', function(data) {
+            document.getElementById('temp').textContent = data.temperature || '--';
+            document.getElementById('humidity').textContent = data.humidity || '--';
+            document.getElementById('gas').textContent = data.gas_detected ? 'Warning!' : 'Safe';
+            document.getElementById('gas').style.color = data.gas_detected ? 'var(--danger)' : 'var(--success)';
+            document.getElementById('light').textContent = data.light_level || '--';
+            
+            // Update climate tile
+            document.getElementById('climateTemp').textContent = `${data.temperature || '--'}°C`;
+        });
+        
+        socket.on('news_update', function(news) {
+            const container = document.getElementById('newsContainer');
+            if (news && news.length > 0) {
+                container.innerHTML = news.slice(0, 5).map(item => `
+                    <div class="news-item" onclick="window.open('${item.url}', '_blank')">
+                        <div style="font-weight: 600;">${item.title}</div>
+                        <div style="font-size: 12px; color: var(--text-secondary); margin-top: 5px;">
+                            ${item.provider} • ${formatTime(item.published)}
+                        </div>
+                    </div>
+                `).join('');
             } else {
-                // fallback: if no Web Speech, click toggles nothing. (Server-side push-to-talk can be wired here)
-                alert('Voice recognition not supported on this browser.');
+                container.innerHTML = '<div style="text-align: center; color: var(--text-secondary);">No news available</div>';
             }
-        }
-        function handleLocalVoice(text){
-            if (!text) return;
-            // go home / settings quick intents
-            if (/(^|\s)(home|go home|back to home|main screen)($|\s)/i.test(text)) { showHome(); return; }
-            if (/(settings|open settings|system settings)/i.test(text)) { showSettings(); return; }
-            if (/(back|go back|previous)/i.test(text)) { goBack(); return; }
-            // Otherwise let backend handle (lights, scenes, etc.) if you want:
-            fetch('/api/voice', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text})})
-                .then(r=>r.json()).then(j=>{ if(!j.success && j.error){ console.log(j.error); } });
-        }
-
-        /* ---------------- Gestures: pinch-in to HOME ---------------- */
-        let pinchStartDist = null;
-        function touchDistance(t1,t2){
-            const dx = t1.clientX - t2.clientX, dy = t1.clientY - t2.clientY;
-            return Math.hypot(dx, dy);
-        }
-        window.addEventListener('touchstart', (e)=>{
-            if (e.touches.length===2){
-                pinchStartDist = touchDistance(e.touches[0], e.touches[1]);
-            }
-        }, {passive:true});
-        window.addEventListener('touchmove', (e)=>{
-            if (e.touches.length===2 && pinchStartDist){
-                const dist = touchDistance(e.touches[0], e.touches[1]);
-                // if user pinches in by >20% of start distance -> go home
-                if (dist < pinchStartDist * 0.8){
-                    pinchStartDist = null;
-                    showHome();
+        });
+        
+        socket.on('voice_status', function(data) {
+            const status = document.getElementById('voiceStatus');
+            const btn = document.getElementById('voiceBtn');
+            const mode = document.getElementById('voiceMode');
+            
+            if (data.available) {
+                mode.textContent = data.mode || 'Ready';
+                if (data.status === 'listening') {
+                    status.textContent = 'Listening...';
+                    btn.classList.add('listening');
+                } else {
+                    status.textContent = 'Ready - Say "Hey Bing"';
+                    btn.classList.remove('listening');
                 }
+            } else {
+                status.textContent = 'Voice not available';
+                mode.textContent = 'Offline';
             }
-        }, {passive:true});
-        window.addEventListener('touchend', ()=>{ if (event.touches && event.touches.length<2) pinchStartDist=null; }, {passive:true});
-
-        /* ---------------- Init ---------------- */
-        function safe(fn){ try{ fn(); }catch(e){} }
-        safe(updateOnline); safe(updateDateTime); safe(updateSensorData); safe(updateNews);
-        setInterval(()=>safe(updateDateTime), 60000);
-        setInterval(()=>safe(updateSensorData), 30000);
-        setInterval(()=>safe(updateNews), 300000);
-
-        // Close modal when clicking outside
-        window.onclick = function(event) {
-            const modal = document.getElementById('settings-modal');
-            if (event.target === modal) modal.style.display = 'none';
+        });
+        
+        socket.on('voice_command', function(data) {
+            showNotification(`Heard: "${data.command}"`, 'success');
+            if (data.response) {
+                // Show response
+                showNotification(`Response: ${data.response}`, 'success');
+            }
+        });
+        
+        socket.on('alert', function(data) {
+            showNotification(data.message, data.type);
+        });
+        
+        socket.on('device_status', function(data) {
+            if (data.device === 'lights') {
+                document.getElementById('lightStatus').textContent = data.state.toUpperCase();
+            }
+        });
+        
+        // Voice control
+        function initVoiceControl() {
+            // Browser-based speech recognition for web interface
+            if ('webkitSpeechRecognition' in window) {
+                recognition = new webkitSpeechRecognition();
+                recognition.continuous = false;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+                
+                recognition.onstart = function() {
+                    isListening = true;
+                    document.getElementById('voiceBtn').classList.add('listening');
+                    document.getElementById('voiceStatus').textContent = 'Listening...';
+                };
+                
+                recognition.onresult = function(event) {
+                    const command = event.results[0][0].transcript;
+                    console.log('Voice command:', command);
+                    sendVoiceCommand(command);
+                };
+                
+                recognition.onerror = function(event) {
+                    console.error('Voice recognition error:', event.error);
+                    stopListening();
+                };
+                
+                recognition.onend = function() {
+                    stopListening();
+                };
+            }
+            
+            // Voice button handler
+            document.getElementById('voiceBtn').addEventListener('click', toggleVoice);
         }
+        
+        function toggleVoice() {
+            if (isListening) {
+                stopListening();
+            } else {
+                startListening();
+            }
+        }
+        
+        function startListening() {
+            if (recognition && !isListening) {
+                recognition.start();
+            }
+        }
+        
+        function stopListening() {
+            if (recognition && isListening) {
+                recognition.stop();
+                isListening = false;
+                document.getElementById('voiceBtn').classList.remove('listening');
+                document.getElementById('voiceStatus').textContent = 'Ready';
+            }
+        }
+        
+        function sendVoiceCommand(command) {
+            fetch('/api/voice', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ command: command })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Command processed', 'success');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showNotification('Voice command error', 'error');
+            });
+        }
+        
+        // Settings functions
+        function openSettings() {
+            document.getElementById('settingsModal').classList.add('active');
+            loadSettings();
+        }
+        
+        function closeSettings() {
+            document.getElementById('settingsModal').classList.remove('active');
+        }
+        
+        function loadSettings() {
+            fetch('/api/settings')
+                .then(response => response.json())
+                .then(settings => {
+                    currentSettings = settings;
+                    
+                    // Update form fields
+                    document.getElementById('voiceModeSelect').value = settings.voice_mode || 'auto';
+                    document.getElementById('wakeWords').value = (settings.wake_words || []).join(', ');
+                    document.getElementById('ttsEngine').value = settings.tts_engine || 'pyttsx3';
+                    document.getElementById('haUrl').value = settings.home_assistant_url || '';
+                    
+                    // GPIO pins
+                    if (settings.gpio_pins) {
+                        document.getElementById('dht22Pin').value = settings.gpio_pins.dht22 || 4;
+                        document.getElementById('gasPin').value = settings.gpio_pins.gas_sensor || 17;
+                        document.getElementById('lightPin').value = settings.gpio_pins.light_sensor || 27;
+                    }
+                    
+                    // Update status indicators
+                    updateStatusIndicators(settings);
+                })
+                .catch(error => {
+                    console.error('Error loading settings:', error);
+                });
+        }
+        
+        function updateStatusIndicators(settings) {
+            // OpenAI status
+            const openaiStatus = document.getElementById('openaiStatus');
+            if (settings.has_openai_key) {
+                openaiStatus.classList.add('connected');
+                openaiStatus.classList.remove('disconnected');
+            } else {
+                openaiStatus.classList.add('disconnected');
+                openaiStatus.classList.remove('connected');
+            }
+            
+            // Bing status
+            const bingStatus = document.getElementById('bingStatus');
+            if (settings.has_bing_key) {
+                bingStatus.classList.add('connected');
+                bingStatus.classList.remove('disconnected');
+            } else {
+                bingStatus.classList.add('disconnected');
+                bingStatus.classList.remove('connected');
+            }
+            
+            // Home Assistant status
+            const haStatus = document.getElementById('haStatus');
+            if (settings.has_ha_token) {
+                haStatus.classList.add('connected');
+                haStatus.classList.remove('disconnected');
+            } else {
+                haStatus.classList.add('disconnected');
+                haStatus.classList.remove('connected');
+            }
+        }
+        
+        function saveSettings() {
+            const settings = {
+                openai_api_key: document.getElementById('openaiKey').value,
+                bing_api_key: document.getElementById('bingKey').value,
+                home_assistant_url: document.getElementById('haUrl').value,
+                home_assistant_token: document.getElementById('haToken').value,
+                voice_mode: document.getElementById('voiceModeSelect').value,
+                wake_words: document.getElementById('wakeWords').value.split(',').map(w => w.trim()),
+                tts_engine: document.getElementById('ttsEngine').value,
+                gpio_pins: {
+                    dht22: parseInt(document.getElementById('dht22Pin').value) || 4,
+                    gas_sensor: parseInt(document.getElementById('gasPin').value) || 17,
+                    light_sensor: parseInt(document.getElementById('lightPin').value) || 27
+                }
+            };
+            
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(settings)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Settings saved successfully', 'success');
+                    closeSettings();
+                    setTimeout(() => location.reload(), 1000);
+                } else {
+                    showNotification('Error saving settings', 'error');
+                }
+            })
+            .catch(error => {
+                showNotification('Error saving settings', 'error');
+            });
+        }
+        
+        function resetSettings() {
+            if (confirm('Reset all settings to defaults?')) {
+                document.getElementById('openaiKey').value = '';
+                document.getElementById('bingKey').value = '';
+                document.getElementById('haUrl').value = 'http://localhost:8123';
+                document.getElementById('haToken').value = '';
+                document.getElementById('voiceModeSelect').value = 'auto';
+                document.getElementById('wakeWords').value = 'hey bing, okay bing';
+                document.getElementById('ttsEngine').value = 'pyttsx3';
+                document.getElementById('dht22Pin').value = '4';
+                document.getElementById('gasPin').value = '17';
+                document.getElementById('lightPin').value = '27';
+            }
+        }
+        
+        function loginWithOpenAI() {
+            showNotification('Redirecting to ChatGPT login...', 'success');
+            window.location.href = '/auth/login';
+        }
+        
+        function testVoice() {
+            sendVoiceCommand('test voice recognition');
+        }
+        
+        // UI functions
+        function toggleLights() {
+            const status = document.getElementById('lightStatus');
+            const newStatus = status.textContent === 'ON' ? 'OFF' : 'ON';
+            
+            socket.emit('control_device', {
+                device: 'lights',
+                action: newStatus.toLowerCase()
+            });
+        }
+        
+        function toggleClimate() {
+            showNotification('Climate control opening...', 'success');
+        }
+        
+        function openSecurity() {
+            showNotification('Security panel opening...', 'success');
+        }
+        
+        function openMedia() {
+            showNotification('Media center opening...', 'success');
+        }
+        
+        function openEnergy() {
+            showNotification('Energy dashboard opening...', 'success');
+        }
+        
+        // Utility functions
+        function showNotification(message, type = 'info') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+            
+            setTimeout(() => {
+                notification.style.animation = 'slideIn 0.3s ease reverse';
+                setTimeout(() => {
+                    notification.remove();
+                }, 300);
+            }, 3000);
+        }
+        
+        function updateTime() {
+            const now = new Date();
+            const time = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            // Update time in header if needed
+        }
+        
+        function formatTime(dateString) {
+            if (!dateString) return '';
+            const date = new Date(dateString);
+            const now = new Date();
+            const diff = Math.floor((now - date) / 60000);
+            
+            if (diff < 60) return `${diff}m ago`;
+            if (diff < 1440) return `${Math.floor(diff / 60)}h ago`;
+            return `${Math.floor(diff / 1440)}d ago`;
+        }
+        
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            if (e.key === ' ' && e.ctrlKey) {
+                e.preventDefault();
+                toggleVoice();
+            }
+            if (e.key === 'Escape') {
+                closeSettings();
+            }
+            if (e.key === 's' && e.ctrlKey) {
+                e.preventDefault();
+                openSettings();
+            }
+        });
     </script>
 </body>
 </html>
