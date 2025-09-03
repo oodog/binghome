@@ -1,726 +1,1233 @@
+#!/usr/bin/env python3
+"""
+BingHome - Smart Home Control System
+Version 2.1.0 - Enhanced with OAuth and automatic voice fallback
+"""
+
 import os
-import time
+import sys
 import json
-import shutil
-import subprocess
-from pathlib import Path
-from typing import Dict, Any, Optional, List
-
-from flask import Flask, render_template, request, jsonify
+import time
+import threading
+import logging
+import queue
+import numpy as np
+import secrets
+from datetime import datetime, timedelta
+from flask import Flask, render_template, jsonify, request, redirect, session, url_for
+from flask_cors import CORS
+from flask_socketio import SocketIO, emit
 import requests
-from bs4 import BeautifulSoup
+from functools import wraps
 
-# ---------- Optional hardware ----------
-GPIO = None
-SMBus = None
-
-# Prefer CircuitPython DHT on Pi 5 (no C compile)
-adafruit_dht = None
-board = None
+# Hardware libraries - will be installed on Raspberry Pi
 try:
-    import adafruit_dht as _adafruit_dht
-    import board as _board
-    adafruit_dht = _adafruit_dht
-    board = _board
-except Exception:
-    pass
+    import RPi.GPIO as GPIO
+    import adafruit_dht
+    import board
+    import busio
+    import adafruit_tpa2016
+    HARDWARE_AVAILABLE = True
+except ImportError:
+    HARDWARE_AVAILABLE = False
+    print("Warning: Hardware libraries not available. Running in simulation mode.")
 
-# Legacy Adafruit_DHT fallback (C extension) – only used if present
-Adafruit_DHT = None
-if adafruit_dht is None:
+# Voice recognition libraries
+try:
+    import sounddevice as sd
+    import whisper
+    import torch
+    WHISPER_AVAILABLE = True
+except ImportError:
+    WHISPER_AVAILABLE = False
+
+try:
+    import vosk
+    import pyaudio
+    VOSK_AVAILABLE = True
+except ImportError:
+    VOSK_AVAILABLE = False
+
+try:
+    import speech_recognition as sr
+    SPEECH_RECOGNITION_AVAILABLE = True
+except ImportError:
+    SPEECH_RECOGNITION_AVAILABLE = False
+
+# Text-to-speech
+try:
+    import pyttsx3
+    TTS_ENGINE = 'pyttsx3'
+except ImportError:
     try:
-        import Adafruit_DHT as _Adafruit_DHT
-        Adafruit_DHT = _Adafruit_DHT
-    except Exception:
-        pass
+        from gtts import gTTS
+        import pygame
+        TTS_ENGINE = 'gtts'
+    except ImportError:
+        TTS_ENGINE = None
 
-try:
-    import RPi.GPIO as _GPIO
-    GPIO = _GPIO
-except Exception:
-    pass
-
-try:
-    from smbus2 import SMBus as _SMBus
-    SMBus = _SMBus
-except Exception:
-    pass
-
-# ---------- LLM / Voice ----------
-OPENAI_AVAILABLE = False
+# OpenAI
 try:
     from openai import OpenAI
     OPENAI_AVAILABLE = True
-except Exception:
-    pass
+except ImportError:
+    OPENAI_AVAILABLE = False
 
-# ---------- Feature modules ----------
-from core import media
-from core import news as news_mod
-from core import weather as weather_mod
-from core import timers as timers_mod
+# Configure logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
-# ---------- App ----------
+# Flask app setup
 app = Flask(__name__)
-APP_DIR = Path(__file__).resolve().parent
-DATA_DIR = APP_DIR / "data"
-CONFIG_FILE = APP_DIR / "settings.json"
-DATA_DIR.mkdir(exist_ok=True)
+app.config['SECRET_KEY'] = secrets.token_hex(32)
+app.config['SESSION_TYPE'] = 'filesystem'
+app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
+CORS(app, supports_credentials=True)
+socketio = SocketIO(app, cors_allowed_origins="*")
 
-# -------------------- Config helpers --------------------
-DEFAULT_CONFIG = {
-    "provider": "openai",
-    "openai_api_key": "",
-    "openai_model": "gpt-4o-mini",
+# Settings file path
+SETTINGS_FILE = os.path.join(os.path.dirname(__file__), 'settings.json')
 
-    "ha_base_url": "http://localhost:8123",
-    "ha_token": "",
-
-    # Location for weather
-    "lat": None,     # e.g., -27.4698
-    "lon": None,     # e.g., 153.0251
-    "timezone": "auto",
-
-    # Wake word (browser-based UI piece; offline later)
-    "wake_word_enabled": True,
-    "wake_word_phrase": "hey bing",
-
-    # Sensors
-    "invert_gas": False,
-    "invert_light": False,
-
-    # Voice entity aliases
-    "voice_aliases": {}
-}
-
-def load_config() -> Dict[str, Any]:
-    if CONFIG_FILE.exists():
-        try:
-            with open(CONFIG_FILE, "r") as f:
-                data = json.load(f)
-            changed = False
-            for k, v in DEFAULT_CONFIG.items():
-                if k not in data:
-                    data[k] = v
-                    changed = True
-            if changed:
-                with open(CONFIG_FILE, "w") as f:
-                    json.dump(data, f, indent=2)
-            return data
-        except Exception:
-            pass
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(DEFAULT_CONFIG, f, indent=2)
-    return DEFAULT_CONFIG.copy()
-
-def save_config(cfg: Dict[str, Any]):
-    with open(CONFIG_FILE, "w") as f:
-        json.dump(cfg, f, indent=2)
-
-CONFIG = load_config()
-
-# -------------------- Hardware config --------------------
-DHT_PIN_BCM = 4          # DHT22 on GPIO4
-GAS_PIN = 17             # Digital gas sensor on GPIO17
-LIGHT_PIN = 27           # Digital light sensor on GPIO27
-
-# CircuitPython DHT + simple cache (avoid hammering, tolerate transient errors)
-dht_device = None
-_last_dht = {"t": None, "h": None, "ts": 0.0}
-if adafruit_dht and board:
-    try:
-        dht_device = adafruit_dht.DHT22(board.D4, use_pulseio=False)
-    except Exception as e:
-        print(f"DHT init (CircuitPython) failed: {e}")
-        dht_device = None
-
-# Legacy constants if the old lib is available
-DHT_SENSOR = Adafruit_DHT.DHT22 if Adafruit_DHT else None
-
-I2C_BUS = 1
-TPA2016_ADDR = 0x58
-TPA2016_AGC_CONTROL = 0x01
-TPA2016_FIXED_GAIN = 0x05
-
-audio_available = False
-i2c_bus = None
-if SMBus:
-    try:
-        i2c_bus = SMBus(I2C_BUS)
-        audio_available = True
-    except Exception:
-        audio_available = False
-
-if GPIO:
-    try:
-        GPIO.setmode(GPIO.BCM)
-        GPIO.setup(GAS_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-        GPIO.setup(LIGHT_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-    except Exception as e:
-        print(f"GPIO init: {e}")
-        GPIO = None
-
-# -------------------- Bing wallpaper --------------------
-BING_URL = "https://www.bing.com"
-IMAGE_DIR = APP_DIR / "static" / "images"
-IMAGE_DIR.mkdir(parents=True, exist_ok=True)
-
-def get_bing_wallpaper():
-    try:
-        headers = {"User-Agent": "Mozilla/5.0"}
-        r = requests.get(BING_URL + "/", headers=headers, timeout=10)
-        r.raise_for_status()
-        soup = BeautifulSoup(r.text, "html.parser")
-        bg_image = None
-
-        body = soup.find("body", style=True)
-        if body:
-            style = body["style"]
-            if "url(" in style:
-                start = style.find("url(") + 4
-                end = style.find(")", start)
-                if start > 3 and end > 0:
-                    bg = style[start:end].strip("'\"")
-                    bg_image = bg if bg.startswith("http") else BING_URL + bg
-
-        if not bg_image:
-            meta = soup.find("meta", {"property": "og:image"})
-            if meta and meta.get("content"):
-                img_url = meta["content"]
-                if img_url.startswith("//"):
-                    img_url = "https:" + img_url
-                elif img_url.startswith("/"):
-                    img_url = BING_URL + img_url
-                bg_image = img_url
-
-        if bg_image:
-            img_name = os.path.basename(bg_image.split("?")[0])
-            img_path = IMAGE_DIR / img_name
-            if not img_path.exists():
-                img_data = requests.get(bg_image, headers=headers, timeout=10).content
-                img_path.write_bytes(img_data)
-            return f"/static/images/{img_name}", "Today’s Bing Wallpaper"
-    except Exception as e:
-        print(f"[BING] {e}")
-    return "/static/images/default.jpg", "Bing Wallpaper"
-
-# -------------------- Volume (I2C amp) --------------------
-class VolumeController:
+# Configuration class
+class Config:
     def __init__(self):
-        self.current_volume = 50
-        self.muted = False
-        self.previous_volume = 50
-
-    def _write_gain(self, gain_0_to_30):
-        if not audio_available or not i2c_bus:
-            return False
+        self.load_settings()
+    
+    def load_settings(self):
+        """Load settings from file"""
+        default_settings = {
+            'openai_api_key': '',
+            'bing_api_key': '',
+            'home_assistant_url': 'http://localhost:8123',
+            'home_assistant_token': '',
+            'voice_mode': 'auto',  # auto, vosk, whisper, speech_recognition
+            'wake_words': ["hey bing", "okay bing", "bing"],
+            'tts_engine': 'pyttsx3',
+            'tts_rate': 150,
+            'tts_volume': 0.9,
+            'language': 'en-US',
+            'gpio_pins': {
+                'dht22': 4,
+                'gas_sensor': 17,
+                'light_sensor': 27
+            }
+        }
+        
+        if os.path.exists(SETTINGS_FILE):
+            try:
+                with open(SETTINGS_FILE, 'r') as f:
+                    saved_settings = json.load(f)
+                    default_settings.update(saved_settings)
+            except Exception as e:
+                logger.error(f"Error loading settings: {e}")
+        
+        # Update attributes
+        for key, value in default_settings.items():
+            setattr(self, key.upper(), value)
+        
+        # Additional computed properties
+        self.SENSOR_UPDATE_INTERVAL = 5
+        self.NEWS_UPDATE_INTERVAL = 300
+        self.SAMPLE_RATE = 16000
+        self.CHANNELS = 1
+        self.CHUNK_SIZE = 1024
+        
+    def save_settings(self, settings):
+        """Save settings to file"""
         try:
-            i2c_bus.write_byte_data(TPA2016_ADDR, TPA2016_FIXED_GAIN, gain_0_to_30)
+            # Update current config
+            for key, value in settings.items():
+                setattr(self, key.upper(), value)
+            
+            # Save to file
+            with open(SETTINGS_FILE, 'w') as f:
+                json.dump(settings, f, indent=2)
+            
             return True
         except Exception as e:
-            print(f"Volume err: {e}")
+            logger.error(f"Error saving settings: {e}")
             return False
 
-    def set_volume(self, volume):
-        volume = max(0, min(100, int(volume)))
-        reg = int((volume / 100) * 30)
-        ok = self._write_gain(reg)
-        if ok:
-            self.current_volume = volume
-            self.muted = False
-        return ok
+# Global instances
+config = Config()
+sensor_data = {
+    'temperature': 0,
+    'humidity': 0,
+    'gas_detected': False,
+    'light_level': 'dark',
+    'timestamp': None
+}
+news_data = []
+voice_assistant = None
 
-    def volume_up(self, step=5):
-        return self.set_volume(self.current_volume + step)
+# OAuth Configuration
+OAUTH_CONFIG = {
+    'client_id': os.environ.get('OPENAI_CLIENT_ID', ''),
+    'client_secret': os.environ.get('OPENAI_CLIENT_SECRET', ''),
+    'redirect_uri': 'http://localhost:5000/auth/callback',
+    'authorize_url': 'https://auth.openai.com/authorize',
+    'token_url': 'https://auth.openai.com/oauth/token',
+    'scope': 'openai.api'
+}
 
-    def volume_down(self, step=5):
-        return self.set_volume(self.current_volume - step)
-
-    def mute_toggle(self):
-        if self.muted:
-            self.set_volume(self.previous_volume)
-            self.muted = False
-        else:
-            self.previous_volume = self.current_volume
-            self.set_volume(0)
-            self.muted = True
-        return self.muted
-
-volume_controller = VolumeController()
-
-# -------------------- Sensors --------------------
-def _read_dht_cached():
-    now = time.time()
-    if now - _last_dht["ts"] < 2.0:
-        return _last_dht["t"], _last_dht["h"]
-
-    t = h = None
-    if dht_device:
+class SensorManager:
+    """Manages all sensor operations"""
+    
+    def __init__(self):
+        self.dht = None
+        self.i2c = None
+        self.tpa2016 = None
+        self.setup_hardware()
+    
+    def setup_hardware(self):
+        """Initialize hardware components"""
+        if not HARDWARE_AVAILABLE:
+            logger.info("Hardware not available, using simulated values")
+            return
+        
         try:
-            t = dht_device.temperature
-            h = dht_device.humidity
-        except RuntimeError:
-            pass
+            GPIO.setmode(GPIO.BCM)
+            GPIO.setup(config.GPIO_PINS['gas_sensor'], GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+            GPIO.setup(config.GPIO_PINS['light_sensor'], GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+            
+            self.dht = adafruit_dht.DHT22(getattr(board, f"D{config.GPIO_PINS['dht22']}"), use_pulseio=False)
+            
+            self.i2c = busio.I2C(board.SCL, board.SDA)
+            self.tpa2016 = adafruit_tpa2016.TPA2016(self.i2c)
+            self.tpa2016.amplifier_gain = 10
+            
+            logger.info("Hardware initialized successfully")
         except Exception as e:
-            print(f"DHT read (CircuitPython) error: {e}")
-    elif Adafruit_DHT and DHT_SENSOR:
+            logger.error(f"Error initializing hardware: {e}")
+    
+    def read_sensors(self):
+        """Read all sensor values"""
+        global sensor_data
+        
+        if not HARDWARE_AVAILABLE:
+            import random
+            sensor_data = {
+                'temperature': round(20 + random.random() * 10, 1),
+                'humidity': round(40 + random.random() * 20, 1),
+                'gas_detected': random.random() > 0.95,
+                'light_level': 'bright' if random.random() > 0.5 else 'dark',
+                'timestamp': datetime.now().isoformat()
+            }
+            return sensor_data
+        
         try:
-            h, t = Adafruit_DHT.read_retry(DHT_SENSOR, DHT_PIN_BCM)
+            if self.dht:
+                try:
+                    temperature = self.dht.temperature
+                    humidity = self.dht.humidity
+                    if temperature and humidity:
+                        sensor_data['temperature'] = round(temperature, 1)
+                        sensor_data['humidity'] = round(humidity, 1)
+                except RuntimeError:
+                    pass  # Normal for DHT22 to occasionally fail
+            
+            sensor_data['gas_detected'] = GPIO.input(config.GPIO_PINS['gas_sensor']) == GPIO.HIGH
+            sensor_data['light_level'] = 'bright' if GPIO.input(config.GPIO_PINS['light_sensor']) == GPIO.HIGH else 'dark'
+            sensor_data['timestamp'] = datetime.now().isoformat()
+            
         except Exception as e:
-            print(f"DHT read (legacy) error: {e}")
+            logger.error(f"Error reading sensors: {e}")
+        
+        return sensor_data
 
-    if t is not None or h is not None:
-        _last_dht.update({"t": t, "h": h, "ts": now})
-    else:
-        _last_dht["ts"] = now
-    return _last_dht["t"], _last_dht["h"]
-
-def get_sensor_data():
-    t, h = _read_dht_cached()
-    gas = light = None
-
-    if GPIO:
-        try:
-            gas_raw = GPIO.input(GAS_PIN) == GPIO.HIGH
-            light_raw = GPIO.input(LIGHT_PIN) == GPIO.HIGH
-            gas = (not gas_raw) if CONFIG.get("invert_gas") else gas_raw
-            light = (not light_raw) if CONFIG.get("invert_light") else light_raw
-        except Exception as e:
-            print(f"GPIO read: {e}")
-
-    return {
-        "timestamp": time.time(),
-        "temperature": round(float(t), 1) if t is not None else None,
-        "humidity": round(float(h), 1) if h is not None else None,
-        "gas_detected": bool(gas) if gas is not None else False,
-        "light_detected": bool(light) if light is not None else False,
-        "hardware": {
-            "gpio": bool(GPIO),
-            "dht": bool(dht_device) or bool(DHT_SENSOR),
-            "i2c_audio": audio_available,
-        },
-    }
-
-# -------------------- Wi-Fi (NM first, iwlist fallback) --------------------
-def _have(cmd: str) -> bool:
-    return shutil.which(cmd) is not None
-
-def get_wifi_networks() -> List[str]:
-    if _have("nmcli"):
-        try:
-            subprocess.run(["nmcli", "device", "wifi", "rescan"], timeout=10)
-            out = subprocess.check_output(
-                ["nmcli", "-t", "-f", "SSID", "device", "wifi", "list"],
-                text=True, timeout=10
-            )
-            nets = [ln.strip() for ln in out.splitlines() if ln.strip() and ln.strip() != "--"]
-            return sorted(set(nets))
-        except Exception as e:
-            print(f"nmcli scan: {e}")
-    try:
-        result = subprocess.run(
-            ["sudo", "iwlist", "wlan0", "scan"],
-            capture_output=True, text=True, timeout=20
-        )
-        networks = []
-        for line in result.stdout.splitlines():
-            if "ESSID:" in line:
-                essid = line.split("ESSID:")[1].strip().strip('"')
-                if essid and essid != "<hidden>":
-                    networks.append(essid)
-        return sorted(set(networks))
-    except Exception as e:
-        print(f"iwlist scan: {e}")
-        return []
-
-def connect_wifi(ssid: str, password: str):
-    if _have("nmcli"):
-        try:
-            cmd = ["nmcli", "device", "wifi", "connect", ssid]
-            if password: cmd += ["password", password]
-            r = subprocess.run(cmd, capture_output=True, text=True, timeout=25)
-            if r.returncode == 0: return True, "OK"
-            return False, r.stderr.strip() or r.stdout.strip() or "Failed"
-        except Exception as e:
-            return False, str(e)
-    try:
-        cfg = f'network={{\n    ssid="{ssid}"\n    psk="{password}"\n}}\n'
-        tmp = "/tmp/wpa_temp.conf"
-        with open(tmp, "w") as f: f.write(cfg)
-        subprocess.run(["sudo", "wpa_supplicant", "-B", "-i", "wlan0", "-c", tmp],
-                       capture_output=True, text=True, timeout=20)
-        subprocess.run(["sudo", "dhclient", "wlan0"], timeout=15)
-        return True, "OK"
-    except Exception as e:
-        return False, str(e)
-
-# -------------------- Home Assistant helpers --------------------
-def ha_headers():
-    if not CONFIG.get("ha_token"):
-        return None
-    return {"Authorization": f"Bearer {CONFIG['ha_token']}", "Content-Type": "application/json"}
-
-def ha_call(service_domain, service, payload):
-    if not CONFIG.get("ha_base_url") or not CONFIG.get("ha_token"):
-        return False, "Home Assistant not configured"
-    try:
-        url = f"{CONFIG['ha_base_url'].rstrip('/')}/api/services/{service_domain}/{service}"
-        r = requests.post(url, headers=ha_headers(), json=payload, timeout=8)
-        return r.ok, (r.text if not r.ok else "OK")
-    except Exception as e:
-        return False, str(e)
-
-# -------------------- Intent handling (voice) --------------------
-def handle_intent_text(text: str):
-    tl = (text or "").strip().lower()
-
-    # Teach alias: "remember that <alias> is <entity_id>"
-    if tl.startswith("remember that "):
-        try:
-            rest = tl[len("remember that "):]
-            if " is " in rest:
-                alias, entity = rest.split(" is ", 1)
-                alias = alias.strip().lower()
-                entity = entity.strip()
-                if alias and entity:
-                    CONFIG.setdefault("voice_aliases", {})[alias] = entity
-                    save_config(CONFIG)
-                    return True, f"Saved alias: '{alias}' -> {entity}"
-        except Exception as e:
-            return False, f"Teach failed: {e}"
-
-    def resolve_entity(words: List[str]) -> Optional[str]:
-        aliases = CONFIG.get("voice_aliases", {})
-        for k, v in aliases.items():
-            if k in tl:
-                return v
-        for w in words:
-            if "." in w and w.split(".", 1)[0] in {"light","fan","switch","climate","cover","media_player"}:
-                return w
-        return None
-
-    words = tl.split()
-
-    if "turn on" in tl or "switch on" in tl:
-        ent = resolve_entity(words) or "light.living_room"
-        return ha_call(ent.split(".", 1)[0], "turn_on", {"entity_id": ent})
-
-    if "turn off" in tl or "switch off" in tl:
-        ent = resolve_entity(words) or "light.living_room"
-        return ha_call(ent.split(".", 1)[0], "turn_off", {"entity_id": ent})
-
-    if "set" in tl and "temperature" in tl:
-        import re
-        m = re.search(r"(\d{2})", tl)
-        if m:
-            temp = int(m.group(1))
-            return ha_call("climate", "set_temperature",
-                           {"entity_id": "climate.home", "temperature": temp})
-
-    if CONFIG.get("provider") == "openai" and CONFIG.get("openai_api_key") and OPENAI_AVAILABLE:
-        try:
-            aliases = CONFIG.get("voice_aliases", {})
-            alias_text = "; ".join([f"{k} -> {v}" for k, v in aliases.items()]) or "none"
-            client = OpenAI(api_key=CONFIG["openai_api_key"])
-            system = (
-                "Convert user voice commands into Home Assistant service calls. "
-                "Return pure JSON with keys: domain, service, payload (object). "
-                "If unclear, include 'question' with a short clarification request. "
-                f"Known voice aliases: {alias_text}."
-            )
-            msg = [{"role": "system", "content": system},
-                   {"role": "user", "content": text}]
-            resp = client.chat.completions.create(
-                model=CONFIG.get("openai_model", "gpt-4o-mini"),
-                messages=msg, temperature=0
-            )
-            content = resp.choices[0].message.content.strip()
-            import json as _json, re as _re
-            match = _re.search(r"\{.*\}", content, _re.S)
-            if not match:
-                return False, "Could not parse intent."
-            data = _json.loads(match.group(0))
-            if "question" in data:
-                return False, data["question"]
-            domain = data["domain"]; service = data["service"]
-            payload = data.get("payload", {})
-            return ha_call(domain, service, payload)
-        except Exception as e:
-            return False, f"LLM intent error: {e}"
-
-    return False, "Sorry, I couldn’t understand that."
-
-# -------------------- Routes: UI --------------------
-@app.route("/")
-def index():
-    img_url, title = get_bing_wallpaper()
-    return render_template("index.html",
-                           img_url=img_url,
-                           title=title,
-                           audio_available=audio_available)
-
-@app.route("/settings")
-def settings():
-    sensor_data = get_sensor_data()
-    cfg = load_config()
-    return render_template("settings.html",
-                           sensor_data=sensor_data,
-                           current_volume=volume_controller.current_volume,
-                           audio_available=audio_available,
-                           cfg=cfg)
-
-@app.route("/settings/system_status")
-def system_status():
-    system_info = {}
-    try:
-        if os.path.exists("/sys/class/thermal/thermal_zone0/temp"):
-            with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
-                system_info["cpu_temp"] = round(float(f.read()) / 1000.0, 1)
-        mem_total = mem_avail = None
-        with open("/proc/meminfo", "r") as f:
-            for line in f:
-                if line.startswith("MemTotal:"): mem_total = int(line.split()[1])
-                if line.startswith("MemAvailable:"): mem_avail = int(line.split()[1])
-        if mem_total and mem_avail:
-            system_info["memory_used_percent"] = round((mem_total - mem_avail) / mem_total * 100, 1)
-        disk = subprocess.run(["df", "-h", "/"], capture_output=True, text=True).stdout
-        parts = disk.splitlines()[1].split()
-        system_info["disk_used_percent"] = int(parts[4].strip("%"))
-        system_info["uptime"] = subprocess.run(["uptime", "-p"], capture_output=True, text=True).stdout.strip()
-    except Exception as e:
-        print(f"Sysinfo: {e}")
-    return render_template("system_status.html",
-                           system_info=system_info,
-                           sensor_data=get_sensor_data())
-
-@app.route("/settings/wifi")
-def wifi_settings():
-    return render_template("wifi_settings.html", networks=get_wifi_networks())
-
-# -------------------- API: config --------------------
-@app.route("/api/config", methods=["GET", "POST"])
-def api_config():
-    global CONFIG
-    if request.method == "GET":
-        return jsonify(load_config())
-    data = request.get_json(silent=True) or {}
-    CONFIG.update({
-        "provider": data.get("provider", CONFIG["provider"]),
-        "openai_api_key": data.get("openai_api_key", CONFIG["openai_api_key"]),
-        "openai_model": data.get("openai_model", CONFIG["openai_model"]),
-        "ha_base_url": data.get("ha_base_url", CONFIG["ha_base_url"]),
-        "ha_token": data.get("ha_token", CONFIG["ha_token"]),
-        "wake_word_enabled": bool(data.get("wake_word_enabled", CONFIG["wake_word_enabled"])),
-        "wake_word_phrase": data.get("wake_word_phrase", CONFIG["wake_word_phrase"]),
-        "invert_gas": bool(data.get("invert_gas", CONFIG["invert_gas"])),
-        "invert_light": bool(data.get("invert_light", CONFIG["invert_light"])),
-        "lat": data.get("lat", CONFIG.get("lat")),
-        "lon": data.get("lon", CONFIG.get("lon")),
-        "timezone": data.get("timezone", CONFIG.get("timezone", "auto")),
-    })
-    if "voice_aliases" in data and isinstance(data["voice_aliases"], dict):
-        CONFIG["voice_aliases"].update({str(k).lower(): str(v) for k, v in data["voice_aliases"].items()})
-    save_config(CONFIG)
-    return jsonify({"success": True})
-
-# -------------------- API: sensors/health/news/weather --------------------
-@app.route("/api/sensor_data")
-def api_sensor_data():
-    return jsonify(get_sensor_data())
-
-@app.route("/api/health")
-def api_health():
-    return jsonify({"status": "healthy", "timestamp": time.time(), "audio_available": audio_available})
-
-@app.route("/api/news")
-def api_news():
-    return jsonify(news_mod.get_news())
-
-@app.route("/api/weather")
-def api_weather():
-    lat = CONFIG.get("lat"); lon = CONFIG.get("lon"); tz = CONFIG.get("timezone") or "auto"
-    if lat is None or lon is None:
-        return jsonify({"success": False, "error": "Set lat/lon in Settings or via /api/config"}), 400
-    try:
-        data = weather_mod.get_weather(float(lat), float(lon), tz=tz)
-        return jsonify({"success": True, "data": data})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-# -------------------- API: volume --------------------
-@app.route("/api/volume/up", methods=["POST"])
-def api_volume_up():
-    step = request.json.get("step", 5) if request.is_json else 5
-    ok = volume_controller.volume_up(step)
-    return jsonify({"success": ok, "volume": volume_controller.current_volume, "muted": volume_controller.muted})
-
-@app.route("/api/volume/down", methods=["POST"])
-def api_volume_down():
-    step = request.json.get("step", 5) if request.is_json else 5
-    ok = volume_controller.volume_down(step)
-    return jsonify({"success": ok, "volume": volume_controller.current_volume, "muted": volume_controller.muted})
-
-@app.route("/api/volume/set", methods=["POST"])
-def api_volume_set():
-    vol = request.json.get("volume", 50) if request.is_json else 50
-    ok = volume_controller.set_volume(vol)
-    return jsonify({"success": ok, "volume": volume_controller.current_volume, "muted": volume_controller.muted})
-
-@app.route("/api/volume/mute", methods=["POST"])
-def api_volume_mute():
-    return jsonify({"success": True, "volume": volume_controller.current_volume, "muted": volume_controller.mute_toggle()})
-
-# -------------------- API: Wi-Fi --------------------
-@app.route("/api/wifi_scan")
-def api_wifi_scan():
-    return jsonify({"networks": get_wifi_networks()})
-
-@app.route("/api/wifi_connect", methods=["POST"])
-def api_wifi_connect():
-    data = request.get_json(silent=True) or {}
-    ssid = data.get("ssid"); password = data.get("password") or ""
-    if not ssid:
-        return jsonify({"success": False, "error": "SSID required"}), 400
-    ok, info = connect_wifi(ssid, password)
-    code = 200 if ok else 500
-    return jsonify({"success": ok, "info": info}), code
-
-# -------------------- API: Home Assistant passthrough & discovery --------------------
-@app.route("/api/ha/service", methods=["POST"])
-def api_ha_service():
-    data = request.get_json(silent=True) or {}
-    domain = data.get("domain"); service = data.get("service"); payload = data.get("payload", {})
-    if not domain or not service:
-        return jsonify({"success": False, "error": "domain and service required"}), 400
-    ok, info = ha_call(domain, service, payload)
-    return jsonify({"success": ok, "info": info}), (200 if ok else 500)
-
-@app.route("/api/ha/entities")
-def api_ha_entities():
-    if not CONFIG.get("ha_base_url") or not CONFIG.get("ha_token"):
-        return jsonify({"success": False, "error": "Home Assistant not configured"}), 400
-    try:
-        url = f"{CONFIG['ha_base_url'].rstrip('/')}/api/states"
-        r = requests.get(url, headers=ha_headers(), timeout=10); r.raise_for_status()
-        items = r.json()
-        out = [{"entity_id": it.get("entity_id"),
-                "name": (it.get("attributes", {}) or {}).get("friendly_name")} for it in items]
-        return jsonify({"success": True, "entities": out})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route("/api/voice_alias", methods=["POST"])
-def api_voice_alias():
-    data = request.get_json(silent=True) or {}
-    alias = (data.get("alias") or "").strip().lower()
-    entity_id = (data.get("entity_id") or "").strip()
-    if not alias or not entity_id:
-        return jsonify({"success": False, "error": "alias and entity_id required"}), 400
-    CONFIG.setdefault("voice_aliases", {})[alias] = entity_id
-    save_config(CONFIG)
-    return jsonify({"success": True, "aliases": CONFIG["voice_aliases"]})
-
-# -------------------- API: Voice (push-to-talk) --------------------
-@app.route("/api/voice", methods=["POST"])
-def api_voice():
-    if request.is_json:
-        text = (request.get_json() or {}).get("text", "").strip()
-        if not text:
-            return jsonify({"success": False, "error": "No text provided"}), 400
-        ok, info = handle_intent_text(text)
-        return jsonify({"success": ok, "text": text, "result": info}), 200
-
-    if "audio" not in request.files:
-        return jsonify({"success": False, "error": "No audio file"}), 400
-
-    if CONFIG.get("provider") != "openai" or not CONFIG.get("openai_api_key") or not OPENAI_AVAILABLE:
-        return jsonify({"success": False, "error": "Voice transcription not configured (OpenAI)"}), 400
-
-    try:
-        client = OpenAI(api_key=CONFIG["openai_api_key"])
-        f = request.files["audio"]
-        tmp = APP_DIR / "tmp_voice.webm"
-        f.save(tmp)
-        with open(tmp, "rb") as af:
-            tr = client.audio.transcriptions.create(model="whisper-1", file=af)
-        text = tr.text.strip() if hasattr(tr, "text") else (tr.get("text", "").strip() if isinstance(tr, dict) else "")
-        if not text:
-            return jsonify({"success": False, "error": "Empty transcription"}), 200
-        ok, info = handle_intent_text(text)
-        return jsonify({"success": ok, "text": text, "result": info}), 200
-    except Exception as e:
-        return jsonify({"success": False, "error": f"Transcription failed: {e}"}), 200
-
-# -------------------- API: Media --------------------
-@app.route("/api/media/play", methods=["POST"])
-def api_media_play():
-    data = request.get_json(silent=True) or {}
-    url = (data.get("url") or data.get("query") or "").strip()
-    if not url:
-        return jsonify({"success": False, "error": "Provide 'url' or 'query'"}), 400
-    try:
-        media.play(url)
-        return jsonify({"success": True})
-    except Exception as e:
-        return jsonify({"success": False, "error": str(e)}), 500
-
-@app.route("/api/media/pause", methods=["POST"])
-def api_media_pause():
-    media.pause(None)
-    return jsonify({"success": True})
-
-@app.route("/api/media/stop", methods=["POST"])
-def api_media_stop():
-    media.stop()
-    return jsonify({"success": True})
-
-@app.route("/api/media/volume", methods=["POST"])
-def api_media_volume():
-    data = request.get_json(silent=True) or {}
-    v = data.get("volume")
-    if v is None:
-        return jsonify({"success": True, "volume": media.status().get("volume")})
-    media.set_volume(int(v))
-    return jsonify({"success": True, "volume": int(v)})
-
-@app.route("/api/media/status")
-def api_media_status():
-    return jsonify(media.status())
-
-# -------------------- API: Timers/Alarms --------------------
-TIMER_API = None
-
-@app.route("/api/timers", methods=["GET", "POST"])
-def api_timers():
-    if request.method == "GET":
-        return jsonify({"success": True, "timers": TIMER_API.list()})
-    data = request.get_json(silent=True) or {}
-    label = (data.get("label") or "Timer").strip()
-    if "seconds" in data:
-        item = TIMER_API.create_in(int(data["seconds"]), label)
-        return jsonify({"success": True, "timer": item})
-    if "at" in data:
-        item = TIMER_API.create_at(str(data["at"]), label or "Alarm")
-        return jsonify({"success": True, "timer": item})
-    return jsonify({"success": False, "error": "Provide 'seconds' or 'at'"}), 400
-
-@app.route("/api/timers/<tid>", methods=["DELETE"])
-def api_timers_delete(tid):
-    ok = TIMER_API.delete(tid)
-    return jsonify({"success": ok})
-
-# -------------------- Main --------------------
-if __name__ == "__main__":
-    # init timers with media chime
-    TIMER_API = timers_mod.init(DATA_DIR, play_func=media.play)
-
-    try:
-        if audio_available and 'i2c_bus' in globals() and i2c_bus:
+class VoiceAssistant:
+    """Enhanced voice assistant with automatic fallback"""
+    
+    def __init__(self):
+        self.listening = False
+        self.processing = False
+        self.audio_queue = queue.Queue()
+        self.whisper_model = None
+        self.vosk_model = None
+        self.speech_recognizer = None
+        self.openai_client = None
+        self.tts_engine = None
+        self.current_mode = None
+        self.setup_voice()
+    
+    def setup_voice(self):
+        """Initialize voice components with fallback"""
+        # Setup OpenAI if available
+        if OPENAI_AVAILABLE and config.OPENAI_API_KEY:
             try:
-                i2c_bus.write_byte_data(TPA2016_ADDR, TPA2016_AGC_CONTROL, 0x05)
+                self.openai_client = OpenAI(api_key=config.OPENAI_API_KEY)
+                logger.info("OpenAI client initialized")
+            except:
+                pass
+        
+        # Determine voice mode
+        mode = config.VOICE_MODE
+        
+        if mode == 'auto':
+            # Try local first, then cloud
+            if self.setup_vosk():
+                self.current_mode = 'vosk'
+            elif self.setup_speech_recognition():
+                self.current_mode = 'speech_recognition'
+            elif self.setup_whisper():
+                self.current_mode = 'whisper'
+            else:
+                logger.error("No voice recognition available")
+                self.current_mode = None
+        elif mode == 'vosk':
+            if not self.setup_vosk():
+                self.setup_fallback()
+        elif mode == 'whisper':
+            if not self.setup_whisper():
+                self.setup_fallback()
+        elif mode == 'speech_recognition':
+            if not self.setup_speech_recognition():
+                self.setup_fallback()
+        
+        # Setup TTS
+        self.setup_tts()
+        
+        logger.info(f"Voice assistant initialized with mode: {self.current_mode}")
+    
+    def setup_vosk(self):
+        """Setup Vosk for offline recognition"""
+        if not VOSK_AVAILABLE:
+            return False
+        
+        try:
+            model_path = os.path.expanduser("~/vosk-model-small-en-us-0.15")
+            if os.path.exists(model_path):
+                self.vosk_model = vosk.Model(model_path)
+                logger.info("Vosk model loaded")
+                return True
+        except Exception as e:
+            logger.error(f"Vosk setup failed: {e}")
+        return False
+    
+    def setup_whisper(self):
+        """Setup Whisper for high-quality recognition"""
+        if not WHISPER_AVAILABLE:
+            return False
+        
+        try:
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            self.whisper_model = whisper.load_model("tiny", device=device)
+            if device == "cpu":
+                self.whisper_model = self.whisper_model.half()
+            logger.info("Whisper model loaded")
+            return True
+        except Exception as e:
+            logger.error(f"Whisper setup failed: {e}")
+        return False
+    
+    def setup_speech_recognition(self):
+        """Setup speech_recognition for cloud-based recognition"""
+        if not SPEECH_RECOGNITION_AVAILABLE:
+            return False
+        
+        try:
+            self.speech_recognizer = sr.Recognizer()
+            self.speech_microphone = sr.Microphone()
+            with self.speech_microphone as source:
+                self.speech_recognizer.adjust_for_ambient_noise(source, duration=1)
+            logger.info("Speech recognition initialized")
+            return True
+        except Exception as e:
+            logger.error(f"Speech recognition setup failed: {e}")
+        return False
+    
+    def setup_fallback(self):
+        """Setup fallback voice recognition"""
+        logger.info("Setting up fallback voice recognition...")
+        
+        # Try alternatives in order
+        if self.setup_speech_recognition():
+            self.current_mode = 'speech_recognition'
+        elif self.setup_whisper():
+            self.current_mode = 'whisper'
+        elif self.setup_vosk():
+            self.current_mode = 'vosk'
+        else:
+            self.current_mode = None
+            logger.error("No fallback voice recognition available")
+    
+    def setup_tts(self):
+        """Initialize text-to-speech"""
+        if TTS_ENGINE == 'pyttsx3':
+            try:
+                self.tts_engine = pyttsx3.init()
+                self.tts_engine.setProperty('rate', config.TTS_RATE)
+                self.tts_engine.setProperty('volume', config.TTS_VOLUME)
+                logger.info("TTS initialized")
+            except:
+                self.tts_engine = None
+        elif TTS_ENGINE == 'gtts':
+            pygame.mixer.init()
+    
+    def listen_continuous(self):
+        """Main listening loop with automatic fallback"""
+        self.listening = True
+        logger.info(f"Listening with {self.current_mode}")
+        
+        while self.listening and self.current_mode:
+            try:
+                if self.current_mode == 'vosk':
+                    self.listen_with_vosk()
+                elif self.current_mode == 'whisper':
+                    self.listen_with_whisper()
+                elif self.current_mode == 'speech_recognition':
+                    self.listen_with_speech_recognition()
             except Exception as e:
-                print(f"TPA2016 init: {e}")
-        app.run(host="0.0.0.0", port=5000, debug=False)
-    finally:
-        if GPIO:
+                logger.error(f"Voice recognition error: {e}")
+                logger.info("Attempting fallback...")
+                self.setup_fallback()
+                time.sleep(2)
+    
+    def listen_with_vosk(self):
+        """Vosk listening implementation"""
+        if not self.vosk_model:
+            raise Exception("Vosk not available")
+        
+        p = pyaudio.PyAudio()
+        stream = p.open(
+            format=pyaudio.paInt16,
+            channels=config.CHANNELS,
+            rate=config.SAMPLE_RATE,
+            input=True,
+            frames_per_buffer=config.CHUNK_SIZE
+        )
+        
+        rec = vosk.KaldiRecognizer(self.vosk_model, config.SAMPLE_RATE)
+        
+        try:
+            while self.listening:
+                data = stream.read(config.CHUNK_SIZE, exception_on_overflow=False)
+                
+                if rec.AcceptWaveform(data):
+                    result = json.loads(rec.Result())
+                    text = result.get('text', '').lower()
+                    
+                    if text:
+                        self.process_speech(text)
+        finally:
+            stream.stop_stream()
+            stream.close()
+            p.terminate()
+    
+    def listen_with_whisper(self):
+        """Whisper listening implementation"""
+        if not self.whisper_model:
+            raise Exception("Whisper not available")
+        
+        def audio_callback(indata, frames, time, status):
+            if status:
+                logger.warning(f"Audio status: {status}")
+            self.audio_queue.put(indata.copy())
+        
+        with sd.InputStream(
+            samplerate=config.SAMPLE_RATE,
+            channels=config.CHANNELS,
+            callback=audio_callback,
+            blocksize=config.CHUNK_SIZE
+        ):
+            while self.listening:
+                audio_chunks = []
+                silence_counter = 0
+                recording = False
+                
+                while True:
+                    if not self.audio_queue.empty():
+                        chunk = self.audio_queue.get()
+                        volume = np.sqrt(np.mean(chunk**2))
+                        
+                        if volume > 0.01:
+                            recording = True
+                            silence_counter = 0
+                            audio_chunks.append(chunk)
+                        elif recording:
+                            audio_chunks.append(chunk)
+                            silence_counter += 1
+                            if silence_counter > 30:
+                                break
+                    
+                    time.sleep(0.01)
+                
+                if audio_chunks and len(audio_chunks) > 10:
+                    audio_data = np.concatenate(audio_chunks).flatten()
+                    audio_data = audio_data.astype(np.float32)
+                    if audio_data.max() > 1.0:
+                        audio_data = audio_data / np.max(np.abs(audio_data))
+                    
+                    result = self.whisper_model.transcribe(audio_data, language='en', fp16=False)
+                    text = result["text"].lower().strip()
+                    
+                    if text:
+                        self.process_speech(text)
+    
+    def listen_with_speech_recognition(self):
+        """Speech recognition (Google) listening implementation"""
+        if not self.speech_recognizer:
+            raise Exception("Speech recognition not available")
+        
+        with self.speech_microphone as source:
+            while self.listening:
+                try:
+                    audio = self.speech_recognizer.listen(source, timeout=1, phrase_time_limit=5)
+                    
+                    try:
+                        # Try Google first (free)
+                        text = self.speech_recognizer.recognize_google(audio).lower()
+                        if text:
+                            self.process_speech(text)
+                    except sr.UnknownValueError:
+                        pass
+                    except sr.RequestError as e:
+                        # If Google fails, try Whisper API if available
+                        if config.OPENAI_API_KEY:
+                            try:
+                                text = self.speech_recognizer.recognize_whisper_api(
+                                    audio,
+                                    api_key=config.OPENAI_API_KEY
+                                ).lower()
+                                if text:
+                                    self.process_speech(text)
+                            except:
+                                raise e
+                        else:
+                            raise e
+                            
+                except sr.WaitTimeoutError:
+                    pass
+                except Exception as e:
+                    logger.error(f"Recognition error: {e}")
+                    raise
+    
+    def process_speech(self, text):
+        """Process recognized speech"""
+        logger.info(f"Heard: {text}")
+        
+        # Check for wake word
+        for wake_word in config.WAKE_WORDS:
+            if wake_word in text:
+                logger.info("Wake word detected!")
+                self.handle_command_mode()
+                return
+        
+        # If already in command mode, process as command
+        if self.processing:
+            self.process_command(text)
+    
+    def handle_command_mode(self):
+        """Enter command mode"""
+        try:
+            self.processing = True
+            self.speak("Yes, I'm listening")
+            socketio.emit('voice_status', {'status': 'listening'})
+            
+            # Record command with appropriate method
+            command = None
+            
+            if self.current_mode == 'vosk':
+                command = self.record_command_vosk()
+            elif self.current_mode == 'whisper':
+                command = self.record_command_whisper()
+            elif self.current_mode == 'speech_recognition':
+                command = self.record_command_speech_recognition()
+            
+            if command:
+                self.process_command(command)
+            else:
+                self.speak("I didn't catch that. Please try again.")
+                
+        except Exception as e:
+            logger.error(f"Command mode error: {e}")
+            self.speak("Sorry, there was an error")
+        finally:
+            self.processing = False
+            socketio.emit('voice_status', {'status': 'ready'})
+    
+    def record_command_vosk(self):
+        """Record command using Vosk"""
+        p = pyaudio.PyAudio()
+        stream = p.open(
+            format=pyaudio.paInt16,
+            channels=config.CHANNELS,
+            rate=config.SAMPLE_RATE,
+            input=True,
+            frames_per_buffer=config.CHUNK_SIZE
+        )
+        
+        rec = vosk.KaldiRecognizer(self.vosk_model, config.SAMPLE_RATE)
+        command_text = ""
+        
+        try:
+            start_time = time.time()
+            while time.time() - start_time < 10:
+                data = stream.read(config.CHUNK_SIZE, exception_on_overflow=False)
+                
+                if rec.AcceptWaveform(data):
+                    result = json.loads(rec.Result())
+                    text = result.get('text', '')
+                    if text:
+                        command_text = text
+                        break
+        finally:
+            stream.stop_stream()
+            stream.close()
+            p.terminate()
+        
+        return command_text.lower()
+    
+    def record_command_whisper(self):
+        """Record command using Whisper"""
+        audio_chunks = []
+        
+        def callback(indata, frames, time, status):
+            audio_chunks.append(indata.copy())
+        
+        with sd.InputStream(
+            samplerate=config.SAMPLE_RATE,
+            channels=config.CHANNELS,
+            callback=callback,
+            blocksize=config.CHUNK_SIZE
+        ):
+            time.sleep(5)  # Record for 5 seconds
+        
+        if audio_chunks:
+            audio_data = np.concatenate(audio_chunks).flatten()
+            audio_data = audio_data.astype(np.float32)
+            if audio_data.max() > 1.0:
+                audio_data = audio_data / np.max(np.abs(audio_data))
+            
+            result = self.whisper_model.transcribe(audio_data, language='en', fp16=False)
+            return result["text"].lower().strip()
+        
+        return None
+    
+    def record_command_speech_recognition(self):
+        """Record command using speech recognition"""
+        with self.speech_microphone as source:
+            try:
+                audio = self.speech_recognizer.listen(source, timeout=5, phrase_time_limit=10)
+                
+                try:
+                    return self.speech_recognizer.recognize_google(audio).lower()
+                except:
+                    if config.OPENAI_API_KEY:
+                        return self.speech_recognizer.recognize_whisper_api(
+                            audio,
+                            api_key=config.OPENAI_API_KEY
+                        ).lower()
+            except:
+                pass
+        
+        return None
+    
+    def process_command(self, command):
+        """Process voice command"""
+        logger.info(f"Processing: {command}")
+        
+        # Get response
+        if self.openai_client:
+            response = self.process_with_chatgpt(command)
+        else:
+            response = self.process_locally(command)
+        
+        # Extract and execute actions
+        actions = self.extract_actions(response)
+        if actions:
+            self.execute_actions(actions)
+        
+        # Speak response
+        self.speak(response)
+        
+        # Send to frontend
+        socketio.emit('voice_command', {
+            'command': command,
+            'response': response,
+            'actions': actions
+        })
+    
+    def process_with_chatgpt(self, command):
+        """Process with ChatGPT"""
+        try:
+            context = f"""
+            You are BingHome, a helpful smart home assistant.
+            
+            Current conditions:
+            - Temperature: {sensor_data['temperature']}°C
+            - Humidity: {sensor_data['humidity']}%
+            - Gas: {'DETECTED - WARNING!' if sensor_data['gas_detected'] else 'Clear'}
+            - Light: {sensor_data['light_level']}
+            - Time: {datetime.now().strftime('%H:%M')}
+            
+            User said: "{command}"
+            
+            Respond concisely. For device control, include tags like:
+            [ACTION:LIGHTS_ON] or [ACTION:TEMPERATURE_SET:22]
+            """
+            
+            response = self.openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=[
+                    {"role": "system", "content": "You are BingHome, a friendly smart home assistant. Be concise."},
+                    {"role": "user", "content": context}
+                ],
+                max_tokens=150,
+                temperature=0.7
+            )
+            
+            return response.choices[0].message.content
+            
+        except Exception as e:
+            logger.error(f"ChatGPT error: {e}")
+            return self.process_locally(command)
+    
+    def process_locally(self, command):
+        """Process command locally without AI"""
+        command = command.lower()
+        
+        if 'temperature' in command or 'temp' in command:
+            return f"The temperature is {sensor_data['temperature']} degrees."
+        elif 'humidity' in command:
+            return f"The humidity is {sensor_data['humidity']} percent."
+        elif 'light' in command:
+            if 'on' in command:
+                return "Turning on the lights. [ACTION:LIGHTS_ON]"
+            elif 'off' in command:
+                return "Turning off the lights. [ACTION:LIGHTS_OFF]"
+            else:
+                return f"It's {sensor_data['light_level']} according to the sensor."
+        elif 'gas' in command or 'smoke' in command:
+            if sensor_data['gas_detected']:
+                return "Warning! Gas detected. Check immediately!"
+            else:
+                return "No gas detected. Air is clear."
+        elif 'time' in command:
+            return f"The time is {datetime.now().strftime('%I:%M %p')}."
+        else:
+            return "I can help with lights, temperature, humidity, and sensors. What would you like?"
+    
+    def extract_actions(self, response):
+        """Extract action tags from response"""
+        import re
+        actions = []
+        pattern = r'\[ACTION:([^\]]+)\]'
+        matches = re.findall(pattern, response)
+        
+        for match in matches:
+            parts = match.split(':')
+            actions.append({
+                'type': parts[0],
+                'value': parts[1] if len(parts) > 1 else None
+            })
+        
+        return actions
+    
+    def execute_actions(self, actions):
+        """Execute smart home actions"""
+        for action in actions:
+            try:
+                action_type = action['type']
+                value = action.get('value')
+                
+                if action_type == 'LIGHTS_ON':
+                    self.control_lights(True)
+                elif action_type == 'LIGHTS_OFF':
+                    self.control_lights(False)
+                elif action_type == 'TEMPERATURE_SET' and value:
+                    self.set_temperature(float(value))
+                
+                logger.info(f"Executed: {action}")
+            except Exception as e:
+                logger.error(f"Action error: {e}")
+    
+    def control_lights(self, state):
+        """Control lights"""
+        if config.HOME_ASSISTANT_URL and config.HOME_ASSISTANT_TOKEN:
+            try:
+                headers = {
+                    'Authorization': f'Bearer {config.HOME_ASSISTANT_TOKEN}',
+                    'Content-Type': 'application/json'
+                }
+                service = 'turn_on' if state else 'turn_off'
+                url = f"{config.HOME_ASSISTANT_URL}/api/services/light/{service}"
+                response = requests.post(url, headers=headers, json={'entity_id': 'light.living_room'}, timeout=5)
+                
+                if response.status_code == 200:
+                    logger.info(f"Lights {'on' if state else 'off'}")
+            except:
+                pass
+        
+        socketio.emit('device_status', {'device': 'lights', 'state': 'on' if state else 'off'})
+    
+    def set_temperature(self, temp):
+        """Set temperature"""
+        logger.info(f"Setting temperature to {temp}°C")
+        socketio.emit('device_status', {'device': 'thermostat', 'temperature': temp})
+    
+    def speak(self, text):
+        """Text to speech"""
+        try:
+            import re
+            clean_text = re.sub(r'\[ACTION:[^\]]+\]', '', text).strip()
+            
+            if not clean_text:
+                return
+            
+            if TTS_ENGINE == 'pyttsx3' and self.tts_engine:
+                self.tts_engine.say(clean_text)
+                self.tts_engine.runAndWait()
+            elif TTS_ENGINE == 'gtts':
+                tts = gTTS(text=clean_text, lang='en', slow=False)
+                tts.save("/tmp/response.mp3")
+                pygame.mixer.music.load("/tmp/response.mp3")
+                pygame.mixer.music.play()
+                while pygame.mixer.music.get_busy():
+                    time.sleep(0.1)
+            else:
+                os.system(f'espeak "{clean_text}" 2>/dev/null')
+        except Exception as e:
+            logger.error(f"TTS error: {e}")
+    
+    def stop(self):
+        """Stop voice assistant"""
+        self.listening = False
+        self.processing = False
+
+# Background threads
+def sensor_update_loop():
+    """Sensor monitoring thread"""
+    sensor_manager = SensorManager()
+    
+    while True:
+        try:
+            data = sensor_manager.read_sensors()
+            socketio.emit('sensor_update', data)
+            
+            if data['gas_detected']:
+                socketio.emit('alert', {
+                    'type': 'danger',
+                    'message': 'Gas detected! Check immediately!'
+                })
+            
+            time.sleep(config.SENSOR_UPDATE_INTERVAL)
+        except Exception as e:
+            logger.error(f"Sensor error: {e}")
+            time.sleep(5)
+
+def news_update_loop():
+    """News fetching thread"""
+    while True:
+        try:
+            if config.BING_API_KEY:
+                headers = {'Ocp-Apim-Subscription-Key': config.BING_API_KEY}
+                params = {'mkt': 'en-US', 'count': 10, 'freshness': 'Day'}
+                
+                response = requests.get(
+                    'https://api.bing.microsoft.com/v7.0/news',
+                    headers=headers,
+                    params=params,
+                    timeout=10
+                )
+                
+                if response.status_code == 200:
+                    global news_data
+                    data = response.json()
+                    news_data = [{
+                        'title': article['name'],
+                        'description': article.get('description', ''),
+                        'url': article['url'],
+                        'provider': article['provider'][0]['name'] if article.get('provider') else '',
+                        'published': article.get('datePublished', '')
+                    } for article in data.get('value', [])]
+                    
+                    socketio.emit('news_update', news_data)
+            
+            time.sleep(config.NEWS_UPDATE_INTERVAL)
+        except Exception as e:
+            logger.error(f"News error: {e}")
+            time.sleep(60)
+
+# Authentication decorator
+def login_required(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user' not in session:
+            return jsonify({'error': 'Authentication required'}), 401
+        return f(*args, **kwargs)
+    return decorated_function
+
+# Flask routes
+@app.route('/')
+def index():
+    """Main dashboard"""
+    return render_template('index.html')
+
+@app.route('/api/sensor_data')
+def get_sensor_data():
+    """Get current sensor readings"""
+    return jsonify(sensor_data)
+
+@app.route('/api/news')
+def get_news():
+    """Get latest news"""
+    return jsonify(news_data)
+
+@app.route('/api/health')
+def health_check():
+    """System health check"""
+    return jsonify({
+        'status': 'healthy',
+        'hardware': HARDWARE_AVAILABLE,
+        'voice_mode': voice_assistant.current_mode if voice_assistant else None,
+        'whisper': WHISPER_AVAILABLE,
+        'vosk': VOSK_AVAILABLE,
+        'speech_recognition': SPEECH_RECOGNITION_AVAILABLE,
+        'tts': TTS_ENGINE,
+        'timestamp': datetime.now().isoformat()
+    })
+
+@app.route('/api/voice', methods=['POST'])
+def voice_command():
+    """Process voice command via API"""
+    try:
+        data = request.json
+        command = data.get('command', '')
+        
+        if voice_assistant and command:
+            if voice_assistant.openai_client:
+                response = voice_assistant.process_with_chatgpt(command)
+            else:
+                response = voice_assistant.process_locally(command)
+            
+            actions = voice_assistant.extract_actions(response)
+            if actions:
+                voice_assistant.execute_actions(actions)
+            
+            return jsonify({
+                'success': True,
+                'response': response,
+                'actions': actions
+            })
+        
+        return jsonify({'success': False, 'error': 'Voice assistant not available'}), 503
+            
+    except Exception as e:
+        logger.error(f"Voice API error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/settings', methods=['GET', 'POST'])
+def settings():
+    """Get or update settings"""
+    if request.method == 'GET':
+        # Don't send API keys to frontend
+        safe_settings = {
+            'voice_mode': config.VOICE_MODE,
+            'wake_words': config.WAKE_WORDS,
+            'language': config.LANGUAGE,
+            'tts_engine': config.TTS_ENGINE,
+            'tts_rate': config.TTS_RATE,
+            'tts_volume': config.TTS_VOLUME,
+            'home_assistant_url': config.HOME_ASSISTANT_URL,
+            'gpio_pins': config.GPIO_PINS,
+            'has_openai_key': bool(config.OPENAI_API_KEY),
+            'has_bing_key': bool(config.BING_API_KEY),
+            'has_ha_token': bool(config.HOME_ASSISTANT_TOKEN)
+        }
+        return jsonify(safe_settings)
+    
+    else:  # POST
+        try:
+            new_settings = request.json
+            
+            # Save settings
+            if config.save_settings(new_settings):
+                # Restart voice assistant if needed
+                global voice_assistant
+                if voice_assistant:
+                    voice_assistant.stop()
+                    voice_assistant = VoiceAssistant()
+                    threading.Thread(
+                        target=voice_assistant.listen_continuous,
+                        daemon=True
+                    ).start()
+                
+                return jsonify({'success': True})
+            
+            return jsonify({'success': False, 'error': 'Failed to save settings'}), 500
+            
+        except Exception as e:
+            logger.error(f"Settings error: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/auth/login')
+def auth_login():
+    """Initiate OAuth login with OpenAI"""
+    # Generate state for security
+    state = secrets.token_urlsafe(32)
+    session['oauth_state'] = state
+    
+    # Build authorization URL
+    params = {
+        'client_id': OAUTH_CONFIG['client_id'],
+        'redirect_uri': OAUTH_CONFIG['redirect_uri'],
+        'response_type': 'code',
+        'scope': OAUTH_CONFIG['scope'],
+        'state': state
+    }
+    
+    auth_url = OAUTH_CONFIG['authorize_url'] + '?' + '&'.join([f"{k}={v}" for k, v in params.items()])
+    
+    return redirect(auth_url)
+
+@app.route('/auth/callback')
+def auth_callback():
+    """Handle OAuth callback"""
+    try:
+        # Verify state
+        if request.args.get('state') != session.get('oauth_state'):
+            return jsonify({'error': 'Invalid state'}), 400
+        
+        # Exchange code for token
+        code = request.args.get('code')
+        if not code:
+            return jsonify({'error': 'No code provided'}), 400
+        
+        # Get access token
+        token_data = {
+            'grant_type': 'authorization_code',
+            'code': code,
+            'redirect_uri': OAUTH_CONFIG['redirect_uri'],
+            'client_id': OAUTH_CONFIG['client_id'],
+            'client_secret': OAUTH_CONFIG['client_secret']
+        }
+        
+        response = requests.post(OAUTH_CONFIG['token_url'], data=token_data)
+        
+        if response.status_code == 200:
+            token_info = response.json()
+            
+            # Save token and user info
+            session['user'] = {
+                'access_token': token_info['access_token'],
+                'authenticated_at': datetime.now().isoformat()
+            }
+            
+            # Update OpenAI API key
+            config.OPENAI_API_KEY = token_info['access_token']
+            config.save_settings({'openai_api_key': token_info['access_token']})
+            
+            # Reinitialize voice assistant
+            global voice_assistant
+            if voice_assistant:
+                voice_assistant.setup_voice()
+            
+            return redirect('/?auth=success')
+        else:
+            return redirect('/?auth=failed')
+            
+    except Exception as e:
+        logger.error(f"OAuth error: {e}")
+        return redirect('/?auth=error')
+
+@app.route('/auth/logout')
+def auth_logout():
+    """Logout user"""
+    session.pop('user', None)
+    session.pop('oauth_state', None)
+    return redirect('/')
+
+@app.route('/api/wifi_scan')
+def wifi_scan():
+    """Scan for WiFi networks"""
+    try:
+        import subprocess
+        result = subprocess.run(
+            ['sudo', 'iwlist', 'wlan0', 'scan'],
+            capture_output=True,
+            text=True,
+            timeout=10
+        )
+        
+        networks = []
+        lines = result.stdout.split('\n')
+        current_network = {}
+        
+        for line in lines:
+            if 'Cell' in line:
+                if current_network and 'ssid' in current_network:
+                    networks.append(current_network)
+                current_network = {}
+            elif 'ESSID:' in line:
+                ssid = line.split('"')[1] if '"' in line else ''
+                if ssid:
+                    current_network['ssid'] = ssid
+            elif 'Signal level=' in line:
+                try:
+                    signal = line.split('Signal level=')[1].split(' ')[0]
+                    current_network['signal'] = signal
+                except:
+                    pass
+            elif 'Encryption key:on' in line:
+                current_network['encrypted'] = True
+        
+        if current_network and 'ssid' in current_network:
+            networks.append(current_network)
+        
+        return jsonify(networks)
+        
+    except Exception as e:
+        logger.error(f"WiFi scan error: {e}")
+        return jsonify([])
+
+@app.route('/api/wifi_connect', methods=['POST'])
+def wifi_connect():
+    """Connect to WiFi network"""
+    try:
+        data = request.json
+        ssid = data.get('ssid')
+        password = data.get('password')
+        
+        if not ssid:
+            return jsonify({'success': False, 'error': 'SSID required'}), 400
+        
+        config = f'''
+ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
+update_config=1
+country=US
+
+network={{
+    ssid="{ssid}"
+    {"psk=\"" + password + "\"" if password else "key_mgmt=NONE"}
+}}
+'''
+        
+        with open('/tmp/wpa_supplicant.conf', 'w') as f:
+            f.write(config)
+        
+        import subprocess
+        subprocess.run(['sudo', 'cp', '/tmp/wpa_supplicant.conf', '/etc/wpa_supplicant/wpa_supplicant.conf'])
+        subprocess.run(['sudo', 'systemctl', 'restart', 'wpa_supplicant'])
+        
+        return jsonify({'success': True})
+        
+    except Exception as e:
+        logger.error(f"WiFi connect error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# WebSocket events
+@socketio.on('connect')
+def handle_connect():
+    """Handle client connection"""
+    logger.info(f"Client connected: {request.sid}")
+    emit('connected', {'data': 'Connected to BingHome'})
+    
+    # Send initial data
+    emit('sensor_update', sensor_data)
+    emit('news_update', news_data)
+    
+    # Send voice status
+    if voice_assistant:
+        emit('voice_status', {
+            'available': True,
+            'mode': voice_assistant.current_mode,
+            'listening': voice_assistant.listening
+        })
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    """Handle client disconnection"""
+    logger.info(f"Client disconnected: {request.sid}")
+
+@socketio.on('request_sensor_data')
+def handle_sensor_request():
+    """Handle sensor data request"""
+    emit('sensor_update', sensor_data)
+
+@socketio.on('control_device')
+def handle_device_control(data):
+    """Handle device control commands"""
+    device = data.get('device')
+    action = data.get('action')
+    value = data.get('value')
+    
+    logger.info(f"Device control: {device} - {action} - {value}")
+    
+    if voice_assistant:
+        if device == 'lights':
+            voice_assistant.control_lights(action == 'on')
+        elif device == 'thermostat' and value:
+            voice_assistant.set_temperature(float(value))
+    
+    emit('device_status', {
+        'device': device,
+        'status': 'success',
+        'action': action
+    })
+
+# Main execution
+def main():
+    """Main application entry point"""
+    global voice_assistant
+    
+    logger.info("=" * 50)
+    logger.info("BingHome Smart Home System v2.1.0")
+    logger.info(f"Hardware: {'Available' if HARDWARE_AVAILABLE else 'Simulated'}")
+    logger.info("=" * 50)
+    
+    # Start sensor monitoring
+    sensor_thread = threading.Thread(target=sensor_update_loop, daemon=True)
+    sensor_thread.start()
+    logger.info("✓ Sensor monitoring started")
+    
+    # Start news fetching
+    if config.BING_API_KEY:
+        news_thread = threading.Thread(target=news_update_loop, daemon=True)
+        news_thread.start()
+        logger.info("✓ News fetching started")
+    
+    # Initialize voice assistant
+    try:
+        voice_assistant = VoiceAssistant()
+        if voice_assistant.current_mode:
+            voice_thread = threading.Thread(
+                target=voice_assistant.listen_continuous,
+                daemon=True
+            )
+            voice_thread.start()
+            logger.info(f"✓ Voice assistant started ({voice_assistant.current_mode})")
+        else:
+            logger.warning("⚠ Voice assistant not available")
+    except Exception as e:
+        logger.error(f"Voice assistant error: {e}")
+    
+    # Start Flask app
+    try:
+        port = int(os.environ.get('PORT', 5000))
+        logger.info(f"Starting web server on http://0.0.0.0:{port}")
+        logger.info("Press Ctrl+C to stop")
+        
+        socketio.run(
+            app,
+            host='0.0.0.0',
+            port=port,
+            debug=False,
+            use_reloader=False
+        )
+    except KeyboardInterrupt:
+        logger.info("\nShutting down...")
+        if voice_assistant:
+            voice_assistant.stop()
+        if HARDWARE_AVAILABLE:
             GPIO.cleanup()
+        logger.info("Goodbye!")
+    except Exception as e:
+        logger.error(f"Fatal error: {e}")
+        sys.exit(1)
+
+if __name__ == '__main__':
+    main()
