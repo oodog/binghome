@@ -1,20 +1,51 @@
-# Core web
-Flask==2.3.3
-requests==2.31.0
-beautifulsoup4==4.12.2
+# Core Flask and Web
+flask==2.3.3
+flask-cors==4.0.0
+flask-socketio==5.3.4
+python-socketio==5.9.0
 python-dotenv==1.0.0
-psutil==5.9.5
+requests==2.31.0
+numpy==1.24.3
 
-# Pi hardware (optional in code, safe on Pi 5/Bookworm)
+# Hardware Support (Raspberry Pi)
 RPi.GPIO==0.7.1
-smbus2==0.4.2
+adafruit-circuitpython-dht==4.0.2
+adafruit-circuitpython-tpa2016==1.1.10
+board==1.0
+busio==1.2.0
 
-# DHT sensor (Pi 5 friendly — replaces Adafruit-DHT)
-adafruit-circuitpython-dht==4.0.4
-adafruit-blinka==8.51.0
+# Audio Processing
+sounddevice==0.4.6
+PyAudio==0.2.13
 
-# Voice/LLM (optional feature; safe to keep)
-openai==1.35.14
+# Text-to-Speech
+pyttsx3==2.90
+gTTS==2.4.0
+pygame==2.5.2
 
-#APScheduler for timers
-APScheduler==3.10.4
+# Voice Recognition - Core
+SpeechRecognition==3.10.1
+
+# Voice Recognition - Vosk (Offline)
+vosk==0.3.45
+
+# Voice Recognition - Whisper (Optional, comment out if not using)
+# Uncomment these if using Whisper:
+# openai-whisper==20231117
+# torch==2.1.0+cpu  # CPU version for Raspberry Pi
+# torchaudio==2.1.0+cpu
+# torchvision==0.16.0+cpu
+
+# AI and ChatGPT
+openai==1.3.5
+
+# Session Management
+Flask-Session==0.5.0
+
+# Security
+cryptography==41.0.7
+PyJWT==2.8.0
+
+# Utilities
+python-dateutil==2.8.2
+pytz==2023.3
