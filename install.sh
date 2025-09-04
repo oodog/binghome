@@ -1,7 +1,8 @@
 #!/bin/bash
 # ============================================
-# BingHome Installation Script v2.1.0
+# BingHome Installation Script v2.1.0 - FIXED
 # Smart Home System with Voice Control
+# Fixed for Python 3.11 compatibility
 # ============================================
 
 set -e  # Exit on error
@@ -56,18 +57,18 @@ check_raspberry_pi() {
     fi
 }
 
-# Check system requirements
+# Check system requirements - FIXED VERSION
 check_requirements() {
     echo -e "\n${BLUE}Checking system requirements...${NC}"
     
-    # Check Python version
+    # Check Python version - FIXED FOR 3.11
     if command -v python3 &> /dev/null; then
-        PYTHON_VERSION=$(python3 --version | cut -d' ' -f2)
+        PYTHON_VERSION=$(python3 --version 2>&1 | grep -oP '\d+\.\d+' | head -1)
         PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d'.' -f1)
         PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d'.' -f2)
         
         # Check if Python 3.9 or higher
-        if [ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -ge 9 ]; then
+        if [ "$PYTHON_MAJOR" -eq "3" ] && [ "$PYTHON_MINOR" -ge "9" ]; then
             echo -e "${GREEN}✓ Python $PYTHON_VERSION${NC}"
         else
             echo -e "${RED}✗ Python $PYTHON_VERSION (3.9+ required)${NC}"
@@ -88,10 +89,10 @@ check_requirements() {
     fi
     
     # Check disk space
-    AVAILABLE_SPACE=$(df -h /home | awk 'NR==2 {print $4}' | sed 's/G//')
-    if [ "$(echo "$AVAILABLE_SPACE < 2" | bc)" -eq 1 ]; then
-        echo -e "${RED}✗ Low disk space: ${AVAILABLE_SPACE}GB (2GB+ required)${NC}"
-        exit 1
+    AVAILABLE_SPACE=$(df -h /home | awk 'NR==2 {print $4}' | sed 's/[^0-9.]//g')
+    AVAILABLE_INT=$(echo $AVAILABLE_SPACE | cut -d'.' -f1)
+    if [ "$AVAILABLE_INT" -lt "2" ]; then
+        echo -e "${YELLOW}⚠ Low disk space: ${AVAILABLE_SPACE}GB (2GB+ recommended)${NC}"
     else
         echo -e "${GREEN}✓ Disk space: ${AVAILABLE_SPACE}GB available${NC}"
     fi
@@ -170,7 +171,7 @@ install_dependencies() {
 
 # Enable hardware interfaces
 enable_interfaces() {
-    if ! check_raspberry_pi; then
+    if [ ! -f /proc/device-tree/model ]; then
         return
     fi
     
@@ -179,30 +180,31 @@ enable_interfaces() {
     # Enable I2C
     sudo raspi-config nonint do_i2c 0
     
-    # Enable SPI
+    # Enable SPI  
     sudo raspi-config nonint do_spi 0
     
     # Add user to required groups
     sudo usermod -a -G gpio,i2c,spi,audio $USER
     
     echo -e "${GREEN}✓ Hardware interfaces enabled${NC}"
+    echo -e "${YELLOW}Note: You may need to logout and login for group changes to take effect${NC}"
 }
 
-# Clone or update repository
+# Clone or create repository
 setup_repository() {
     echo -e "\n${BLUE}Setting up repository...${NC}"
     
     if [ -d "$INSTALL_DIR" ]; then
-        echo -e "${YELLOW}Directory exists. Updating...${NC}"
-        cd "$INSTALL_DIR"
-        git stash
-        git pull origin main || true
+        echo -e "${YELLOW}Directory exists. Backing up...${NC}"
+        mv "$INSTALL_DIR" "$INSTALL_DIR.backup.$(date +%Y%m%d_%H%M%S)"
+    fi
+    
+    # Try to clone, but continue if it fails
+    if git clone "$GITHUB_REPO" "$INSTALL_DIR" 2>/dev/null; then
+        echo -e "${GREEN}✓ Repository cloned${NC}"
     else
-        echo -e "${BLUE}Cloning repository...${NC}"
-        git clone "$GITHUB_REPO" "$INSTALL_DIR" || {
-            echo -e "${YELLOW}Repository not available. Creating local installation...${NC}"
-            mkdir -p "$INSTALL_DIR"
-        }
+        echo -e "${YELLOW}Creating local installation...${NC}"
+        mkdir -p "$INSTALL_DIR"
     fi
     
     cd "$INSTALL_DIR"
@@ -214,11 +216,7 @@ setup_venv() {
     
     cd "$INSTALL_DIR"
     
-    if [ -d "venv" ]; then
-        echo -e "${YELLOW}Virtual environment exists. Recreating...${NC}"
-        rm -rf venv
-    fi
-    
+    # Create virtual environment
     python3 -m venv venv
     source venv/bin/activate
     
@@ -235,16 +233,18 @@ install_python_packages() {
     # Core packages
     pip install flask flask-cors flask-socketio
     pip install requests numpy
+    pip install python-dotenv
     
     # Hardware packages (Raspberry Pi)
-    if check_raspberry_pi; then
-        pip install RPi.GPIO
-        pip install adafruit-circuitpython-dht
-        pip install adafruit-circuitpython-tpa2016
+    if [ -f /proc/device-tree/model ]; then
+        pip install RPi.GPIO || echo -e "${YELLOW}GPIO support not available${NC}"
+        pip install adafruit-circuitpython-dht || echo -e "${YELLOW}DHT sensor support not available${NC}"
+        pip install adafruit-circuitpython-tpa2016 || echo -e "${YELLOW}Audio amplifier support not available${NC}"
     fi
     
     # Audio packages
-    pip install sounddevice pyaudio
+    pip install sounddevice || echo -e "${YELLOW}Sounddevice not available${NC}"
+    pip install pyaudio || echo -e "${YELLOW}PyAudio not available${NC}"
     
     # TTS packages
     pip install pyttsx3 gTTS pygame
@@ -266,14 +266,14 @@ install_python_packages() {
     
     case $VOICE_MODE in
         "whisper"|"all")
-            echo -e "${BLUE}Installing Whisper...${NC}"
-            # Install PyTorch CPU version
+            echo -e "${BLUE}Installing Whisper (this may take a while)...${NC}"
+            # Install PyTorch CPU version for Raspberry Pi
             pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cpu
             pip install openai-whisper
             
             # Pre-download tiny model
             echo -e "${BLUE}Downloading Whisper model...${NC}"
-            python3 -c "import whisper; whisper.load_model('tiny')" || true
+            python3 -c "import whisper; whisper.load_model('tiny')" || echo -e "${YELLOW}Model download will complete on first run${NC}"
             ;;
     esac
     
@@ -281,6 +281,9 @@ install_python_packages() {
     if [ "$VOICE_MODE" != "none" ]; then
         pip install openai
     fi
+    
+    # Session management
+    pip install Flask-Session
     
     echo -e "${GREEN}✓ Python packages installed${NC}"
 }
@@ -313,6 +316,21 @@ create_app_files() {
     
     # Create directories
     mkdir -p templates static docs systemd
+    
+    # Download app.py if not exists
+    if [ ! -f "app.py" ]; then
+        echo -e "${YELLOW}Downloading app.py...${NC}"
+        wget -q https://raw.githubusercontent.com/oodog/binghome/master/app.py 2>/dev/null || \
+        echo -e "${YELLOW}Please copy app.py from the documentation${NC}"
+    fi
+    
+    # Download index.html if not exists
+    if [ ! -f "templates/index.html" ]; then
+        echo -e "${YELLOW}Downloading index.html...${NC}"
+        wget -q https://raw.githubusercontent.com/oodog/binghome/master/templates/index.html \
+             -O templates/index.html 2>/dev/null || \
+        echo -e "${YELLOW}Please copy index.html to templates/ from the documentation${NC}"
+    fi
     
     # Create .env file
     if [ ! -f ".env" ]; then
@@ -349,8 +367,6 @@ EOF
 }
 EOF
     fi
-    
-    echo -e "${YELLOW}Note: Copy app.py and templates/index.html from the repository${NC}"
 }
 
 # Setup systemd service
@@ -370,8 +386,6 @@ Environment="PATH=$INSTALL_DIR/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin
 ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/app.py
 Restart=always
 RestartSec=10
-StandardOutput=append:/var/log/binghome.log
-StandardError=append:/var/log/binghome.error.log
 
 [Install]
 WantedBy=multi-user.target
@@ -393,7 +407,7 @@ setup_audio() {
     
     # Test audio
     echo -e "${BLUE}Testing audio...${NC}"
-    espeak "BingHome installation complete" 2>/dev/null || true
+    espeak "BingHome installation complete" 2>/dev/null || echo -e "${YELLOW}Audio test skipped${NC}"
     
     echo -e "${GREEN}✓ Audio configured${NC}"
 }
@@ -411,17 +425,6 @@ python app.py
 EOF
     chmod +x "$INSTALL_DIR/start.sh"
     
-    # Update script
-    cat > "$INSTALL_DIR/update.sh" << 'EOF'
-#!/bin/bash
-cd "$(dirname "$0")"
-git pull
-source venv/bin/activate
-pip install --upgrade -r requirements.txt
-sudo systemctl restart binghome
-EOF
-    chmod +x "$INSTALL_DIR/update.sh"
-    
     echo -e "${GREEN}✓ Helper scripts created${NC}"
 }
 
@@ -431,9 +434,6 @@ final_setup() {
     
     # Get IP address
     IP=$(hostname -I | awk '{print $1}')
-    
-    # Create completion marker
-    touch "$INSTALL_DIR/.installed"
     
     echo -e "\n${GREEN}========================================${NC}"
     echo -e "${GREEN}   Installation Complete! 🎉            ${NC}"
@@ -451,17 +451,13 @@ final_setup() {
     echo -e "  Logs:    ${GREEN}journalctl -u binghome -f${NC}"
     
     echo -e "\n${CYAN}Next Steps:${NC}"
-    echo -e "  1. Open ${GREEN}http://$IP:5000${NC} in your browser"
-    echo -e "  2. Click the settings icon (⚙️)"
-    echo -e "  3. Add your API keys or sign in with ChatGPT"
-    echo -e "  4. Say '${GREEN}Hey Bing${NC}' to start using voice control!"
+    echo -e "  1. Copy app.py and templates/index.html from the documentation"
+    echo -e "  2. Open ${GREEN}http://$IP:5000${NC} in your browser"
+    echo -e "  3. Click the settings icon (⚙️)"
+    echo -e "  4. Add your API keys"
+    echo -e "  5. Say '${GREEN}Hey Bing${NC}' to start using voice control!"
     
-    echo -e "\n${YELLOW}Note: Reboot recommended for hardware changes${NC}"
-    read -p "Reboot now? (y/n) " -n 1 -r
-    echo
-    if [[ $REPLY =~ ^[Yy]$ ]]; then
-        sudo reboot
-    fi
+    echo -e "\n${YELLOW}Important: Copy the app.py and index.html files from the artifacts${NC}"
 }
 
 # Main installation flow
