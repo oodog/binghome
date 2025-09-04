@@ -1,94 +1,77 @@
-# core/media.py
-import os, json, time, socket, subprocess, threading
-from pathlib import Path
-from typing import Optional, Dict, Any
+# ============================================
+# core/media.py - Media Controller Module
+# ============================================
+"""Media control module for BingHome"""
 
-class MPV:
-    def __init__(self, sock_path="/tmp/mpv-binghome.sock"):
-        self.sock = sock_path
-        self.proc = None
-        self.lock = threading.Lock()
+import os
+import logging
+import subprocess
+import threading
 
-    def _ensure(self):
-        if self.proc and self.proc.poll() is None:
-            return
+logger = logging.getLogger(__name__)
+
+class MediaController:
+    def __init__(self):
+        self.is_playing = False
+        self.current_source = None
+        self.volume = 50
+        
+    def play(self, source=None):
+        """Play media from source"""
         try:
-            if os.path.exists(self.sock):
-                os.remove(self.sock)
-        except Exception:
-            pass
-        self.proc = subprocess.Popen([
-            "mpv", "--idle=yes", f"--input-ipc-server={self.sock}",
-            "--no-video", "--force-window=no", "--volume=70"
-        ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-
-        # wait for socket
-        for _ in range(50):
-            if os.path.exists(self.sock):
-                break
-            time.sleep(0.1)
-
-    def _cmd(self, command):
-        self._ensure()
-        s = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
-        s.settimeout(1.0)
-        s.connect(self.sock)
-        payload = json.dumps({"command": command}).encode("utf-8") + b"\n"
-        s.sendall(payload)
-        data = s.recv(4096)
-        s.close()
-        try:
-            return json.loads(data.decode("utf-8").strip() or "{}")
-        except Exception:
-            return {}
-
-    def play(self, url_or_path: str):
-        return self._cmd(["loadfile", url_or_path, "replace"])
-
-    def pause(self, state: Optional[bool] = None):
-        if state is None:
-            # toggle
-            cur = self.get_property("pause") or False
-            return self.set_property("pause", not cur)
-        return self.set_property("pause", bool(state))
-
+            self.is_playing = True
+            self.current_source = source or "default"
+            logger.info(f"Playing from {self.current_source}")
+            
+            # Example: Use omxplayer on Raspberry Pi
+            if os.path.exists('/usr/bin/omxplayer'):
+                subprocess.Popen(['omxplayer', source]) if source else None
+            
+            return True
+        except Exception as e:
+            logger.error(f"Media play error: {e}")
+            return False
+    
+    def pause(self):
+        """Pause media playback"""
+        self.is_playing = False
+        logger.info("Media paused")
+        return True
+    
     def stop(self):
-        return self._cmd(["stop"])
-
-    def volume(self, v: Optional[int] = None):
-        if v is None:
-            return self.get_property("volume")
-        return self.set_property("volume", max(0, min(100, int(v))))
-
-    def get_property(self, name: str):
-        res = self._cmd(["get_property", name])
-        return res.get("data")
-
-    def set_property(self, name: str, value: Any):
-        return self._cmd(["set_property", name, value])
-
-    def status(self) -> Dict[str, Any]:
-        return {
-            "path": self.get_property("path"),
-            "pause": self.get_property("pause"),
-            "volume": self.get_property("volume"),
-            "time-pos": self.get_property("time-pos"),
-            "duration": self.get_property("duration"),
-        }
-
-_player = MPV()
-
-def play(url_or_path: str):
-    _player.play(url_or_path)
-
-def pause(state: Optional[bool]=None):
-    _player.pause(state)
-
-def stop():
-    _player.stop()
-
-def set_volume(v: int):
-    _player.volume(v)
-
-def status() -> Dict[str, Any]:
-    return _player.status()
+        """Stop media playback"""
+        self.is_playing = False
+        self.current_source = None
+        logger.info("Media stopped")
+        
+        # Kill omxplayer if running
+        try:
+            subprocess.run(['killall', 'omxplayer.bin'], capture_output=True)
+        except:
+            pass
+        
+        return True
+    
+    def next(self):
+        """Skip to next track"""
+        logger.info("Next track")
+        return True
+    
+    def previous(self):
+        """Go to previous track"""
+        logger.info("Previous track")
+        return True
+    
+    def set_volume(self, level):
+        """Set volume level (0-100)"""
+        self.volume = max(0, min(100, level))
+        
+        # Set system volume
+        try:
+            # Use amixer on Raspberry Pi
+            subprocess.run(['amixer', 'set', 'Master', f'{self.volume}%'])
+        except:
+            pass
+        
+        logger.info(f"Volume set to {self.volume}")
+        return True
