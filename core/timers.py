@@ -1,129 +1,103 @@
-# core/timers.py
-import json, time, threading, uuid
-from pathlib import Path
-from typing import List, Dict, Any, Optional
-from datetime import datetime, timedelta, timezone
+# ============================================
+# core/timers.py - Timer Manager Module
+# ============================================
+"""Timer and routine management for BingHome"""
 
-from apscheduler.schedulers.background import BackgroundScheduler
+import os
+import logging
+import threading
+import time
+from datetime import datetime, timedelta
+import uuid
 
-CHIME_PATH = None  # set by init()
+logger = logging.getLogger(__name__)
 
-class TimerStore:
-    def __init__(self, path: Path):
-        self.path = path
-        self.lock = threading.Lock()
-        self.data: Dict[str, Any] = {"timers": []}
-        self._load()
-
-    def _load(self):
-        if self.path.exists():
-            try:
-                self.data = json.loads(self.path.read_text() or "{}")
-                if "timers" not in self.data: self.data["timers"] = []
-            except Exception:
-                self.data = {"timers": []}
-
-    def _save(self):
-        tmp = self.path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(self.data, indent=2))
-        tmp.replace(self.path)
-
-    def list(self) -> List[Dict[str, Any]]:
-        with self.lock:
-            return list(self.data["timers"])
-
-    def add(self, when_ts: float, label: str = "") -> Dict[str, Any]:
-        with self.lock:
-            item = {
-                "id": str(uuid.uuid4()),
-                "when": float(when_ts),
-                "label": label or "Timer",
-                "created": time.time(),
-                "done": False,
-            }
-            self.data["timers"].append(item)
-            self._save()
-            return item
-
-    def mark_done(self, tid: str):
-        with self.lock:
-            for t in self.data["timers"]:
-                if t["id"] == tid:
-                    t["done"] = True
-                    break
-            self._save()
-
-    def delete(self, tid: str) -> bool:
-        with self.lock:
-            before = len(self.data["timers"])
-            self.data["timers"] = [t for t in self.data["timers"] if t["id"] != tid]
-            changed = len(self.data["timers"]) != before
-            if changed: self._save()
-            return changed
-
-def _ensure_chime(path: Path):
-    if path.exists(): return
-    # write a tiny 440Hz sine “beep” WAV (1 second, 16-bit PCM, 16kHz)
-    import math, struct
-    sr = 16000; freq = 440; dur = 1.0
-    n = int(sr*dur)
-    samples = [int(32767*math.sin(2*math.pi*freq*(i/sr))) for i in range(n)]
-    import wave
-    with wave.open(str(path), "w") as w:
-        w.setnchannels(1); w.setsampwidth(2); w.setframerate(sr)
-        w.writeframes(b"".join(struct.pack("<h", s) for s in samples))
-
-def init(data_dir: Path, play_func):
-    """
-    data_dir: folder for timers.json and chime.wav
-    play_func: callable(path: str) -> None (used to play chime via media module)
-    """
-    global CHIME_PATH
-    data_dir.mkdir(parents=True, exist_ok=True)
-    CHIME_PATH = data_dir / "chime.wav"
-    _ensure_chime(CHIME_PATH)
-    store = TimerStore(data_dir / "timers.json")
-    sched = BackgroundScheduler(timezone=timezone.utc)
-    sched.start()
-
-    def schedule_timer(item: Dict[str, Any]):
-        dt = datetime.fromtimestamp(item["when"], tz=timezone.utc)
-        def _fire():
-            try:
-                play_func(str(CHIME_PATH))
-                time.sleep(1.2)
-            finally:
-                store.mark_done(item["id"])
-        sched.add_job(_fire, "date", run_date=dt)
-
-    # re-schedule pending timers on start
-    now = time.time()
-    for t in store.list():
-        if not t.get("done") and t["when"] > now:
-            schedule_timer(t)
-
-    class API:
-        def list(self): return store.list()
-        def create_in(self, seconds: int, label: str="Timer") -> Dict[str, Any]:
-            when = time.time() + max(1, int(seconds))
-            item = store.add(when, label)
-            schedule_timer(item)
-            return item
-        def create_at(self, iso_ts: str, label: str="Alarm") -> Dict[str, Any]:
-            # iso like "2025-08-09T07:30:00+10:00" or naive local time
-            try:
-                from dateutil import parser  # optional
-                dt = parser.isoparse(iso_ts)
-            except Exception:
-                # naive: HH:MM today (local time)
-                hh, mm = iso_ts.split(":")
-                local = datetime.now().replace(hour=int(hh), minute=int(mm), second=0, microsecond=0)
-                dt = local.astimezone(timezone.utc)
-            when = dt.timestamp()
-            item = store.add(when, label)
-            schedule_timer(item)
-            return item
-        def delete(self, tid: str) -> bool:
-            return store.delete(tid)
-
-    return API()
+class TimerManager:
+    def __init__(self):
+        self.timers = {}
+        self.routines = []
+        
+    def create_timer(self, duration, name="Timer", callback=None):
+        """Create a new timer"""
+        timer_id = str(uuid.uuid4())[:8]
+        
+        def timer_thread():
+            time.sleep(duration)
+            if timer_id in self.timers:
+                logger.info(f"Timer '{name}' completed")
+                if callback:
+                    callback()
+                del self.timers[timer_id]
+        
+        timer = {
+            'id': timer_id,
+            'name': name,
+            'duration': duration,
+            'started': datetime.now(),
+            'ends': datetime.now() + timedelta(seconds=duration),
+            'thread': threading.Thread(target=timer_thread, daemon=True)
+        }
+        
+        self.timers[timer_id] = timer
+        timer['thread'].start()
+        
+        logger.info(f"Timer '{name}' created for {duration} seconds")
+        return timer_id
+    
+    def cancel_timer(self, timer_id):
+        """Cancel a timer"""
+        if timer_id in self.timers:
+            # Thread will check if timer still exists
+            del self.timers[timer_id]
+            logger.info(f"Timer {timer_id} cancelled")
+            return True
+        return False
+    
+    def get_timers(self):
+        """Get all active timers"""
+        active_timers = []
+        for timer_id, timer in self.timers.items():
+            remaining = (timer['ends'] - datetime.now()).total_seconds()
+            if remaining > 0:
+                active_timers.append({
+                    'id': timer_id,
+                    'name': timer['name'],
+                    'remaining': int(remaining),
+                    'duration': timer['duration']
+                })
+        return active_timers
+    
+    def create_routine(self, name, time_str, actions, days=None):
+        """Create a routine"""
+        routine = {
+            'id': str(uuid.uuid4())[:8],
+            'name': name,
+            'time': time_str,  # "HH:MM" format
+            'actions': actions,
+            'days': days or ['everyday'],  # ['monday', 'tuesday', ...] or ['everyday']
+            'enabled': True
+        }
+        
+        self.routines.append(routine)
+        logger.info(f"Routine '{name}' created")
+        return routine['id']
+    
+    def check_routines(self):
+        """Check if any routine should run"""
+        current_time = datetime.now().strftime('%H:%M')
+        current_day = datetime.now().strftime('%A').lower()
+        
+        for routine in self.routines:
+            if not routine['enabled']:
+                continue
+                
+            if routine['time'] == current_time:
+                if 'everyday' in routine['days'] or current_day in routine['days']:
+                    self.execute_routine(routine)
+    
+    def execute_routine(self, routine):
+        """Execute a routine's actions"""
+        logger.info(f"Executing routine: {routine['name']}")
+        for action in routine['actions']:
+            # Actions would be executed here
+            logger.info(f"  Action: {action}")
