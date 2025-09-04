@@ -51,7 +51,7 @@ A modern smart home control system with voice recognition, optimized for Raspber
 ## 🚀 Quick Start
 
 ```bash
-curl -sSL https://raw.githubusercontent.com/oodog/binghome/main/install.sh | bash
+curl -sSL https://raw.githubusercontent.com/oodog/binghome/refs/heads/master/install.sh| bash
 ```
 
 Or clone and install manually:
