@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
-# BingHome Installation Script - Final Version
-# Works with your complete GitHub structure
+# BingHome Installation Script - Auto-Start Fixed
+# Includes browser kiosk mode and proper startup
 # ============================================
 
 set -e
@@ -21,7 +21,14 @@ SERVICE_NAME="binghome"
 
 echo -e "${CYAN}=====================================${NC}"
 echo -e "${CYAN}   BingHome Smart Hub Installer     ${NC}"
+echo -e "${CYAN}   With Auto-Start Browser Fix      ${NC}"
 echo -e "${CYAN}=====================================${NC}"
+
+# Check if running as root
+if [ "$EUID" -eq 0 ]; then
+    echo -e "${RED}Please run as regular user (not root)${NC}"
+    exit 1
+fi
 
 # Check Python version
 check_python() {
@@ -42,7 +49,7 @@ update_system() {
     sudo apt-get upgrade -y
 }
 
-# Install dependencies
+# Install dependencies with browser support
 install_dependencies() {
     echo -e "\n${BLUE}Installing system dependencies...${NC}"
     
@@ -52,18 +59,33 @@ install_dependencies() {
         portaudio19-dev python3-pyaudio \
         espeak ffmpeg libsndfile1 \
         i2c-tools \
-        chromium-browser || true
+        chromium-browser \
+        xdotool \
+        unclutter \
+        x11-xserver-utils \
+        xinit \
+        openbox \
+        lxde-core \
+        lightdm \
+        xserver-xorg \
+        matchbox-window-manager \
+        xautomation \
+        screen || true
     
     # Raspberry Pi specific
     if [ -f /proc/device-tree/model ]; then
+        echo -e "${BLUE}Configuring Raspberry Pi...${NC}"
         sudo apt-get install -y python3-rpi.gpio || true
         
         # Enable interfaces
         sudo raspi-config nonint do_i2c 0 2>/dev/null || true
         sudo raspi-config nonint do_spi 0 2>/dev/null || true
         
+        # Enable auto-login to desktop
+        sudo raspi-config nonint do_boot_behaviour B4 2>/dev/null || true
+        
         # Add user to groups
-        sudo usermod -a -G gpio,i2c,spi,audio,dialout $USER || true
+        sudo usermod -a -G gpio,i2c,spi,audio,dialout,video $USER || true
     fi
     
     echo -e "${GREEN}✓ Dependencies installed${NC}"
@@ -306,28 +328,150 @@ setup_python_env() {
     echo -e "${GREEN}✓ Python environment ready${NC}"
 }
 
-# Create systemd service
+# Setup auto-start browser configuration
+setup_autostart() {
+    echo -e "\n${BLUE}Setting up browser auto-start...${NC}"
+    
+    # Create autostart directories
+    mkdir -p "$HOME/.config/lxsession/LXDE-pi"
+    mkdir -p "$HOME/.config/openbox"
+    
+    # Create browser launch script
+    cat > "$INSTALL_DIR/launch-browser.sh" << 'EOF'
+#!/bin/bash
+
+# Wait for X server to be ready
+while ! xset q &>/dev/null; do
+    echo "Waiting for X server..."
+    sleep 2
+done
+
+# Hide cursor after inactivity
+unclutter -idle 1 &
+
+# Disable screen blanking
+xset s off
+xset -dpms
+xset s noblank
+
+# Wait for BingHome service to be ready
+echo "Waiting for BingHome service..."
+while ! curl -s http://localhost:5000 > /dev/null; do
+    sleep 3
+done
+
+echo "Launching browser in kiosk mode..."
+
+# Launch Chromium in kiosk mode
+chromium-browser \
+    --kiosk \
+    --incognito \
+    --disable-infobars \
+    --disable-web-security \
+    --disable-features=TranslateUI \
+    --disable-component-extensions-with-background-pages \
+    --disable-background-timer-throttling \
+    --disable-renderer-backgrounding \
+    --disable-backgrounding-occluded-windows \
+    --autoplay-policy=no-user-gesture-required \
+    --no-first-run \
+    --fast \
+    --fast-start \
+    --disable-default-apps \
+    --no-default-browser-check \
+    --disable-translate \
+    --disable-features=VizDisplayCompositor \
+    --window-position=0,0 \
+    --window-size=1920,1080 \
+    http://localhost:5000 &
+
+# Keep script running
+wait
+EOF
+    
+    chmod +x "$INSTALL_DIR/launch-browser.sh"
+    
+    # Create LXDE autostart
+    cat > "$HOME/.config/lxsession/LXDE-pi/autostart" << EOF
+@lxpanel --profile LXDE-pi
+@pcmanfm --desktop --profile LXDE-pi
+@xscreensaver -no-splash
+@$INSTALL_DIR/launch-browser.sh
+EOF
+    
+    # Create openbox autostart as fallback
+    cat > "$HOME/.config/openbox/autostart" << EOF
+# Launch BingHome browser
+$INSTALL_DIR/launch-browser.sh &
+EOF
+    
+    chmod +x "$HOME/.config/openbox/autostart"
+    
+    echo -e "${GREEN}✓ Browser auto-start configured${NC}"
+}
+
+# Setup desktop environment for kiosk mode
+setup_desktop() {
+    echo -e "\n${BLUE}Configuring desktop environment...${NC}"
+    
+    # Configure lightdm for auto-login
+    sudo mkdir -p /etc/lightdm/lightdm.conf.d
+    
+    cat > /tmp/01-autologin.conf << EOF
+[Seat:*]
+autologin-user=$USER
+autologin-user-timeout=0
+user-session=LXDE-pi
+EOF
+    
+    sudo mv /tmp/01-autologin.conf /etc/lightdm/lightdm.conf.d/01-autologin.conf
+    
+    # Create .dmrc for session selection
+    cat > "$HOME/.dmrc" << EOF
+[Desktop]
+Session=LXDE-pi
+EOF
+    
+    echo -e "${GREEN}✓ Desktop environment configured${NC}"
+}
+
+# Create systemd service with proper startup order
 create_service() {
     echo -e "\n${BLUE}Creating systemd service...${NC}"
     
     sudo tee /etc/systemd/system/${SERVICE_NAME}.service > /dev/null << EOF
 [Unit]
 Description=BingHome Smart Hub
-After=network-online.target
+After=network-online.target sound.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=$USER
+Group=$USER
 WorkingDirectory=$INSTALL_DIR
 Environment="PATH=$INSTALL_DIR/venv/bin:/usr/bin:/bin"
+Environment="PYTHONPATH=$INSTALL_DIR"
+ExecStartPre=/bin/sleep 10
 ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/app.py
 Restart=always
-RestartSec=10
+RestartSec=15
+StandardOutput=append:/var/log/binghome.log
+StandardError=append:/var/log/binghome.error.log
+
+# Security settings
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=false
+ReadWritePaths=$INSTALL_DIR /var/log
 
 [Install]
 WantedBy=multi-user.target
 EOF
+    
+    # Create log files with proper permissions
+    sudo touch /var/log/binghome.log /var/log/binghome.error.log
+    sudo chown $USER:$USER /var/log/binghome.log /var/log/binghome.error.log
     
     sudo systemctl daemon-reload
     sudo systemctl enable ${SERVICE_NAME}.service
@@ -361,6 +505,53 @@ sudo systemctl restart binghome
 EOF
     chmod +x update.sh
     
+    # Control script
+    cat > binghome-control.sh << 'EOF'
+#!/bin/bash
+
+SERVICE_NAME="binghome"
+
+case "$1" in
+    start)
+        echo "Starting BingHome service..."
+        sudo systemctl start $SERVICE_NAME
+        ;;
+    stop)
+        echo "Stopping BingHome service..."
+        sudo systemctl stop $SERVICE_NAME
+        pkill -f chromium-browser 2>/dev/null || true
+        ;;
+    restart)
+        echo "Restarting BingHome service..."
+        sudo systemctl restart $SERVICE_NAME
+        ;;
+    status)
+        sudo systemctl status $SERVICE_NAME
+        ;;
+    logs)
+        sudo journalctl -u $SERVICE_NAME -f
+        ;;
+    browser)
+        echo "Launching browser..."
+        ./launch-browser.sh &
+        ;;
+    kiosk)
+        echo "Stopping browser and restarting in kiosk mode..."
+        pkill -f chromium-browser 2>/dev/null || true
+        sleep 2
+        ./launch-browser.sh &
+        ;;
+    *)
+        echo "Usage: $0 {start|stop|restart|status|logs|browser|kiosk}"
+        exit 1
+        ;;
+esac
+EOF
+    chmod +x binghome-control.sh
+    
+    # Create global command
+    sudo ln -sf "$INSTALL_DIR/binghome-control.sh" /usr/local/bin/binghome
+    
     echo -e "${GREEN}✓ Helper scripts created${NC}"
 }
 
@@ -369,10 +560,10 @@ start_service() {
     echo -e "\n${BLUE}Starting BingHome...${NC}"
     
     sudo systemctl start ${SERVICE_NAME}
-    sleep 3
+    sleep 5
     
     if systemctl is-active --quiet ${SERVICE_NAME}; then
-        echo -e "${GREEN}✓ BingHome is running${NC}"
+        echo -e "${GREEN}✓ BingHome service is running${NC}"
     else
         echo -e "${YELLOW}⚠ Service may not be running. Check logs with:${NC}"
         echo -e "  journalctl -u ${SERVICE_NAME} -f"
@@ -387,6 +578,8 @@ main() {
     setup_project
     create_core_modules
     setup_python_env
+    setup_autostart
+    setup_desktop
     create_service
     create_scripts
     start_service
@@ -401,18 +594,28 @@ main() {
     echo -e "\n${CYAN}Access BingHome at:${NC}"
     echo -e "  ${GREEN}http://$IP:5000${NC}"
     
-    echo -e "\n${CYAN}Available Pages:${NC}"
-    echo -e "  Dashboard:    ${GREEN}http://$IP:5000/${NC}"
-    echo -e "  Settings:     ${GREEN}http://$IP:5000/settings${NC}"
-    echo -e "  WiFi:         ${GREEN}http://$IP:5000/wifi${NC}"
-    echo -e "  System:       ${GREEN}http://$IP:5000/system${NC}"
+    echo -e "\n${CYAN}Available Commands:${NC}"
+    echo -e "  Start service:    ${GREEN}binghome start${NC}"
+    echo -e "  Stop service:     ${GREEN}binghome stop${NC}"
+    echo -e "  Restart:          ${GREEN}binghome restart${NC}"
+    echo -e "  View logs:        ${GREEN}binghome logs${NC}"
+    echo -e "  Launch browser:   ${GREEN}binghome browser${NC}"
+    echo -e "  Kiosk mode:       ${GREEN}binghome kiosk${NC}"
     
-    echo -e "\n${CYAN}Commands:${NC}"
-    echo -e "  View logs:    ${GREEN}journalctl -u ${SERVICE_NAME} -f${NC}"
-    echo -e "  Restart:      ${GREEN}sudo systemctl restart ${SERVICE_NAME}${NC}"
-    echo -e "  Stop:         ${GREEN}sudo systemctl stop ${SERVICE_NAME}${NC}"
+    echo -e "\n${CYAN}Auto-Start Features:${NC}"
+    echo -e "  ✓ Service auto-starts on boot"
+    echo -e "  ✓ Desktop auto-login configured"
+    echo -e "  ✓ Browser kiosk mode on login"
+    echo -e "  ✓ Screen blanking disabled"
     
-    echo -e "\n${YELLOW}The service will auto-start on reboot!${NC}"
+    echo -e "\n${YELLOW}Reboot to activate auto-start:${NC}"
+    echo -e "  ${GREEN}sudo reboot${NC}"
+    
+    echo -e "\n${BLUE}After reboot, the system will:${NC}"
+    echo -e "  1. Auto-login to desktop"
+    echo -e "  2. Start BingHome service"
+    echo -e "  3. Launch browser in kiosk mode"
+    echo -e "  4. Display BingHome interface"
 }
 
 # Run
