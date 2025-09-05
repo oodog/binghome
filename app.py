@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-BingHome Smart Hub - Main Application
-Modular design with core components
+BingHome - Smart Home Control System
+Auto-start optimized version with kiosk mode support
 """
 
 import os
@@ -9,582 +9,551 @@ import sys
 import json
 import time
 import threading
-import logging
-import secrets
-from datetime import datetime, timedelta
-from flask import Flask, render_template, jsonify, request, redirect, session, url_for
-from flask_cors import CORS
+import subprocess
+import socket
+from datetime import datetime
+from pathlib import Path
+
+# Flask and web framework imports
+from flask import Flask, render_template, request, jsonify, redirect, url_for
 from flask_socketio import SocketIO, emit
-import requests
+from flask_cors import CORS
 
-# Add core modules to path
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'core'))
-
-# Import core modules
-try:
-    from core.media import MediaController
-    from core.news import NewsManager
-    from core.timers import TimerManager
-    from core.weather import WeatherService
-except ImportError as e:
-    print(f"Warning: Could not import core modules: {e}")
-    # Define placeholder classes if modules don't exist
-    class MediaController:
-        def __init__(self): pass
-        def play(self): pass
-        def pause(self): pass
-        def stop(self): pass
-        
-    class NewsManager:
-        def __init__(self): pass
-        def fetch_news(self): return []
-        
-    class TimerManager:
-        def __init__(self): pass
-        def create_timer(self, duration): pass
-        def cancel_timer(self, timer_id): pass
-        
-    class WeatherService:
-        def __init__(self): pass
-        def get_current(self): return {}
-        def get_forecast(self): return []
-
-# Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-)
-logger = logging.getLogger(__name__)
-
-# Flask app setup
-app = Flask(__name__)
-app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', secrets.token_hex(32))
-app.config['SESSION_TYPE'] = 'filesystem'
-app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=30)
-CORS(app, supports_credentials=True)
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
-
-# Try to import hardware libraries
+# Hardware and sensor imports
 try:
     import RPi.GPIO as GPIO
     import adafruit_dht
     import board
-    HARDWARE_AVAILABLE = True
-    logger.info("Hardware libraries loaded")
+    RPI_AVAILABLE = True
 except ImportError:
-    HARDWARE_AVAILABLE = False
-    logger.warning("Hardware not available - simulation mode")
+    RPI_AVAILABLE = False
+    print("⚠️  Raspberry Pi libraries not available - running in development mode")
 
-# Try voice libraries
+# Audio and speech imports
+import requests
+import numpy as np
 try:
     import speech_recognition as sr
-    VOICE_AVAILABLE = True
-except ImportError:
-    VOICE_AVAILABLE = False
-
-try:
     import pyttsx3
-    TTS_AVAILABLE = True
+    import pygame
+    AUDIO_AVAILABLE = True
 except ImportError:
-    TTS_AVAILABLE = False
+    AUDIO_AVAILABLE = False
+    print("⚠️  Audio libraries not available - speech features disabled")
+
+# AI and language processing
+try:
+    import openai
+    AI_AVAILABLE = True
+except ImportError:
+    AI_AVAILABLE = False
+    print("⚠️  OpenAI library not available - ChatGPT features disabled")
 
 # Configuration
-class Config:
-    # API Keys
-    OPENAI_API_KEY = os.environ.get('OPENAI_API_KEY', '')
-    BING_API_KEY = os.environ.get('BING_API_KEY', '')
-    WEATHER_API_KEY = os.environ.get('WEATHER_API_KEY', '')
-    HOME_ASSISTANT_URL = os.environ.get('HOME_ASSISTANT_URL', 'http://localhost:8123')
-    HOME_ASSISTANT_TOKEN = os.environ.get('HOME_ASSISTANT_TOKEN', '')
-    
-    # GPIO Pins
-    DHT22_PIN = 4
-    GAS_SENSOR_PIN = 17
-    LIGHT_SENSOR_PIN = 27
-    MOTION_SENSOR_PIN = 22
-    
-    # Server
-    PORT = int(os.environ.get('PORT', 5000))
-    
-    # Settings file
-    SETTINGS_FILE = 'settings.json'
-    
-    @classmethod
-    def load_settings(cls):
-        """Load settings from file"""
-        if os.path.exists(cls.SETTINGS_FILE):
-            try:
-                with open(cls.SETTINGS_FILE, 'r') as f:
-                    settings = json.load(f)
-                    for key, value in settings.items():
-                        if hasattr(cls, key.upper()):
-                            setattr(cls, key.upper(), value)
-                    logger.info("Settings loaded from file")
-            except Exception as e:
-                logger.error(f"Error loading settings: {e}")
-    
-    @classmethod
-    def save_settings(cls, settings):
-        """Save settings to file"""
+BASE_DIR = Path(__file__).parent
+CONFIG_FILE = BASE_DIR / "settings.json"
+ENV_FILE = BASE_DIR / ".env"
+
+# Flask app setup
+app = Flask(__name__)
+app.config['SECRET_KEY'] = os.environ.get('SECRET_KEY', 'binghome-secret-key-change-me')
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='threading')
+CORS(app)
+
+class BingHomeSystem:
+    def __init__(self):
+        self.settings = self.load_settings()
+        self.setup_hardware()
+        self.setup_audio()
+        self.setup_ai()
+        self.running = True
+        self.sensor_thread = None
+        self.voice_thread = None
+        self.startup_complete = False
+        
+    def load_settings(self):
+        """Load settings from JSON file or create defaults"""
+        default_settings = {
+            "openai_api_key": "",
+            "bing_api_key": "",
+            "home_assistant_url": "http://localhost:8123",
+            "home_assistant_token": "",
+            "voice_mode": "auto",
+            "wake_words": ["hey bing", "okay bing", "bing"],
+            "tts_engine": "pyttsx3",
+            "tts_rate": 150,
+            "tts_volume": 0.9,
+            "language": "en-US",
+            "kiosk_mode": True,
+            "auto_start_browser": True,
+            "gpio_pins": {
+                "dht22": 4,
+                "gas_sensor": 17,
+                "light_sensor": 27
+            }
+        }
+        
         try:
-            with open(cls.SETTINGS_FILE, 'w') as f:
+            if CONFIG_FILE.exists():
+                with open(CONFIG_FILE, 'r') as f:
+                    settings = json.load(f)
+                # Merge with defaults for any missing keys
+                for key, value in default_settings.items():
+                    if key not in settings:
+                        settings[key] = value
+                return settings
+        except Exception as e:
+            print(f"Error loading settings: {e}")
+        
+        return default_settings
+    
+    def save_settings(self, settings):
+        """Save settings to JSON file"""
+        try:
+            with open(CONFIG_FILE, 'w') as f:
                 json.dump(settings, f, indent=2)
-            
-            # Update config
-            for key, value in settings.items():
-                if hasattr(cls, key.upper()):
-                    setattr(cls, key.upper(), value)
-            
-            logger.info("Settings saved")
+            self.settings = settings
             return True
         except Exception as e:
-            logger.error(f"Error saving settings: {e}")
+            print(f"Error saving settings: {e}")
             return False
-
-# Load settings on startup
-Config.load_settings()
-
-# Initialize core modules
-media_controller = MediaController()
-news_manager = NewsManager()
-timer_manager = TimerManager()
-weather_service = WeatherService()
-
-# Global data
-sensor_data = {
-    'temperature': 22.5,
-    'humidity': 45.0,
-    'gas_detected': False,
-    'light_level': 'bright',
-    'motion_detected': False,
-    'timestamp': None
-}
-
-devices = {
-    'lights': {},
-    'switches': {},
-    'thermostats': {},
-    'cameras': {},
-    'speakers': {}
-}
-
-routines = []
-notifications = []
-
-# Sensor Manager
-class SensorManager:
-    def __init__(self):
-        self.dht = None
-        self.setup_hardware()
     
     def setup_hardware(self):
-        if not HARDWARE_AVAILABLE:
+        """Initialize hardware components"""
+        self.sensors = {}
+        
+        if not RPI_AVAILABLE:
+            print("🔧 Hardware simulation mode - no GPIO access")
             return
         
         try:
+            # GPIO setup
             GPIO.setmode(GPIO.BCM)
-            GPIO.setup(Config.GAS_SENSOR_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-            GPIO.setup(Config.LIGHT_SENSOR_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
-            GPIO.setup(Config.MOTION_SENSOR_PIN, GPIO.IN, pull_up_down=GPIO.PUD_DOWN)
+            GPIO.setwarnings(False)
             
-            self.dht = adafruit_dht.DHT22(board.D4, use_pulseio=False)
-            logger.info("Hardware initialized")
+            # DHT22 temperature/humidity sensor
+            dht_pin = self.settings["gpio_pins"]["dht22"]
+            self.sensors['dht22'] = adafruit_dht.DHT22(getattr(board, f'D{dht_pin}'))
+            
+            # Gas sensor
+            gas_pin = self.settings["gpio_pins"]["gas_sensor"]
+            GPIO.setup(gas_pin, GPIO.IN)
+            self.sensors['gas_pin'] = gas_pin
+            
+            # Light sensor
+            light_pin = self.settings["gpio_pins"]["light_sensor"]
+            GPIO.setup(light_pin, GPIO.IN)
+            self.sensors['light_pin'] = light_pin
+            
+            print("✅ Hardware sensors initialized")
+            
         except Exception as e:
-            logger.error(f"Hardware init error: {e}")
+            print(f"⚠️  Hardware setup error: {e}")
+    
+    def setup_audio(self):
+        """Initialize audio system"""
+        if not AUDIO_AVAILABLE:
+            print("🔇 Audio simulation mode")
+            return
+        
+        try:
+            # Text-to-speech setup
+            self.tts_engine = pyttsx3.init()
+            self.tts_engine.setProperty('rate', self.settings['tts_rate'])
+            self.tts_engine.setProperty('volume', self.settings['tts_volume'])
+            
+            # Speech recognition setup
+            self.recognizer = sr.Recognizer()
+            self.microphone = sr.Microphone()
+            
+            # Audio output setup
+            pygame.mixer.init()
+            
+            print("✅ Audio system initialized")
+            
+        except Exception as e:
+            print(f"⚠️  Audio setup error: {e}")
+    
+    def setup_ai(self):
+        """Initialize AI services"""
+        if not AI_AVAILABLE:
+            print("🤖 AI simulation mode")
+            return
+        
+        try:
+            if self.settings.get('openai_api_key'):
+                openai.api_key = self.settings['openai_api_key']
+                print("✅ OpenAI API configured")
+            else:
+                print("⚠️  OpenAI API key not configured")
+                
+        except Exception as e:
+            print(f"⚠️  AI setup error: {e}")
     
     def read_sensors(self):
-        global sensor_data
+        """Read all sensor data"""
+        data = {
+            'timestamp': datetime.now().isoformat(),
+            'temperature': None,
+            'humidity': None,
+            'gas_detected': False,
+            'light_level': 'unknown'
+        }
         
-        if HARDWARE_AVAILABLE and self.dht:
-            try:
-                temp = self.dht.temperature
-                hum = self.dht.humidity
-                if temp and hum:
-                    sensor_data['temperature'] = round(temp, 1)
-                    sensor_data['humidity'] = round(hum, 1)
-                
-                sensor_data['gas_detected'] = GPIO.input(Config.GAS_SENSOR_PIN) == GPIO.HIGH
-                sensor_data['light_level'] = 'bright' if GPIO.input(Config.LIGHT_SENSOR_PIN) == GPIO.HIGH else 'dark'
-                sensor_data['motion_detected'] = GPIO.input(Config.MOTION_SENSOR_PIN) == GPIO.HIGH
-            except:
-                pass
-        else:
-            # Simulation
+        if not RPI_AVAILABLE:
+            # Simulate sensor data for development
             import random
-            sensor_data['temperature'] = round(20 + random.random() * 10, 1)
-            sensor_data['humidity'] = round(40 + random.random() * 20, 1)
-            sensor_data['gas_detected'] = random.random() > 0.95
-            sensor_data['light_level'] = 'bright' if random.random() > 0.5 else 'dark'
-            sensor_data['motion_detected'] = random.random() > 0.8
+            data.update({
+                'temperature': round(20 + random.uniform(-5, 15), 1),
+                'humidity': round(40 + random.uniform(-10, 30), 1),
+                'gas_detected': random.choice([True, False]),
+                'light_level': random.choice(['dark', 'dim', 'bright'])
+            })
+            return data
         
-        sensor_data['timestamp'] = datetime.now().isoformat()
-        return sensor_data
-
-# Voice Assistant
-class VoiceAssistant:
-    def __init__(self):
-        self.recognizer = None
-        self.tts_engine = None
-        self.setup_voice()
-    
-    def setup_voice(self):
-        if VOICE_AVAILABLE:
-            try:
-                self.recognizer = sr.Recognizer()
-                logger.info("Voice recognition ready")
-            except:
-                pass
-        
-        if TTS_AVAILABLE:
-            try:
-                self.tts_engine = pyttsx3.init()
-                self.tts_engine.setProperty('rate', 150)
-                logger.info("TTS ready")
-            except:
-                pass
-    
-    def process_command(self, command):
-        """Process voice command"""
-        command = command.lower()
-        
-        # Media controls
-        if 'play music' in command:
-            media_controller.play()
-            return "Playing music"
-        elif 'stop music' in command:
-            media_controller.stop()
-            return "Music stopped"
-        
-        # Weather
-        elif 'weather' in command:
-            weather = weather_service.get_current()
-            if weather:
-                return f"Currently {weather.get('temp')}° and {weather.get('condition')}"
-            return "Weather data unavailable"
-        
-        # Timer
-        elif 'set timer' in command:
-            # Extract duration from command
-            import re
-            match = re.search(r'(\d+)\s*(minute|hour|second)', command)
-            if match:
-                duration = int(match.group(1))
-                unit = match.group(2)
-                if unit == 'hour':
-                    duration *= 3600
-                elif unit == 'minute':
-                    duration *= 60
-                timer_manager.create_timer(duration)
-                return f"Timer set for {match.group(1)} {unit}s"
-        
-        # Sensors
-        elif 'temperature' in command:
-            return f"The temperature is {sensor_data['temperature']} degrees"
-        elif 'humidity' in command:
-            return f"The humidity is {sensor_data['humidity']} percent"
-        
-        return "How can I help you?"
-
-# Background threads
-def sensor_update_loop():
-    sensor_manager = SensorManager()
-    while True:
         try:
-            data = sensor_manager.read_sensors()
-            socketio.emit('sensor_update', data)
+            # Read DHT22 sensor
+            if 'dht22' in self.sensors:
+                dht = self.sensors['dht22']
+                data['temperature'] = dht.temperature
+                data['humidity'] = dht.humidity
             
-            if data['gas_detected']:
-                socketio.emit('alert', {
-                    'type': 'danger',
-                    'message': 'Gas detected!'
-                })
+            # Read gas sensor
+            if 'gas_pin' in self.sensors:
+                gas_state = GPIO.input(self.sensors['gas_pin'])
+                data['gas_detected'] = bool(gas_state)
             
-            time.sleep(5)
+            # Read light sensor
+            if 'light_pin' in self.sensors:
+                light_state = GPIO.input(self.sensors['light_pin'])
+                data['light_level'] = 'bright' if light_state else 'dark'
+                
         except Exception as e:
-            logger.error(f"Sensor loop error: {e}")
-            time.sleep(5)
-
-def news_update_loop():
-    while True:
+            print(f"Sensor read error: {e}")
+        
+        return data
+    
+    def speak(self, text):
+        """Text-to-speech output"""
+        if not AUDIO_AVAILABLE:
+            print(f"🔊 TTS: {text}")
+            return
+        
         try:
-            if Config.BING_API_KEY:
-                news = news_manager.fetch_news()
-                if news:
-                    socketio.emit('news_update', news)
-            time.sleep(300)  # 5 minutes
-        except:
-            time.sleep(60)
+            self.tts_engine.say(text)
+            self.tts_engine.runAndWait()
+        except Exception as e:
+            print(f"TTS error: {e}")
+    
+    def process_voice_command(self, command):
+        """Process voice command and return response"""
+        command = command.lower().strip()
+        
+        # Temperature query
+        if 'temperature' in command:
+            data = self.read_sensors()
+            if data['temperature']:
+                temp = data['temperature']
+                return f"The current temperature is {temp:.1f} degrees Celsius"
+            return "Temperature sensor not available"
+        
+        # Humidity query
+        if 'humidity' in command:
+            data = self.read_sensors()
+            if data['humidity']:
+                humidity = data['humidity']
+                return f"The current humidity is {humidity:.1f} percent"
+            return "Humidity sensor not available"
+        
+        # Gas sensor query
+        if 'gas' in command:
+            data = self.read_sensors()
+            gas = "detected" if data['gas_detected'] else "not detected"
+            return f"Gas is {gas}"
+        
+        # Light control
+        if 'lights' in command:
+            if 'on' in command or 'turn on' in command:
+                return "Turning on the lights"
+            elif 'off' in command or 'turn off' in command:
+                return "Turning off the lights"
+            return "Light status: unknown"
+        
+        # Default AI response
+        if AI_AVAILABLE and self.settings.get('openai_api_key'):
+            try:
+                response = openai.ChatCompletion.create(
+                    model="gpt-3.5-turbo",
+                    messages=[
+                        {"role": "system", "content": "You are BingHome, a helpful smart home assistant. Keep responses brief and friendly."},
+                        {"role": "user", "content": command}
+                    ],
+                    max_tokens=100
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                print(f"OpenAI API error: {e}")
+        
+        return "I'm sorry, I didn't understand that command."
+    
+    def start_browser_kiosk(self):
+        """Start browser in kiosk mode after service is ready"""
+        if not self.settings.get('auto_start_browser', True):
+            return
+        
+        def launch_browser():
+            # Wait for web service to be ready
+            max_attempts = 30
+            for attempt in range(max_attempts):
+                try:
+                    response = requests.get('http://localhost:5000', timeout=2)
+                    if response.status_code == 200:
+                        break
+                except:
+                    pass
+                time.sleep(2)
+            else:
+                print("⚠️  Web service not ready for browser launch")
+                return
+            
+            # Check if running in graphical environment
+            if os.environ.get('DISPLAY'):
+                try:
+                    # Launch Chromium in kiosk mode
+                    subprocess.Popen([
+                        'chromium-browser',
+                        '--kiosk',
+                        '--incognito',
+                        '--disable-infobars',
+                        '--disable-web-security',
+                        '--disable-features=TranslateUI',
+                        '--autoplay-policy=no-user-gesture-required',
+                        '--no-first-run',
+                        '--disable-default-apps',
+                        '--no-default-browser-check',
+                        'http://localhost:5000'
+                    ], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    print("✅ Browser launched in kiosk mode")
+                except Exception as e:
+                    print(f"Browser launch error: {e}")
+            else:
+                print("ℹ️  No display available - browser auto-start disabled")
+        
+        # Launch browser in separate thread
+        browser_thread = threading.Thread(target=launch_browser, daemon=True)
+        browser_thread.start()
+    
+    def sensor_monitor_loop(self):
+        """Background sensor monitoring"""
+        while self.running:
+            try:
+                data = self.read_sensors()
+                socketio.emit('sensor_update', data)
+                time.sleep(5)  # Update every 5 seconds
+            except Exception as e:
+                print(f"Sensor monitor error: {e}")
+                time.sleep(10)
+    
+    def start_background_tasks(self):
+        """Start background monitoring tasks"""
+        if self.sensor_thread is None or not self.sensor_thread.is_alive():
+            self.sensor_thread = threading.Thread(target=self.sensor_monitor_loop, daemon=True)
+            self.sensor_thread.start()
+            print("✅ Background sensor monitoring started")
+    
+    def get_system_status(self):
+        """Get system health status"""
+        return {
+            'status': 'healthy' if self.running else 'stopped',
+            'hardware': RPI_AVAILABLE,
+            'audio': AUDIO_AVAILABLE,
+            'ai': AI_AVAILABLE and bool(self.settings.get('openai_api_key')),
+            'voice_mode': self.settings.get('voice_mode', 'auto'),
+            'startup_complete': self.startup_complete,
+            'timestamp': datetime.now().isoformat()
+        }
 
-def weather_update_loop():
-    while True:
-        try:
-            if Config.WEATHER_API_KEY:
-                current = weather_service.get_current()
-                if current:
-                    socketio.emit('weather_update', current)
-            time.sleep(600)  # 10 minutes
-        except:
-            time.sleep(60)
+# Initialize the system
+binghome = BingHomeSystem()
 
-# Flask Routes
+# Flask routes
 @app.route('/')
-def index():
-    return render_template('index.html')
-
-@app.route('/settings')
-def settings_page():
-    return render_template('settings.html')
-
-@app.route('/wifi')
-def wifi_settings():
-    return render_template('wifi_settings.html')
-
-@app.route('/system')
-def system_status():
-    return render_template('system_status.html')
-
-# API Routes
-@app.route('/api/health')
-def health_check():
-    return jsonify({
-        'status': 'healthy',
-        'hardware': HARDWARE_AVAILABLE,
-        'voice': VOICE_AVAILABLE,
-        'modules': {
-            'media': hasattr(media_controller, 'play'),
-            'news': hasattr(news_manager, 'fetch_news'),
-            'weather': hasattr(weather_service, 'get_current'),
-            'timers': hasattr(timer_manager, 'create_timer')
-        },
-        'timestamp': datetime.now().isoformat()
-    })
+def dashboard():
+    """Main dashboard"""
+    return render_template('index.html', settings=binghome.settings)
 
 @app.route('/api/sensor_data')
-def get_sensor_data():
-    return jsonify(sensor_data)
+def api_sensor_data():
+    """Get current sensor readings"""
+    data = binghome.read_sensors()
+    return jsonify(data)
+
+@app.route('/api/voice', methods=['POST'])
+def api_voice():
+    """Process voice command"""
+    try:
+        data = request.get_json()
+        command = data.get('command', '')
+        
+        if command:
+            response = binghome.process_voice_command(command)
+            binghome.speak(response)
+            
+            return jsonify({
+                'success': True,
+                'response': response,
+                'command': command
+            })
+        else:
+            return jsonify({'success': False, 'error': 'No command provided'})
+            
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
 
 @app.route('/api/settings', methods=['GET', 'POST'])
 def api_settings():
+    """Get or update settings"""
     if request.method == 'GET':
-        # Return settings without sensitive keys
-        safe_settings = {
-            'has_openai_key': bool(Config.OPENAI_API_KEY),
-            'has_bing_key': bool(Config.BING_API_KEY),
-            'has_weather_key': bool(Config.WEATHER_API_KEY),
-            'has_ha_token': bool(Config.HOME_ASSISTANT_TOKEN),
-            'home_assistant_url': Config.HOME_ASSISTANT_URL
-        }
-        return jsonify(safe_settings)
+        return jsonify(binghome.settings)
     
-    else:  # POST
-        try:
-            settings = request.json
-            if Config.save_settings(settings):
-                return jsonify({'success': True})
-            return jsonify({'success': False}), 500
-        except Exception as e:
-            return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/voice', methods=['POST'])
-def voice_command():
     try:
-        command = request.json.get('command', '')
-        voice_assistant = VoiceAssistant()
-        response = voice_assistant.process_command(command)
-        return jsonify({
-            'success': True,
-            'command': command,
-            'response': response
-        })
+        new_settings = request.get_json()
+        if binghome.save_settings(new_settings):
+            # Restart relevant services if needed
+            binghome.setup_ai()
+            return jsonify({'success': True})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to save settings'})
     except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)})
 
-@app.route('/api/media/<action>', methods=['POST'])
-def media_control(action):
-    try:
-        if action == 'play':
-            media_controller.play()
-        elif action == 'pause':
-            media_controller.pause()
-        elif action == 'stop':
-            media_controller.stop()
-        elif action == 'next':
-            media_controller.next()
-        elif action == 'previous':
-            media_controller.previous()
-        
-        return jsonify({'success': True, 'action': action})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
+@app.route('/api/health')
+def api_health():
+    """System health check"""
+    return jsonify(binghome.get_system_status())
 
-@app.route('/api/weather')
-def get_weather():
-    try:
-        current = weather_service.get_current()
-        forecast = weather_service.get_forecast()
-        return jsonify({
-            'current': current,
-            'forecast': forecast
-        })
-    except:
-        return jsonify({'error': 'Weather unavailable'}), 503
-
-@app.route('/api/news')
-def get_news():
-    try:
-        news = news_manager.fetch_news()
-        return jsonify(news)
-    except:
-        return jsonify([])
-
-@app.route('/api/timer', methods=['POST'])
-def create_timer():
-    try:
-        duration = request.json.get('duration', 60)
-        name = request.json.get('name', 'Timer')
-        timer_id = timer_manager.create_timer(duration, name)
-        return jsonify({'success': True, 'timer_id': timer_id})
-    except Exception as e:
-        return jsonify({'success': False, 'error': str(e)}), 500
-
-@app.route('/api/system')
-def system_info():
-    try:
-        import psutil
-        return jsonify({
-            'cpu_percent': psutil.cpu_percent(interval=1),
-            'memory': {
-                'total': psutil.virtual_memory().total,
-                'available': psutil.virtual_memory().available,
-                'percent': psutil.virtual_memory().percent
-            },
-            'disk': {
-                'total': psutil.disk_usage('/').total,
-                'free': psutil.disk_usage('/').free,
-                'percent': psutil.disk_usage('/').percent
-            },
-            'temperature': psutil.sensors_temperatures() if hasattr(psutil, 'sensors_temperatures') else None,
-            'uptime': time.time() - psutil.boot_time()
-        })
-    except:
-        return jsonify({'error': 'System info unavailable'}), 503
-
-@app.route('/api/wifi/scan')
-def wifi_scan():
+@app.route('/api/restart', methods=['POST'])
+def api_restart():
+    """Restart the system"""
     try:
         import subprocess
-        result = subprocess.run(
-            ['sudo', 'iwlist', 'wlan0', 'scan'],
-            capture_output=True,
-            text=True,
-            timeout=10
-        )
-        
-        networks = []
-        lines = result.stdout.split('\n')
-        current = {}
-        
-        for line in lines:
-            if 'Cell' in line:
-                if current and 'ssid' in current:
-                    networks.append(current)
-                current = {}
-            elif 'ESSID:' in line:
-                ssid = line.split('"')[1] if '"' in line else ''
-                if ssid:
-                    current['ssid'] = ssid
-            elif 'Signal level=' in line:
-                try:
-                    signal = line.split('Signal level=')[1].split(' ')[0]
-                    current['signal'] = signal
-                except:
-                    pass
-            elif 'Encryption key:on' in line:
-                current['encrypted'] = True
-        
-        if current and 'ssid' in current:
-            networks.append(current)
-        
-        return jsonify(networks)
+        subprocess.Popen(['sudo', 'systemctl', 'restart', 'binghome'])
+        return jsonify({'success': True, 'message': 'Restarting...'})
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
-
-@app.route('/api/wifi/connect', methods=['POST'])
-def wifi_connect():
-    try:
-        ssid = request.json.get('ssid')
-        password = request.json.get('password')
-        
-        if not ssid:
-            return jsonify({'error': 'SSID required'}), 400
-        
-        config = f'''
-ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
-update_config=1
-country=US
-
-network={{
-    ssid="{ssid}"
-    {"psk=\"" + password + "\"" if password else "key_mgmt=NONE"}
-}}
-'''
-        
-        with open('/tmp/wpa_supplicant.conf', 'w') as f:
-            f.write(config)
-        
-        import subprocess
-        subprocess.run(['sudo', 'cp', '/tmp/wpa_supplicant.conf', '/etc/wpa_supplicant/wpa_supplicant.conf'])
-        subprocess.run(['sudo', 'systemctl', 'restart', 'wpa_supplicant'])
-        
-        return jsonify({'success': True})
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        return jsonify({'success': False, 'error': str(e)})
 
 # WebSocket events
 @socketio.on('connect')
 def handle_connect():
-    logger.info(f"Client connected: {request.sid}")
-    emit('connected', {'message': 'Connected to BingHome'})
+    """Handle client connection"""
+    print(f"Client connected: {request.sid}")
+    emit('status', binghome.get_system_status())
+    
+    # Send initial sensor data
+    sensor_data = binghome.read_sensors()
     emit('sensor_update', sensor_data)
 
 @socketio.on('disconnect')
 def handle_disconnect():
-    logger.info(f"Client disconnected: {request.sid}")
+    """Handle client disconnection"""
+    print(f"Client disconnected: {request.sid}")
 
-@socketio.on('request_update')
-def handle_update_request(data):
-    update_type = data.get('type')
-    
-    if update_type == 'sensors':
-        emit('sensor_update', sensor_data)
-    elif update_type == 'weather':
-        emit('weather_update', weather_service.get_current())
-    elif update_type == 'news':
-        emit('news_update', news_manager.fetch_news())
-
-# Main
-def main():
-    logger.info("=" * 50)
-    logger.info("BingHome Smart Hub Starting")
-    logger.info(f"Port: {Config.PORT}")
-    logger.info(f"Hardware: {'Available' if HARDWARE_AVAILABLE else 'Simulated'}")
-    logger.info("=" * 50)
-    
-    # Start background threads
-    threading.Thread(target=sensor_update_loop, daemon=True).start()
-    threading.Thread(target=news_update_loop, daemon=True).start()
-    threading.Thread(target=weather_update_loop, daemon=True).start()
-    
-    # Start server
+@socketio.on('voice_command')
+def handle_voice_command(data):
+    """Handle voice command via WebSocket"""
     try:
-        socketio.run(app, host='0.0.0.0', port=Config.PORT, debug=False)
-    except KeyboardInterrupt:
-        logger.info("\nShutting down...")
-        if HARDWARE_AVAILABLE:
-            GPIO.cleanup()
+        command = data.get('command', '')
+        if command:
+            response = binghome.process_voice_command(command)
+            binghome.speak(response)
+            
+            emit('voice_response', {
+                'command': command,
+                'response': response,
+                'timestamp': datetime.now().isoformat()
+            })
     except Exception as e:
-        logger.error(f"Fatal error: {e}")
-        sys.exit(1)
+        emit('error', {'message': str(e)})
+
+@socketio.on('request_sensor_data')
+def handle_sensor_request():
+    """Handle sensor data request"""
+    data = binghome.read_sensors()
+    emit('sensor_update', data)
+
+@socketio.on('control_device')
+def handle_device_control(data):
+    """Handle device control commands"""
+    try:
+        device = data.get('device')
+        action = data.get('action')
+        
+        if device == 'lights':
+            if action == 'on':
+                response = "Turning on the lights"
+            elif action == 'off':
+                response = "Turning off the lights"
+            else:
+                response = f"Unknown action: {action}"
+        else:
+            response = f"Unknown device: {device}"
+        
+        binghome.speak(response)
+        emit('device_response', {
+            'device': device,
+            'action': action,
+            'response': response
+        })
+        
+    except Exception as e:
+        emit('error', {'message': str(e)})
+
+# Startup function
+def startup_tasks():
+    """Perform startup tasks"""
+    print("🏠 BingHome starting up...")
+    
+    # Start background monitoring
+    binghome.start_background_tasks()
+    
+    # Mark startup as complete
+    binghome.startup_complete = True
+    
+    # Auto-launch browser if enabled and in graphical environment
+    if binghome.settings.get('auto_start_browser', True):
+        time.sleep(5)  # Wait for web server to be ready
+        binghome.start_browser_kiosk()
+    
+    print("✅ BingHome startup complete")
 
 if __name__ == '__main__':
-    main()
+    try:
+        # Perform startup tasks in background thread
+        startup_thread = threading.Thread(target=startup_tasks, daemon=True)
+        startup_thread.start()
+        
+        # Get host and port from environment or defaults
+        host = os.environ.get('HOST', '0.0.0.0')
+        port = int(os.environ.get('PORT', 5000))
+        debug = os.environ.get('DEBUG', 'False').lower() == 'true'
+        
+        print(f"🚀 Starting BingHome on {host}:{port}")
+        
+        # Run the Flask-SocketIO app
+        socketio.run(app, 
+                    host=host, 
+                    port=port, 
+                    debug=debug,
+                    allow_unsafe_werkzeug=True)
+                    
+    except KeyboardInterrupt:
+        print("\n🛑 BingHome shutting down...")
+        binghome.running = False
+        
+        # Cleanup GPIO if available
+        if RPI_AVAILABLE:
+            GPIO.cleanup()
+            
+    except Exception as e:
+        print(f"❌ Fatal error: {e}")
+        sys.exit(1)
