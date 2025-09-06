@@ -1,7 +1,7 @@
 #!/bin/bash
 # ============================================
-# BingHome Installation Script - Auto-Start Fixed
-# Includes browser kiosk mode and proper startup
+# BingHome Hub Installation Script
+# Complete automated installation with all dependencies
 # ============================================
 
 set -e
@@ -18,10 +18,11 @@ NC='\033[0m'
 GITHUB_REPO="https://github.com/oodog/binghome.git"
 INSTALL_DIR="/home/$USER/binghome"
 SERVICE_NAME="binghome"
+VOSK_MODEL_URL="https://alphacephei.com/vosk/models/vosk-model-small-en-us-0.15.zip"
 
 echo -e "${CYAN}=====================================${NC}"
-echo -e "${CYAN}   BingHome Smart Hub Installer     ${NC}"
-echo -e "${CYAN}   With Auto-Start Browser Fix      ${NC}"
+echo -e "${CYAN}   BingHome Hub Installer v3.0      ${NC}"
+echo -e "${CYAN}   Smart Home Hub System             ${NC}"
 echo -e "${CYAN}=====================================${NC}"
 
 # Check if running as root
@@ -30,12 +31,33 @@ if [ "$EUID" -eq 0 ]; then
     exit 1
 fi
 
+# Detect OS
+detect_os() {
+    if [ -f /etc/os-release ]; then
+        . /etc/os-release
+        OS=$NAME
+        VER=$VERSION_ID
+    else
+        echo -e "${RED}Cannot detect OS${NC}"
+        exit 1
+    fi
+    echo -e "${GREEN}✓ Detected OS: $OS $VER${NC}"
+}
+
 # Check Python version
 check_python() {
     echo -e "\n${BLUE}Checking Python version...${NC}"
     if command -v python3 &> /dev/null; then
         PYTHON_VERSION=$(python3 -c 'import sys; print(f"{sys.version_info.major}.{sys.version_info.minor}")')
-        echo -e "${GREEN}✓ Python $PYTHON_VERSION found${NC}"
+        PYTHON_MAJOR=$(python3 -c 'import sys; print(sys.version_info.major)')
+        PYTHON_MINOR=$(python3 -c 'import sys; print(sys.version_info.minor)')
+        
+        if [ "$PYTHON_MAJOR" -ge 3 ] && [ "$PYTHON_MINOR" -ge 8 ]; then
+            echo -e "${GREEN}✓ Python $PYTHON_VERSION found${NC}"
+        else
+            echo -e "${RED}✗ Python 3.8+ required (found $PYTHON_VERSION)${NC}"
+            exit 1
+        fi
     else
         echo -e "${RED}✗ Python 3 not found${NC}"
         exit 1
@@ -49,40 +71,56 @@ update_system() {
     sudo apt-get upgrade -y
 }
 
-# Install dependencies with browser support
+# Install system dependencies
 install_dependencies() {
     echo -e "\n${BLUE}Installing system dependencies...${NC}"
     
+    # Core dependencies
     sudo apt-get install -y \
         python3-pip python3-venv python3-dev \
         git curl wget build-essential \
+        ffmpeg libssl-dev libffi-dev \
+        python3-setuptools || true
+    
+    # Audio dependencies
+    sudo apt-get install -y \
         portaudio19-dev python3-pyaudio \
-        espeak ffmpeg libsndfile1 \
-        i2c-tools \
+        espeak libespeak-dev \
+        pulseaudio pulseaudio-utils \
+        alsa-base alsa-utils \
+        libsndfile1 libsndfile1-dev || true
+    
+    # Network tools
+    sudo apt-get install -y \
+        network-manager \
+        wireless-tools \
+        wpasupplicant || true
+    
+    # Development tools
+    sudo apt-get install -y \
+        pkg-config \
+        libatlas-base-dev \
+        libopenblas-dev \
+        liblapack-dev || true
+    
+    # Browser for kiosk mode
+    sudo apt-get install -y \
         chromium-browser \
         xdotool \
         unclutter \
-        x11-xserver-utils \
-        xinit \
-        openbox \
-        lxde-core \
-        lightdm \
-        xserver-xorg \
-        matchbox-window-manager \
-        xautomation \
-        screen || true
+        x11-xserver-utils || true
     
     # Raspberry Pi specific
     if [ -f /proc/device-tree/model ]; then
-        echo -e "${BLUE}Configuring Raspberry Pi...${NC}"
-        sudo apt-get install -y python3-rpi.gpio || true
+        echo -e "${BLUE}Configuring Raspberry Pi specific packages...${NC}"
+        sudo apt-get install -y \
+            python3-rpi.gpio \
+            i2c-tools \
+            python3-smbus || true
         
         # Enable interfaces
         sudo raspi-config nonint do_i2c 0 2>/dev/null || true
         sudo raspi-config nonint do_spi 0 2>/dev/null || true
-        
-        # Enable auto-login to desktop
-        sudo raspi-config nonint do_boot_behaviour B4 2>/dev/null || true
         
         # Add user to groups
         sudo usermod -a -G gpio,i2c,spi,audio,dialout,video $USER || true
@@ -91,9 +129,22 @@ install_dependencies() {
     echo -e "${GREEN}✓ Dependencies installed${NC}"
 }
 
+# Install Node.js for better web performance
+install_nodejs() {
+    echo -e "\n${BLUE}Installing Node.js for enhanced performance...${NC}"
+    
+    if ! command -v node &> /dev/null; then
+        curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+        sudo apt-get install -y nodejs
+        echo -e "${GREEN}✓ Node.js installed${NC}"
+    else
+        echo -e "${GREEN}✓ Node.js already installed${NC}"
+    fi
+}
+
 # Setup project
 setup_project() {
-    echo -e "\n${BLUE}Setting up project...${NC}"
+    echo -e "\n${BLUE}Setting up BingHome Hub project...${NC}"
     
     # Clone or update repository
     if [ -d "$INSTALL_DIR" ]; then
@@ -112,191 +163,14 @@ setup_project() {
     cd "$INSTALL_DIR"
     
     # Create required directories
-    mkdir -p core templates static/js
+    mkdir -p core templates static/js static/css models logs
     
-    # Fix any file issues
-    if [ -f "gitignore.txt" ]; then
-        mv gitignore.txt .gitignore
-    fi
-    
-    # Remove redundant files if app.py exists
-    if [ -f "app.py" ] && [ -f "binghome.py" ]; then
-        echo -e "${YELLOW}Removing redundant binghome.py...${NC}"
-        mv binghome.py binghome.py.backup 2>/dev/null || true
-    fi
-}
-
-# Create core modules if missing
-create_core_modules() {
-    echo -e "\n${BLUE}Checking core modules...${NC}"
-    
-    # Create media.py if missing
-    if [ ! -f "core/media.py" ]; then
-        echo -e "${YELLOW}Creating core/media.py...${NC}"
-        cat > core/media.py << 'EOF'
-"""Media control module for BingHome"""
-import logging
-
-logger = logging.getLogger(__name__)
-
-class MediaController:
-    def __init__(self):
-        self.is_playing = False
-        
-    def play(self, source=None):
-        self.is_playing = True
-        logger.info(f"Playing media")
-        return True
-    
-    def pause(self):
-        self.is_playing = False
-        return True
-    
-    def stop(self):
-        self.is_playing = False
-        return True
-    
-    def next(self):
-        return True
-    
-    def previous(self):
-        return True
-EOF
-    fi
-    
-    # Create news.py if missing
-    if [ ! -f "core/news.py" ]; then
-        echo -e "${YELLOW}Creating core/news.py...${NC}"
-        cat > core/news.py << 'EOF'
-"""News fetching module for BingHome"""
-import os
-import logging
-import requests
-
-logger = logging.getLogger(__name__)
-
-class NewsManager:
-    def __init__(self):
-        self.api_key = os.environ.get('BING_API_KEY', '')
-        
-    def fetch_news(self, category='general', count=10):
-        if not self.api_key:
-            return []
-        
-        try:
-            headers = {'Ocp-Apim-Subscription-Key': self.api_key}
-            params = {'mkt': 'en-US', 'count': count}
-            
-            response = requests.get(
-                'https://api.bing.microsoft.com/v7.0/news',
-                headers=headers,
-                params=params,
-                timeout=10
-            )
-            
-            if response.status_code == 200:
-                data = response.json()
-                return data.get('value', [])
-        except Exception as e:
-            logger.error(f"News error: {e}")
-        
-        return []
-EOF
-    fi
-    
-    # Create timers.py if missing
-    if [ ! -f "core/timers.py" ]; then
-        echo -e "${YELLOW}Creating core/timers.py...${NC}"
-        cat > core/timers.py << 'EOF'
-"""Timer management for BingHome"""
-import logging
-import threading
-import time
-import uuid
-
-logger = logging.getLogger(__name__)
-
-class TimerManager:
-    def __init__(self):
-        self.timers = {}
-        
-    def create_timer(self, duration, name="Timer"):
-        timer_id = str(uuid.uuid4())[:8]
-        
-        def timer_thread():
-            time.sleep(duration)
-            if timer_id in self.timers:
-                logger.info(f"Timer {name} completed")
-                del self.timers[timer_id]
-        
-        self.timers[timer_id] = {
-            'name': name,
-            'duration': duration,
-            'thread': threading.Thread(target=timer_thread, daemon=True)
-        }
-        self.timers[timer_id]['thread'].start()
-        return timer_id
-    
-    def cancel_timer(self, timer_id):
-        if timer_id in self.timers:
-            del self.timers[timer_id]
-            return True
-        return False
-EOF
-    fi
-    
-    # Create weather.py if missing
-    if [ ! -f "core/weather.py" ]; then
-        echo -e "${YELLOW}Creating core/weather.py...${NC}"
-        cat > core/weather.py << 'EOF'
-"""Weather service module for BingHome"""
-import os
-import logging
-import requests
-
-logger = logging.getLogger(__name__)
-
-class WeatherService:
-    def __init__(self):
-        self.api_key = os.environ.get('WEATHER_API_KEY', '')
-        
-    def get_current(self, location='London'):
-        if not self.api_key:
-            return {}
-        
-        try:
-            url = "http://api.openweathermap.org/data/2.5/weather"
-            params = {
-                'q': location,
-                'appid': self.api_key,
-                'units': 'metric'
-            }
-            
-            response = requests.get(url, params=params, timeout=10)
-            
-            if response.status_code == 200:
-                data = response.json()
-                return {
-                    'temp': round(data['main']['temp']),
-                    'condition': data['weather'][0]['main'],
-                    'description': data['weather'][0]['description']
-                }
-        except Exception as e:
-            logger.error(f"Weather error: {e}")
-        
-        return {}
-    
-    def get_forecast(self):
-        return []
-EOF
-    fi
-    
-    echo -e "${GREEN}✓ Core modules ready${NC}"
+    echo -e "${GREEN}✓ Project structure created${NC}"
 }
 
 # Setup Python environment
 setup_python_env() {
-    echo -e "\n${BLUE}Setting up Python environment...${NC}"
+    echo -e "\n${BLUE}Setting up Python virtual environment...${NC}"
     
     cd "$INSTALL_DIR"
     
@@ -307,141 +181,138 @@ setup_python_env() {
     # Upgrade pip
     pip install --upgrade pip setuptools wheel
     
-    # Install requirements
-    if [ -f "requirements.txt" ]; then
-        echo -e "${BLUE}Installing from requirements.txt...${NC}"
-        pip install -r requirements.txt
-    else
-        echo -e "${BLUE}Installing packages manually...${NC}"
-        
-        # Core packages
-        pip install flask flask-cors flask-socketio
-        pip install requests python-dotenv psutil
-        
-        # Voice/Audio
-        pip install SpeechRecognition pyttsx3 pyaudio || true
-        
-        # Hardware (Raspberry Pi)
-        pip install RPi.GPIO adafruit-circuitpython-dht || true
+    # Install core requirements first
+    echo -e "${BLUE}Installing core Python packages...${NC}"
+    pip install flask flask-cors flask-socketio
+    pip install requests python-dotenv psutil
+    pip install numpy python-dateutil pytz
+    
+    # Install audio packages
+    echo -e "${BLUE}Installing audio packages...${NC}"
+    pip install pyttsx3 pygame || true
+    pip install SpeechRecognition || true
+    pip install sounddevice || true
+    
+    # Try to install PyAudio
+    pip install PyAudio || {
+        echo -e "${YELLOW}PyAudio installation failed, trying alternative method...${NC}"
+        sudo apt-get install -y python3-pyaudio
+    }
+    
+    # Install hardware packages (Raspberry Pi)
+    if [ -f /proc/device-tree/model ]; then
+        echo -e "${BLUE}Installing Raspberry Pi packages...${NC}"
+        pip install RPi.GPIO || true
+        pip install adafruit-blinka adafruit-circuitpython-dht || true
     fi
+    
+    # Install local AI models
+    echo -e "${BLUE}Installing AI packages...${NC}"
+    pip install vosk || true
+    
+    # Optional: Install Whisper (requires more resources)
+    if [ "$1" == "--with-whisper" ]; then
+        echo -e "${BLUE}Installing Whisper (this may take a while)...${NC}"
+        pip install openai-whisper || true
+    fi
+    
+    # Install Home Assistant API
+    echo -e "${BLUE}Installing Home Automation packages...${NC}"
+    pip install homeassistant-api paho-mqtt || true
     
     echo -e "${GREEN}✓ Python environment ready${NC}"
 }
 
-# Setup auto-start browser configuration
-setup_autostart() {
-    echo -e "\n${BLUE}Setting up browser auto-start...${NC}"
+# Download Vosk model
+download_vosk_model() {
+    echo -e "\n${BLUE}Downloading Vosk speech recognition model...${NC}"
     
-    # Create autostart directories
-    mkdir -p "$HOME/.config/lxsession/LXDE-pi"
-    mkdir -p "$HOME/.config/openbox"
+    MODELS_DIR="$INSTALL_DIR/models"
+    mkdir -p "$MODELS_DIR"
     
-    # Create browser launch script
-    cat > "$INSTALL_DIR/launch-browser.sh" << 'EOF'
-#!/bin/bash
-
-# Wait for X server to be ready
-while ! xset q &>/dev/null; do
-    echo "Waiting for X server..."
-    sleep 2
-done
-
-# Hide cursor after inactivity
-unclutter -idle 1 &
-
-# Disable screen blanking
-xset s off
-xset -dpms
-xset s noblank
-
-# Wait for BingHome service to be ready
-echo "Waiting for BingHome service..."
-while ! curl -s http://localhost:5000 > /dev/null; do
-    sleep 3
-done
-
-echo "Launching browser in kiosk mode..."
-
-# Launch Chromium in kiosk mode
-chromium-browser \
-    --kiosk \
-    --incognito \
-    --disable-infobars \
-    --disable-web-security \
-    --disable-features=TranslateUI \
-    --disable-component-extensions-with-background-pages \
-    --disable-background-timer-throttling \
-    --disable-renderer-backgrounding \
-    --disable-backgrounding-occluded-windows \
-    --autoplay-policy=no-user-gesture-required \
-    --no-first-run \
-    --fast \
-    --fast-start \
-    --disable-default-apps \
-    --no-default-browser-check \
-    --disable-translate \
-    --disable-features=VizDisplayCompositor \
-    --window-position=0,0 \
-    --window-size=1920,1080 \
-    http://localhost:5000 &
-
-# Keep script running
-wait
-EOF
+    if [ ! -d "$MODELS_DIR/vosk-model-small-en-us-0.15" ]; then
+        cd "$MODELS_DIR"
+        echo -e "${YELLOW}Downloading Vosk model (39MB)...${NC}"
+        wget -q --show-progress "$VOSK_MODEL_URL" -O vosk-model.zip
+        
+        echo -e "${BLUE}Extracting model...${NC}"
+        unzip -q vosk-model.zip
+        rm vosk-model.zip
+        
+        echo -e "${GREEN}✓ Vosk model installed${NC}"
+    else
+        echo -e "${GREEN}✓ Vosk model already installed${NC}"
+    fi
     
-    chmod +x "$INSTALL_DIR/launch-browser.sh"
-    
-    # Create LXDE autostart
-    cat > "$HOME/.config/lxsession/LXDE-pi/autostart" << EOF
-@lxpanel --profile LXDE-pi
-@pcmanfm --desktop --profile LXDE-pi
-@xscreensaver -no-splash
-@$INSTALL_DIR/launch-browser.sh
-EOF
-    
-    # Create openbox autostart as fallback
-    cat > "$HOME/.config/openbox/autostart" << EOF
-# Launch BingHome browser
-$INSTALL_DIR/launch-browser.sh &
-EOF
-    
-    chmod +x "$HOME/.config/openbox/autostart"
-    
-    echo -e "${GREEN}✓ Browser auto-start configured${NC}"
+    cd "$INSTALL_DIR"
 }
 
-# Setup desktop environment for kiosk mode
-setup_desktop() {
-    echo -e "\n${BLUE}Configuring desktop environment...${NC}"
+# Create configuration files
+create_config_files() {
+    echo -e "\n${BLUE}Creating configuration files...${NC}"
     
-    # Configure lightdm for auto-login
-    sudo mkdir -p /etc/lightdm/lightdm.conf.d
+    cd "$INSTALL_DIR"
     
-    cat > /tmp/01-autologin.conf << EOF
-[Seat:*]
-autologin-user=$USER
-autologin-user-timeout=0
-user-session=LXDE-pi
+    # Create default settings.json
+    if [ ! -f "settings.json" ]; then
+        cat > settings.json << 'EOF'
+{
+  "voice_provider": "local",
+  "voice_model": "vosk",
+  "openai_api_key": "",
+  "azure_speech_key": "",
+  "google_cloud_key": "",
+  "amazon_polly_key": "",
+  "bing_api_key": "",
+  "weather_api_key": "",
+  "home_assistant_url": "http://localhost:8123",
+  "home_assistant_token": "",
+  "wake_words": ["hey bing", "okay bing", "bing"],
+  "tts_engine": "pyttsx3",
+  "tts_rate": 150,
+  "tts_volume": 0.9,
+  "language": "en-US",
+  "kiosk_mode": true,
+  "auto_start_browser": true,
+  "network_interface": "auto",
+  "gpio_pins": {
+    "dht22": 4,
+    "gas_sensor": 17,
+    "light_sensor": 27
+  },
+  "apps": {
+    "netflix": {"enabled": true, "url": "https://www.netflix.com"},
+    "prime_video": {"enabled": true, "url": "https://www.primevideo.com"},
+    "youtube": {"enabled": true, "url": "https://www.youtube.com/tv"},
+    "xbox_cloud": {"enabled": true, "url": "https://www.xbox.com/play"},
+    "spotify": {"enabled": true, "url": "https://open.spotify.com"},
+    "google_photos": {"enabled": true, "url": "https://photos.google.com"}
+  }
+}
 EOF
+        echo -e "${GREEN}✓ Settings file created${NC}"
+    fi
     
-    sudo mv /tmp/01-autologin.conf /etc/lightdm/lightdm.conf.d/01-autologin.conf
-    
-    # Create .dmrc for session selection
-    cat > "$HOME/.dmrc" << EOF
-[Desktop]
-Session=LXDE-pi
+    # Create .env file
+    if [ ! -f ".env" ]; then
+        cat > .env << 'EOF'
+# BingHome Hub Environment Variables
+SECRET_KEY=binghome-hub-secret-change-this-$(openssl rand -hex 16)
+HOST=0.0.0.0
+PORT=5000
+DEBUG=False
 EOF
-    
-    echo -e "${GREEN}✓ Desktop environment configured${NC}"
+        echo -e "${GREEN}✓ Environment file created${NC}"
+    fi
 }
 
-# Create systemd service with proper startup order
+# Setup systemd service
 create_service() {
     echo -e "\n${BLUE}Creating systemd service...${NC}"
     
     sudo tee /etc/systemd/system/${SERVICE_NAME}.service > /dev/null << EOF
 [Unit]
-Description=BingHome Smart Hub
+Description=BingHome Smart Home Hub
 After=network-online.target sound.target
 Wants=network-online.target
 
@@ -452,6 +323,7 @@ Group=$USER
 WorkingDirectory=$INSTALL_DIR
 Environment="PATH=$INSTALL_DIR/venv/bin:/usr/bin:/bin"
 Environment="PYTHONPATH=$INSTALL_DIR"
+Environment="PYTHONUNBUFFERED=1"
 ExecStartPre=/bin/sleep 10
 ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/app.py
 Restart=always
@@ -459,17 +331,11 @@ RestartSec=15
 StandardOutput=append:/var/log/binghome.log
 StandardError=append:/var/log/binghome.error.log
 
-# Security settings
-NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=false
-ReadWritePaths=$INSTALL_DIR /var/log
-
 [Install]
 WantedBy=multi-user.target
 EOF
     
-    # Create log files with proper permissions
+    # Create log files
     sudo touch /var/log/binghome.log /var/log/binghome.error.log
     sudo chown $USER:$USER /var/log/binghome.log /var/log/binghome.error.log
     
@@ -479,8 +345,58 @@ EOF
     echo -e "${GREEN}✓ Service created and enabled${NC}"
 }
 
+# Setup auto-start for desktop
+setup_autostart() {
+    echo -e "\n${BLUE}Setting up desktop auto-start...${NC}"
+    
+    # Create autostart directory
+    mkdir -p "$HOME/.config/autostart"
+    
+    # Create desktop entry
+    cat > "$HOME/.config/autostart/binghome.desktop" << EOF
+[Desktop Entry]
+Type=Application
+Name=BingHome Hub
+Exec=chromium-browser --kiosk --incognito --disable-infobars --window-position=0,0 --window-size=1920,1080 http://localhost:5000
+Hidden=false
+NoDisplay=false
+X-GNOME-Autostart-enabled=true
+EOF
+    
+    echo -e "${GREEN}✓ Auto-start configured${NC}"
+}
+
+# Configure audio
+configure_audio() {
+    echo -e "\n${BLUE}Configuring audio system...${NC}"
+    
+    # Set default audio output
+    if command -v pactl &> /dev/null; then
+        pactl set-default-sink 0 2>/dev/null || true
+    fi
+    
+    # Configure ALSA
+    if [ ! -f "$HOME/.asoundrc" ]; then
+        cat > "$HOME/.asoundrc" << 'EOF'
+pcm.!default {
+    type hw
+    card 0
+}
+ctl.!default {
+    type hw
+    card 0
+}
+EOF
+    fi
+    
+    # Add user to audio group
+    sudo usermod -a -G audio $USER
+    
+    echo -e "${GREEN}✓ Audio configured${NC}"
+}
+
 # Create helper scripts
-create_scripts() {
+create_helper_scripts() {
     echo -e "\n${BLUE}Creating helper scripts...${NC}"
     
     cd "$INSTALL_DIR"
@@ -500,70 +416,147 @@ EOF
 cd "$(dirname "$0")"
 git pull
 source venv/bin/activate
-pip install -r requirements.txt
+pip install --upgrade -r requirements.txt
 sudo systemctl restart binghome
+echo "BingHome Hub updated successfully!"
 EOF
     chmod +x update.sh
     
-    # Control script
-    cat > binghome-control.sh << 'EOF'
+    # Voice test script
+    cat > test-voice.sh << 'EOF'
 #!/bin/bash
+cd "$(dirname "$0")"
+source venv/bin/activate
+python -c "
+import speech_recognition as sr
+import pyttsx3
 
-SERVICE_NAME="binghome"
+# Test TTS
+engine = pyttsx3.init()
+engine.say('Hello, BingHome Hub voice system is working')
+engine.runAndWait()
+
+# Test microphone
+r = sr.Recognizer()
+m = sr.Microphone()
+with m as source:
+    r.adjust_for_ambient_noise(source)
+    print('Say something!')
+    audio = r.listen(source, timeout=5)
+    try:
+        text = r.recognize_google(audio)
+        print(f'You said: {text}')
+    except:
+        print('Could not understand audio')
+"
+EOF
+    chmod +x test-voice.sh
+    
+    # Control script
+    cat > binghome << 'EOF'
+#!/bin/bash
 
 case "$1" in
     start)
-        echo "Starting BingHome service..."
-        sudo systemctl start $SERVICE_NAME
+        echo "Starting BingHome Hub..."
+        sudo systemctl start binghome
         ;;
     stop)
-        echo "Stopping BingHome service..."
-        sudo systemctl stop $SERVICE_NAME
-        pkill -f chromium-browser 2>/dev/null || true
+        echo "Stopping BingHome Hub..."
+        sudo systemctl stop binghome
         ;;
     restart)
-        echo "Restarting BingHome service..."
-        sudo systemctl restart $SERVICE_NAME
+        echo "Restarting BingHome Hub..."
+        sudo systemctl restart binghome
         ;;
     status)
-        sudo systemctl status $SERVICE_NAME
+        sudo systemctl status binghome
         ;;
     logs)
-        sudo journalctl -u $SERVICE_NAME -f
+        sudo journalctl -u binghome -f
         ;;
-    browser)
-        echo "Launching browser..."
-        ./launch-browser.sh &
+    update)
+        ./update.sh
         ;;
-    kiosk)
-        echo "Stopping browser and restarting in kiosk mode..."
-        pkill -f chromium-browser 2>/dev/null || true
-        sleep 2
-        ./launch-browser.sh &
+    test-voice)
+        ./test-voice.sh
         ;;
     *)
-        echo "Usage: $0 {start|stop|restart|status|logs|browser|kiosk}"
+        echo "Usage: binghome {start|stop|restart|status|logs|update|test-voice}"
         exit 1
         ;;
 esac
 EOF
-    chmod +x binghome-control.sh
+    chmod +x binghome
     
     # Create global command
-    sudo ln -sf "$INSTALL_DIR/binghome-control.sh" /usr/local/bin/binghome
+    sudo ln -sf "$INSTALL_DIR/binghome" /usr/local/bin/binghome
     
     echo -e "${GREEN}✓ Helper scripts created${NC}"
 }
 
-# Test and start
+# Optimize for Raspberry Pi
+optimize_raspberry_pi() {
+    if [ -f /proc/device-tree/model ]; then
+        echo -e "\n${BLUE}Optimizing for Raspberry Pi...${NC}"
+        
+        # Increase GPU memory split for better browser performance
+        if ! grep -q "gpu_mem=" /boot/config.txt; then
+            echo "gpu_mem=128" | sudo tee -a /boot/config.txt > /dev/null
+        fi
+        
+        # Disable unnecessary services
+        sudo systemctl disable bluetooth 2>/dev/null || true
+        
+        # Configure swap for better performance
+        if [ ! -f /swapfile ]; then
+            sudo fallocate -l 2G /swapfile
+            sudo chmod 600 /swapfile
+            sudo mkswap /swapfile
+            sudo swapon /swapfile
+            echo "/swapfile none swap sw 0 0" | sudo tee -a /etc/fstab > /dev/null
+        fi
+        
+        echo -e "${GREEN}✓ Raspberry Pi optimized${NC}"
+    fi
+}
+
+# Test installation
+test_installation() {
+    echo -e "\n${BLUE}Testing installation...${NC}"
+    
+    cd "$INSTALL_DIR"
+    source venv/bin/activate
+    
+    # Test Python imports
+    python -c "
+import flask
+import socketio
+import speech_recognition
+import pyttsx3
+print('✓ Core packages working')
+" || echo -e "${YELLOW}⚠ Some packages may need manual installation${NC}"
+    
+    # Test Vosk model
+    if [ -d "models/vosk-model-small-en-us-0.15" ]; then
+        python -c "
+import vosk
+import json
+model = vosk.Model('models/vosk-model-small-en-us-0.15')
+print('✓ Vosk model loaded successfully')
+" || echo -e "${YELLOW}⚠ Vosk model test failed${NC}"
+    fi
+}
+
+# Start service
 start_service() {
-    echo -e "\n${BLUE}Starting BingHome...${NC}"
+    echo -e "\n${BLUE}Starting BingHome Hub...${NC}"
     
     sudo systemctl start ${SERVICE_NAME}
     sleep 5
     
     if systemctl is-active --quiet ${SERVICE_NAME}; then
-        echo -e "${GREEN}✓ BingHome service is running${NC}"
+        echo -e "${GREEN}✓ BingHome Hub service is running${NC}"
     else
         echo -e "${YELLOW}⚠ Service may not be running. Check logs with:${NC}"
         echo -e "  journalctl -u ${SERVICE_NAME} -f"
@@ -572,16 +565,21 @@ start_service() {
 
 # Main installation
 main() {
+    detect_os
     check_python
     update_system
     install_dependencies
+    install_nodejs
     setup_project
-    create_core_modules
     setup_python_env
-    setup_autostart
-    setup_desktop
+    download_vosk_model
+    create_config_files
     create_service
-    create_scripts
+    setup_autostart
+    configure_audio
+    create_helper_scripts
+    optimize_raspberry_pi
+    test_installation
     start_service
     
     # Get IP
@@ -591,32 +589,48 @@ main() {
     echo -e "${GREEN}   Installation Complete! 🎉         ${NC}"
     echo -e "${GREEN}=====================================${NC}"
     
-    echo -e "\n${CYAN}Access BingHome at:${NC}"
+    echo -e "\n${CYAN}Access BingHome Hub at:${NC}"
     echo -e "  ${GREEN}http://$IP:5000${NC}"
+    echo -e "  ${GREEN}http://localhost:5000${NC} (local)"
     
     echo -e "\n${CYAN}Available Commands:${NC}"
-    echo -e "  Start service:    ${GREEN}binghome start${NC}"
-    echo -e "  Stop service:     ${GREEN}binghome stop${NC}"
-    echo -e "  Restart:          ${GREEN}binghome restart${NC}"
-    echo -e "  View logs:        ${GREEN}binghome logs${NC}"
-    echo -e "  Launch browser:   ${GREEN}binghome browser${NC}"
-    echo -e "  Kiosk mode:       ${GREEN}binghome kiosk${NC}"
+    echo -e "  ${GREEN}binghome start${NC}     - Start service"
+    echo -e "  ${GREEN}binghome stop${NC}      - Stop service"
+    echo -e "  ${GREEN}binghome restart${NC}   - Restart service"
+    echo -e "  ${GREEN}binghome status${NC}    - Check status"
+    echo -e "  ${GREEN}binghome logs${NC}      - View logs"
+    echo -e "  ${GREEN}binghome update${NC}    - Update BingHome"
+    echo -e "  ${GREEN}binghome test-voice${NC} - Test voice system"
     
-    echo -e "\n${CYAN}Auto-Start Features:${NC}"
-    echo -e "  ✓ Service auto-starts on boot"
-    echo -e "  ✓ Desktop auto-login configured"
-    echo -e "  ✓ Browser kiosk mode on login"
-    echo -e "  ✓ Screen blanking disabled"
+    echo -e "\n${CYAN}Features:${NC}"
+    echo -e "  ✓ Local voice recognition (Vosk)"
+    echo -e "  ✓ Smart home control"
+    echo -e "  ✓ Streaming apps integration"
+    echo -e "  ✓ Weather & news"
+    echo -e "  ✓ Home automation"
     
-    echo -e "\n${YELLOW}Reboot to activate auto-start:${NC}"
+    echo -e "\n${CYAN}Next Steps:${NC}"
+    echo -e "  1. Open ${GREEN}http://$IP:5000${NC} in your browser"
+    echo -e "  2. Click the settings button (⚙️)"
+    echo -e "  3. Configure your API keys (optional)"
+    echo -e "  4. Connect to Home Assistant (optional)"
+    echo -e "  5. Say 'Hey Bing' to activate voice control"
+    
+    echo -e "\n${YELLOW}Note: Reboot recommended for all features:${NC}"
     echo -e "  ${GREEN}sudo reboot${NC}"
-    
-    echo -e "\n${BLUE}After reboot, the system will:${NC}"
-    echo -e "  1. Auto-login to desktop"
-    echo -e "  2. Start BingHome service"
-    echo -e "  3. Launch browser in kiosk mode"
-    echo -e "  4. Display BingHome interface"
 }
 
-# Run
-main
+# Handle arguments
+case "$1" in
+    --with-whisper)
+        echo -e "${CYAN}Installing with Whisper support...${NC}"
+        ;;
+    --help)
+        echo "Usage: $0 [--with-whisper]"
+        echo "  --with-whisper  Install OpenAI Whisper for better voice recognition"
+        exit 0
+        ;;
+esac
+
+# Run installation
+main "$@"
