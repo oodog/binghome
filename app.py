@@ -827,4 +827,4 @@ class BingHomeHub:
         sensors = self.read_sensors()
         
         return {
-            'status': 'healthy
+            'status': 'healthy'
