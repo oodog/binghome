@@ -1,0 +1,32 @@
+#!/bin/bash
+
+case "$1" in
+    start)
+        echo "Starting BingHome Hub..."
+        sudo systemctl start binghome
+        ;;
+    stop)
+        echo "Stopping BingHome Hub..."
+        sudo systemctl stop binghome
+        ;;
+    restart)
+        echo "Restarting BingHome Hub..."
+        sudo systemctl restart binghome
+        ;;
+    status)
+        sudo systemctl status binghome
+        ;;
+    logs)
+        sudo journalctl -u binghome -f
+        ;;
+    update)
+        ./update.sh
+        ;;
+    test-voice)
+        ./test-voice.sh
+        ;;
+    *)
+        echo "Usage: binghome {start|stop|restart|status|logs|update|test-voice}"
+        exit 1
+        ;;
+esac

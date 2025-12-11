@@ -1,83 +1,201 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Wi-Fi</title>
-<style>
-  body{font-family:Segoe UI,Arial;background:#111;color:#fff;margin:0}
-  .wrap{max-width:900px;margin:0 auto;padding:20px}
-  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-  .card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.12);border-radius:12px;padding:16px;margin:10px 0}
-  .btn{background:#0078d7;border:none;color:#fff;padding:10px 16px;border-radius:10px;cursor:pointer}
-  input{padding:10px;border-radius:10px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);color:#fff}
-  ul{list-style:none;padding:0}
-  li{padding:8px 10px;border-bottom:1px solid rgba(255,255,255,.1);display:flex;justify-content:space-between;align-items:center}
-  a{color:#0df;text-decoration:none}
-</style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BingHome - WiFi Settings</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        h1 { color: #fff; }
+        .home-btn {
+            background: #0078d7;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+        }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .network-list {
+            list-style: none;
+            padding: 0;
+            margin-top: 20px;
+        }
+        .network-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 5px;
+            margin-bottom: 10px;
+        }
+        .btn {
+            background: #0078d7;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        .status-message {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 5px;
+            display: none;
+        }
+        .status-message.show {
+            display: block;
+        }
+        .status-message.success {
+            background: rgba(0,255,0,0.2);
+            border: 1px solid #0f0;
+        }
+        .status-message.error {
+            background: rgba(255,0,0,0.2);
+            border: 1px solid #f00;
+        }
+        .status-message.info {
+            background: rgba(0,123,255,0.2);
+            border: 1px solid #007bff;
+        }
+    </style>
 </head>
 <body>
-<div class="wrap">
-  <div class="row" style="justify-content:space-between">
-    <h2>Wi-Fi</h2>
-    <div><a class="btn" href="/">Home</a></div>
-  </div>
-
-  <div class="card">
-    <div class="row">
-      <button class="btn" onclick="scan()">Scan</button>
-      <span id="scanOut" style="opacity:.8"></span>
+    <div class="header">
+        <h1>Wi-Fi</h1>
+        <a href="/" class="home-btn">Home</a>
     </div>
-    <ul id="nets"></ul>
-  </div>
 
-  <div class="card">
-    <h3>Join Network</h3>
-    <div class="row">
-      <input id="ssid" placeholder="SSID">
-      <input id="pass" placeholder="Password (if any)" type="password">
-      <button class="btn" onclick="join()">Connect</button>
+    <div id="statusMessage" class="status-message"></div>
+
+    <div class="card">
+        <button class="btn" id="scanBtn" onclick="scanNetworks()">Scan</button>
+        <span id="scanStatus"></span>
+        <ul class="network-list" id="networkList"></ul>
     </div>
-    <div id="joinOut" style="margin-top:8px;opacity:.85"></div>
-  </div>
-</div>
 
-<script>
-async function scan(){
-  const s = document.getElementById('scanOut');
-  const list = document.getElementById('nets');
-  s.textContent='Scanning…'; list.innerHTML='';
-  try{
-    const r = await fetch('/api/wifi_scan');
-    const j = await r.json();
-    const nets = j.networks || [];
-    s.textContent = nets.length ? `${nets.length} networks` : 'No networks found.';
-    nets.forEach(n=>{
-      const li = document.createElement('li');
-      li.innerHTML = `<span>${n}</span> <button class="btn" onclick="fillAndJoin('${n}')">Join</button>`;
-      list.appendChild(li);
-    });
-  }catch(e){
-    s.textContent='Scan failed.';
-  }
-}
-function fillAndJoin(ssid){
-  document.getElementById('ssid').value = ssid;
-  document.getElementById('pass').focus();
-}
-async function join(){
-  const ssid = document.getElementById('ssid').value.trim();
-  const password = document.getElementById('pass').value;
-  const out = document.getElementById('joinOut');
-  if(!ssid){ out.textContent='SSID required.'; return; }
-  out.textContent='Connecting…';
-  try{
-    const r = await fetch('/api/wifi_connect', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ssid, password})});
-    const j = await r.json();
-    out.textContent = j.success ? 'Connected (or attempting)…' : ('Failed: ' + (j.info || j.error || 'unknown'));
-  }catch(e){
-    out.textContent='Connect failed.';
-  }
-}
-</script>
+    <script>
+        let isConnecting = false;
+
+        function showMessage(msg, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = msg;
+            el.className = 'status-message show ' + type;
+            
+            if (type !== 'info') {
+                setTimeout(() => {
+                    el.className = 'status-message';
+                }, 5000);
+            }
+        }
+
+        function scanNetworks() {
+            document.getElementById('scanStatus').textContent = 'Scanning...';
+            document.getElementById('networkList').innerHTML = '';
+            document.getElementById('scanBtn').disabled = true;
+            
+            fetch('/api/wifi_scan')
+                .then(r => r.json())
+                .then(data => {
+                    const list = document.getElementById('networkList');
+                    document.getElementById('scanBtn').disabled = false;
+                    
+                    if (data.networks && data.networks.length > 0) {
+                        document.getElementById('scanStatus').textContent = data.networks.length + ' networks';
+                        
+                        data.networks.forEach(network => {
+                            const li = document.createElement('li');
+                            li.className = 'network-item';
+                            
+                            let networkName = '';
+                            let signal = 0;
+                            
+                            if (typeof network === 'string') {
+                                networkName = network;
+                            } else if (network.ssid) {
+                                networkName = network.ssid;
+                                signal = network.signal || 0;
+                            }
+                            
+                            li.innerHTML = `
+                                <span>${networkName} ${signal > 0 ? `(${signal}%)` : ''}</span>
+                                <button class="btn" onclick="connectToNetwork('${networkName}')">Join</button>
+                            `;
+                            list.appendChild(li);
+                        });
+                    } else {
+                        list.innerHTML = '<li>No networks found</li>';
+                        document.getElementById('scanStatus').textContent = '';
+                    }
+                })
+                .catch(err => {
+                    document.getElementById('scanStatus').textContent = 'Scan failed';
+                    document.getElementById('scanBtn').disabled = false;
+                    showMessage('Failed to scan networks', 'error');
+                });
+        }
+
+        function connectToNetwork(ssid) {
+            if (isConnecting) {
+                showMessage('Already connecting to a network...', 'info');
+                return;
+            }
+            
+            const password = prompt('Enter password for ' + ssid + ':');
+            if (password === null) return;
+            
+            isConnecting = true;
+            showMessage('Connecting to ' + ssid + '...', 'info');
+            
+            fetch('/api/wifi_connect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ssid: ssid, password: password})
+            })
+            .then(r => r.json())
+            .then(data => {
+                isConnecting = false;
+                if (data.success) {
+                    showMessage('Connected to ' + ssid + '!', 'success');
+                    // Refresh the page after 3 seconds to show new connection
+                    setTimeout(() => {
+                        window.location.reload();
+                    }, 3000);
+                } else {
+                    showMessage('Failed to connect: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(err => {
+                isConnecting = false;
+                showMessage('Connection error: ' + err, 'error');
+            });
+        }
+
+        // Auto-scan on load
+        scanNetworks();
+    </script>
 </body>
 </html>

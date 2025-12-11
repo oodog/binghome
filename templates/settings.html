@@ -5,148 +5,130 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>BingHome - Settings</title>
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-        
-        :root {
-            --primary: #1a73e8;
-            --secondary: #5f6368;
-            --background: #ffffff;
-            --surface: #f8f9fa;
-            --error: #ea4335;
-            --success: #34a853;
-            --warning: #fbbc04;
-            --text-primary: #202124;
-            --text-secondary: #5f6368;
-            --border: #dadce0;
-        }
-        
+        * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: 'Google Sans', 'Roboto', -apple-system, BlinkMacSystemFont, sans-serif;
-            background: var(--background);
-            color: var(--text-primary);
-            line-height: 1.6;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
         }
-        
         .header {
-            background: white;
-            border-bottom: 1px solid var(--border);
-            padding: 16px 24px;
             display: flex;
             align-items: center;
-            gap: 16px;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3), 0 1px 3px 1px rgba(60,64,67,.15);
+            gap: 20px;
+            margin-bottom: 30px;
         }
-        
-        .back-button {
-            width: 40px;
-            height: 40px;
-            border-radius: 50%;
-            border: none;
-            background: transparent;
+        .back-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 5px;
             cursor: pointer;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: background 0.2s;
+            text-decoration: none;
         }
-        
-        .back-button:hover {
-            background: var(--surface);
-        }
-        
-        .header-title {
-            font-size: 22px;
-            font-weight: 400;
-        }
-        
-        .container {
-            max-width: 800px;
-            margin: 0 auto;
-            padding: 24px;
-        }
-        
+        h1 { color: #00ff88; }
         .settings-section {
-            background: white;
-            border-radius: 8px;
-            margin-bottom: 16px;
-            overflow: hidden;
-            border: 1px solid var(--border);
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
         }
-        
-        .section-header {
-            padding: 20px 24px;
-            border-bottom: 1px solid var(--border);
-            background: var(--surface);
+        .settings-section h2 {
+            color: #00ff88;
+            margin-bottom: 20px;
         }
-        
-        .section-title {
-            font-size: 16px;
-            font-weight: 500;
-            color: var(--text-primary);
-            margin-bottom: 4px;
+        .form-group {
+            margin-bottom: 20px;
         }
-        
-        .section-subtitle {
-            font-size: 14px;
-            color: var(--text-secondary);
+        .form-group label {
+            display: block;
+            margin-bottom: 8px;
+            color: #aaa;
         }
-        
-        .setting-item {
-            padding: 16px 24px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
+        .form-group input, .form-group select {
+            width: 100%;
+            padding: 10px;
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 5px;
+            color: #fff;
+        }
+        .btn {
+            background: #00ff88;
+            color: #000;
+            border: none;
+            padding: 12px 30px;
+            border-radius: 5px;
             cursor: pointer;
-            transition: background 0.2s;
+            font-weight: bold;
+            margin-right: 10px;
         }
-        
-        .setting-item:hover {
-            background: var(--surface);
+        .btn:hover { background: #00cc66; }
+        .btn-secondary {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
         }
-        
-        .setting-item:last-child {
-            border-bottom: none;
-        }
-        
-        .setting-info {
-            flex: 1;
-        }
-        
-        .setting-label {
-            font-size: 16px;
-            color: var(--text-primary);
-            margin-bottom: 2px;
-        }
-        
-        .setting-description {
-            font-size: 14px;
-            color: var(--text-secondary);
-        }
-        
-        .setting-control {
+        .quick-links {
             display: flex;
-            align-items: center;
-            gap: 12px;
+            gap: 10px;
+            flex-wrap: wrap;
         }
-        
+        .link-btn {
+            background: rgba(255,255,255,0.1);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+            border: 1px solid rgba(255,255,255,0.2);
+        }
+        .link-btn:hover {
+            background: rgba(255,255,255,0.2);
+        }
+        .api-status {
+            font-size: 12px;
+            color: #00ff88;
+            margin-left: 10px;
+        }
+        .status-message {
+            padding: 10px;
+            margin: 20px 0;
+            border-radius: 5px;
+            display: none;
+        }
+        .status-message.show {
+            display: block;
+        }
+        .status-message.success {
+            background: rgba(0,255,136,0.2);
+            border: 1px solid #00ff88;
+        }
+        .status-message.error {
+            background: rgba(255,68,68,0.2);
+            border: 1px solid #ff4444;
+        }
+        .weather-preview {
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 15px;
+            margin-top: 10px;
+        }
+        .weather-source-info {
+            font-size: 12px;
+            color: #888;
+            margin-top: 5px;
+        }
         .toggle-switch {
             position: relative;
-            width: 48px;
+            width: 50px;
             height: 24px;
+            margin: 10px 0;
         }
-        
         .toggle-switch input {
             display: none;
         }
-        
         .toggle-slider {
             position: absolute;
             cursor: pointer;
@@ -158,7 +140,6 @@
             transition: 0.3s;
             border-radius: 24px;
         }
-        
         .toggle-slider:before {
             position: absolute;
             content: "";
@@ -170,527 +151,516 @@
             transition: 0.3s;
             border-radius: 50%;
         }
-        
         input:checked + .toggle-slider {
-            background: var(--primary);
+            background: #00ff88;
         }
-        
         input:checked + .toggle-slider:before {
-            transform: translateX(24px);
+            transform: translateX(26px);
         }
-        
-        .input-field {
-            padding: 12px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 16px;
-            width: 250px;
-            transition: border 0.2s;
-        }
-        
-        .input-field:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-        
-        .button {
-            padding: 8px 24px;
-            border-radius: 4px;
-            border: none;
-            font-size: 14px;
-            font-weight: 500;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .button-primary {
-            background: var(--primary);
-            color: white;
-        }
-        
-        .button-primary:hover {
-            background: #1557b0;
-            box-shadow: 0 1px 2px 0 rgba(60,64,67,.3);
-        }
-        
-        .button-secondary {
-            background: white;
-            color: var(--primary);
-            border: 1px solid var(--border);
-        }
-        
-        .button-secondary:hover {
-            background: var(--surface);
-        }
-        
-        .status-badge {
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            font-weight: 500;
-        }
-        
-        .status-connected {
-            background: #e6f4ea;
-            color: #1e8e3e;
-        }
-        
-        .status-disconnected {
-            background: #fce8e6;
-            color: #d33b27;
-        }
-        
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            z-index: 1000;
-        }
-        
-        .modal.active {
+        .form-row {
             display: flex;
-            align-items: center;
-            justify-content: center;
+            gap: 15px;
         }
-        
-        .modal-content {
-            background: white;
-            border-radius: 8px;
-            padding: 24px;
-            max-width: 500px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-        
-        .modal-header {
-            font-size: 20px;
-            margin-bottom: 20px;
-        }
-        
-        .form-group {
-            margin-bottom: 20px;
-        }
-        
-        .form-label {
-            display: block;
-            margin-bottom: 8px;
-            font-size: 14px;
-            font-weight: 500;
-            color: var(--text-primary);
-        }
-        
-        .form-input {
-            width: 100%;
-            padding: 12px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 16px;
-        }
-        
-        .form-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-        
-        .modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
-            margin-top: 24px;
+        .form-row .form-group {
+            flex: 1;
         }
     </style>
 </head>
 <body>
-    <header class="header">
-        <button class="back-button" onclick="window.location.href='/'">
-            <svg width="24" height="24" viewBox="0 0 24 24">
-                <path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
-            </svg>
-        </button>
-        <h1 class="header-title">Settings</h1>
-    </header>
-    
-    <div class="container">
-        <!-- Account & Assistant Section -->
-        <div class="settings-section">
-            <div class="section-header">
-                <div class="section-title">Account & Assistant</div>
-                <div class="section-subtitle">Manage your account and assistant settings</div>
-            </div>
-            
-            <div class="setting-item" onclick="openAccountModal()">
-                <div class="setting-info">
-                    <div class="setting-label">Google Account</div>
-                    <div class="setting-description">Not signed in</div>
-                </div>
-                <div class="setting-control">
-                    <span class="status-badge status-disconnected">Sign In</span>
-                </div>
-            </div>
-            
-            <div class="setting-item" onclick="openAssistantSettings()">
-                <div class="setting-info">
-                    <div class="setting-label">Assistant Voice</div>
-                    <div class="setting-description">Default voice</div>
-                </div>
-                <div class="setting-control">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="#5f6368">
-                        <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-                    </svg>
-                </div>
-            </div>
-            
-            <div class="setting-item">
-                <div class="setting-info">
-                    <div class="setting-label">Hey Bing Detection</div>
-                    <div class="setting-description">Respond to wake word</div>
-                </div>
-                <div class="setting-control">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="wakeWordToggle" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Devices & Services Section -->
-        <div class="settings-section">
-            <div class="section-header">
-                <div class="section-title">Devices & Services</div>
-                <div class="section-subtitle">Connect and manage your smart devices</div>
-            </div>
-            
-            <div class="setting-item" onclick="window.location.href='/devices'">
-                <div class="setting-info">
-                    <div class="setting-label">Devices</div>
-                    <div class="setting-description">12 devices connected</div>
-                </div>
-                <div class="setting-control">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="#5f6368">
-                        <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-                    </svg>
-                </div>
-            </div>
-            
-            <div class="setting-item" onclick="window.location.href='/routines'">
-                <div class="setting-info">
-                    <div class="setting-label">Routines</div>
-                    <div class="setting-description">2 active routines</div>
-                </div>
-                <div class="setting-control">
-                    <svg width="24" height="24" viewBox="0 0 24 24" fill="#5f6368">
-                        <path d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
-                    </svg>
-                </div>
-            </div>
-            
-            <div class="setting-item" onclick="openHomeAssistant()">
-                <div class="setting-info">
-                    <div class="setting-label">Home Assistant</div>
-                    <div class="setting-description" id="haStatus">Not configured</div>
-                </div>
-                <div class="setting-control">
-                    <span class="status-badge" id="haStatusBadge">Configure</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- API Keys Section -->
-        <div class="settings-section">
-            <div class="section-header">
-                <div class="section-title">API Configuration</div>
-                <div class="section-subtitle">Configure external services</div>
-            </div>
-            
-            <div class="setting-item" onclick="openApiModal('openai')">
-                <div class="setting-info">
-                    <div class="setting-label">OpenAI API</div>
-                    <div class="setting-description" id="openaiStatus">Not configured</div>
-                </div>
-                <div class="setting-control">
-                    <span class="status-badge" id="openaiStatusBadge">Configure</span>
-                </div>
-            </div>
-            
-            <div class="setting-item" onclick="openApiModal('bing')">
-                <div class="setting-info">
-                    <div class="setting-label">Bing News API</div>
-                    <div class="setting-description" id="bingStatus">Not configured</div>
-                </div>
-                <div class="setting-control">
-                    <span class="status-badge" id="bingStatusBadge">Configure</span>
-                </div>
-            </div>
-        </div>
-        
-        <!-- Privacy & Security Section -->
-        <div class="settings-section">
-            <div class="section-header">
-                <div class="section-title">Privacy & Security</div>
-                <div class="section-subtitle">Control your privacy settings</div>
-            </div>
-            
-            <div class="setting-item">
-                <div class="setting-info">
-                    <div class="setting-label">Activity History</div>
-                    <div class="setting-description">Save device activity</div>
-                </div>
-                <div class="setting-control">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="activityToggle" checked>
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-            
-            <div class="setting-item">
-                <div class="setting-info">
-                    <div class="setting-label">Guest Mode</div>
-                    <div class="setting-description">Allow guest access</div>
-                </div>
-                <div class="setting-control">
-                    <label class="toggle-switch">
-                        <input type="checkbox" id="guestToggle">
-                        <span class="toggle-slider"></span>
-                    </label>
-                </div>
-            </div>
-        </div>
-        
-        <!-- System Section -->
-        <div class="settings-section">
-            <div class="section-header">
-                <div class="section-title">System</div>
-                <div class="section-subtitle">System settings and information</div>
-            </div>
-            
-            <div class="setting-item" onclick="checkForUpdates()">
-                <div class="setting-info">
-                    <div class="setting-label">Software Update</div>
-                    <div class="setting-description">Version 2.1.0</div>
-                </div>
-                <div class="setting-control">
-                    <button class="button button-secondary">Check</button>
-                </div>
-            </div>
-            
-            <div class="setting-item" onclick="restartSystem()">
-                <div class="setting-info">
-                    <div class="setting-label">Restart</div>
-                    <div class="setting-description">Restart BingHome system</div>
-                </div>
-                <div class="setting-control">
-                    <button class="button button-secondary">Restart</button>
-                </div>
-            </div>
+    <div class="header">
+        <a href="/" class="back-btn">← Back</a>
+        <h1>Settings</h1>
+    </div>
+
+    <div id="statusMessage" class="status-message"></div>
+
+    <div class="settings-section">
+        <h2>🔗 Quick Access</h2>
+        <div class="quick-links">
+            <a href="/wifi" class="link-btn">📶 WiFi Settings</a>
+            <a href="/system" class="link-btn">📊 System Status</a>
+            <a href="#" onclick="checkHealth()" class="link-btn">❤️ Health Check</a>
+            <a href="#" onclick="restartSystem()" class="link-btn">🔄 Restart</a>
         </div>
     </div>
-    
-    <!-- API Configuration Modal -->
-    <div class="modal" id="apiModal">
-        <div class="modal-content">
-            <div class="modal-header" id="modalTitle">Configure API</div>
-            
+
+    <div class="settings-section">
+        <h2>🌤️ Weather Configuration</h2>
+        <div class="form-group">
+            <label>Weather Data Source</label>
+            <select id="weatherSource" onchange="updateWeatherSourceInfo()">
+                <option value="openweather">OpenWeatherMap (Global)</option>
+                <option value="qld_radar">Queensland Radar (Australia)</option>
+                <option value="bom_australia">Bureau of Meteorology (Australia)</option>
+            </select>
+            <div class="weather-source-info" id="weatherSourceInfo">
+                Select a weather source to see configuration options
+            </div>
+        </div>
+        
+        <div class="form-group" id="weatherLocationGroup">
+            <label>Location</label>
+            <input type="text" id="weatherLocation" placeholder="e.g., Gold Coast, QLD or Sydney, NSW">
+            <div style="font-size: 12px; color: #888; margin-top: 5px;">
+                Enter city name, or "City, State" or "City, Country" for better results
+            </div>
+        </div>
+        
+        <div class="form-group" id="weatherApiGroup">
+            <label>
+                OpenWeatherMap API Key
+                <span class="api-status" id="weatherApiStatus"></span>
+            </label>
+            <input type="password" id="weatherApiKey" placeholder="Your OpenWeatherMap API key">
+            <div style="font-size: 12px; color: #888; margin-top: 5px;">
+                Get free API key at <a href="https://openweathermap.org/api" target="_blank" style="color: #00ff88;">openweathermap.org/api</a>
+            </div>
+        </div>
+        
+        <div class="weather-preview" id="weatherPreview" style="display: none;">
+            <h4>Weather Preview</h4>
+            <div id="weatherPreviewContent">Loading...</div>
+        </div>
+        
+        <div class="form-group">
+            <button class="btn btn-secondary" onclick="testWeatherConfig()">Test Weather</button>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h2>🎤 Voice Control</h2>
+        <div class="form-group">
+            <label>Voice Provider</label>
+            <select id="voiceProvider">
+                <option value="local">Local (Offline)</option>
+                <option value="openai">OpenAI Whisper</option>
+                <option value="google">Google Cloud</option>
+                <option value="azure">Azure Speech</option>
+            </select>
+        </div>
+        <div class="form-group">
+            <label>Wake Words (comma separated)</label>
+            <input type="text" id="wakeWords" value="hey bing, okay bing">
+        </div>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="voiceEnabled"> Enable Voice Control
+            </label>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h2>🔑 API Keys</h2>
+        <div class="form-group">
+            <label>
+                OpenAI API Key
+                <span class="api-status" id="openaiStatus"></span>
+            </label>
+            <input type="password" id="openaiKey" placeholder="sk-...">
+        </div>
+        <div class="form-group">
+            <label>
+                Bing News API Key
+                <span class="api-status" id="bingStatus"></span>
+            </label>
+            <input type="password" id="bingKey" placeholder="Your Bing API key">
+        </div>
+        <div class="form-group">
+            <label>Home Assistant URL</label>
+            <input type="text" id="haUrl" value="http://localhost:8123">
+        </div>
+        <div class="form-group">
+            <label>
+                Home Assistant Token
+                <span class="api-status" id="haStatus"></span>
+            </label>
+            <input type="password" id="haToken" placeholder="Long-lived access token">
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h2>📱 Applications</h2>
+        <div class="form-row">
             <div class="form-group">
-                <label class="form-label" id="apiKeyLabel">API Key</label>
-                <input type="password" class="form-input" id="apiKeyInput" placeholder="Enter your API key">
+                <label>Netflix URL</label>
+                <input type="text" id="netflixUrl" value="https://www.netflix.com">
             </div>
-            
-            <div class="form-group" id="additionalFields"></div>
-            
-            <div class="modal-footer">
-                <button class="button button-secondary" onclick="closeModal()">Cancel</button>
-                <button class="button button-primary" onclick="saveApiKey()">Save</button>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="netflixEnabled" checked> Enable Netflix
+                </label>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>YouTube URL</label>
+                <input type="text" id="youtubeUrl" value="https://www.youtube.com/tv">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="youtubeEnabled" checked> Enable YouTube
+                </label>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Spotify URL</label>
+                <input type="text" id="spotifyUrl" value="https://open.spotify.com">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="spotifyEnabled" checked> Enable Spotify
+                </label>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Xbox Cloud Gaming URL</label>
+                <input type="text" id="xboxUrl" value="https://www.xbox.com/play">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="xboxEnabled" checked> Enable Xbox
+                </label>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Prime Video URL</label>
+                <input type="text" id="primeUrl" value="https://www.primevideo.com">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="primeEnabled" checked> Enable Prime Video
+                </label>
+            </div>
+        </div>
+        
+        <div class="form-row">
+            <div class="form-group">
+                <label>Google Photos URL</label>
+                <input type="text" id="photosUrl" value="https://photos.google.com">
+            </div>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="photosEnabled" checked> Enable Google Photos
+                </label>
             </div>
         </div>
     </div>
-    
+
+    <div class="settings-section">
+        <h2>🏠 System</h2>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="kioskMode"> Enable Kiosk Mode
+            </label>
+        </div>
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="autoStart"> Auto-start Browser
+            </label>
+        </div>
+        <div class="form-group">
+            <label>Display Timeout (minutes)</label>
+            <select id="displayTimeout">
+                <option value="0">Never</option>
+                <option value="5">5 minutes</option>
+                <option value="10">10 minutes</option>
+                <option value="30">30 minutes</option>
+                <option value="60">1 hour</option>
+            </select>
+        </div>
+    </div>
+
+    <div style="margin-top: 30px;">
+        <button class="btn" onclick="saveSettings()">Save Settings</button>
+        <button class="btn btn-secondary" onclick="testSettings()">Test Connection</button>
+    </div>
+
     <script>
-        let currentApi = '';
-        let settings = {};
-        
-        // Load settings on page load
+        let currentSettings = {};
+
         window.onload = function() {
             loadSettings();
         };
-        
+
         function loadSettings() {
             fetch('/api/settings')
-                .then(response => response.json())
-                .then(data => {
-                    settings = data;
-                    updateSettingsDisplay();
+                .then(r => r.json())
+                .then(settings => {
+                    currentSettings = settings;
+                    console.log('Loaded settings:', settings);
+                    
+                    // Voice settings
+                    document.getElementById('voiceProvider').value = settings.voice_provider || 'local';
+                    document.getElementById('wakeWords').value = (settings.wake_words || ['hey bing', 'okay bing']).join(', ');
+                    document.getElementById('voiceEnabled').checked = settings.voice_enabled !== false;
+                    
+                    // Weather settings
+                    document.getElementById('weatherSource').value = settings.weather_source || 'openweather';
+                    document.getElementById('weatherLocation').value = settings.weather_location || 'Gold Coast, QLD';
+                    updateWeatherSourceInfo();
+                    
+                    // API Keys - Show status if configured
+                    if (settings.openai_api_key_configured || settings.openai_api_key) {
+                        document.getElementById('openaiStatus').textContent = '(configured)';
+                    }
+                    
+                    if (settings.weather_api_key_configured || settings.weather_api_key) {
+                        document.getElementById('weatherApiStatus').textContent = '(configured)';
+                    }
+                    
+                    if (settings.bing_api_key_configured || settings.bing_api_key) {
+                        document.getElementById('bingStatus').textContent = '(configured)';
+                    }
+                    
+                    if (settings.home_assistant_token_configured || settings.home_assistant_token) {
+                        document.getElementById('haStatus').textContent = '(configured)';
+                    }
+                    
+                    // Home Assistant URL
+                    document.getElementById('haUrl').value = settings.home_assistant_url || 'http://localhost:8123';
+                    
+                    // Apps settings
+                    if (settings.apps) {
+                        document.getElementById('netflixUrl').value = settings.apps.netflix?.url || 'https://www.netflix.com';
+                        document.getElementById('netflixEnabled').checked = settings.apps.netflix?.enabled !== false;
+                        
+                        document.getElementById('youtubeUrl').value = settings.apps.youtube?.url || 'https://www.youtube.com/tv';
+                        document.getElementById('youtubeEnabled').checked = settings.apps.youtube?.enabled !== false;
+                        
+                        document.getElementById('spotifyUrl').value = settings.apps.spotify?.url || 'https://open.spotify.com';
+                        document.getElementById('spotifyEnabled').checked = settings.apps.spotify?.enabled !== false;
+                        
+                        document.getElementById('xboxUrl').value = settings.apps.xbox_cloud?.url || 'https://www.xbox.com/play';
+                        document.getElementById('xboxEnabled').checked = settings.apps.xbox_cloud?.enabled !== false;
+                        
+                        document.getElementById('primeUrl').value = settings.apps.prime_video?.url || 'https://www.primevideo.com';
+                        document.getElementById('primeEnabled').checked = settings.apps.prime_video?.enabled !== false;
+                        
+                        document.getElementById('photosUrl').value = settings.apps.google_photos?.url || 'https://photos.google.com';
+                        document.getElementById('photosEnabled').checked = settings.apps.google_photos?.enabled !== false;
+                    }
+                    
+                    // System settings
+                    document.getElementById('kioskMode').checked = settings.kiosk_mode || false;
+                    document.getElementById('autoStart').checked = settings.auto_start_browser || false;
+                    document.getElementById('displayTimeout').value = settings.display_timeout || '0';
                 })
-                .catch(error => console.error('Error loading settings:', error));
+                .catch(err => {
+                    console.error('Error loading settings:', err);
+                    showMessage('Error loading settings', 'error');
+                });
         }
-        
-        function updateSettingsDisplay() {
-            // Update OpenAI status
-            if (settings.openai_api_key) {
-                document.getElementById('openaiStatus').textContent = 'Configured';
-                document.getElementById('openaiStatusBadge').textContent = 'Connected';
-                document.getElementById('openaiStatusBadge').className = 'status-badge status-connected';
-            }
+
+        function updateWeatherSourceInfo() {
+            const source = document.getElementById('weatherSource').value;
+            const infoEl = document.getElementById('weatherSourceInfo');
+            const locationGroup = document.getElementById('weatherLocationGroup');
+            const apiGroup = document.getElementById('weatherApiGroup');
             
-            // Update Bing status
-            if (settings.bing_api_key) {
-                document.getElementById('bingStatus').textContent = 'Configured';
-                document.getElementById('bingStatusBadge').textContent = 'Connected';
-                document.getElementById('bingStatusBadge').className = 'status-badge status-connected';
-            }
-            
-            // Update Home Assistant status
-            if (settings.home_assistant_token) {
-                document.getElementById('haStatus').textContent = 'Connected';
-                document.getElementById('haStatusBadge').textContent = 'Connected';
-                document.getElementById('haStatusBadge').className = 'status-badge status-connected';
-            }
-        }
-        
-        function openApiModal(api) {
-            currentApi = api;
-            document.getElementById('apiModal').classList.add('active');
-            
-            if (api === 'openai') {
-                document.getElementById('modalTitle').textContent = 'Configure OpenAI API';
-                document.getElementById('apiKeyLabel').textContent = 'OpenAI API Key';
-                document.getElementById('apiKeyInput').placeholder = 'sk-...';
-                document.getElementById('apiKeyInput').value = settings.openai_api_key || '';
-            } else if (api === 'bing') {
-                document.getElementById('modalTitle').textContent = 'Configure Bing News API';
-                document.getElementById('apiKeyLabel').textContent = 'Bing API Key';
-                document.getElementById('apiKeyInput').placeholder = 'Enter your Bing API key';
-                document.getElementById('apiKeyInput').value = settings.bing_api_key || '';
+            switch(source) {
+                case 'openweather':
+                    infoEl.innerHTML = '🌍 Global weather data with detailed forecasts. Requires free API key.';
+                    locationGroup.style.display = 'block';
+                    apiGroup.style.display = 'block';
+                    break;
+                case 'qld_radar':
+                    infoEl.innerHTML = '🇦🇺 Queensland-specific radar with live precipitation data. No API key required.';
+                    locationGroup.style.display = 'none';
+                    apiGroup.style.display = 'none';
+                    break;
+                case 'bom_australia':
+                    infoEl.innerHTML = '🇦🇺 Australian Bureau of Meteorology data. No API key required.';
+                    locationGroup.style.display = 'block';
+                    apiGroup.style.display = 'none';
+                    break;
             }
         }
-        
-        function openHomeAssistant() {
-            currentApi = 'home_assistant';
-            document.getElementById('apiModal').classList.add('active');
-            document.getElementById('modalTitle').textContent = 'Configure Home Assistant';
-            document.getElementById('apiKeyLabel').textContent = 'Home Assistant URL';
-            document.getElementById('apiKeyInput').placeholder = 'http://localhost:8123';
-            document.getElementById('apiKeyInput').type = 'text';
-            document.getElementById('apiKeyInput').value = settings.home_assistant_url || '';
+
+        function testWeatherConfig() {
+            const source = document.getElementById('weatherSource').value;
+            const location = document.getElementById('weatherLocation').value;
+            const apiKey = document.getElementById('weatherApiKey').value;
             
-            // Add token field
-            document.getElementById('additionalFields').innerHTML = `
-                <div class="form-group">
-                    <label class="form-label">Access Token</label>
-                    <input type="password" class="form-input" id="haTokenInput" 
-                           placeholder="Long-lived access token" 
-                           value="${settings.home_assistant_token || ''}">
-                </div>
-            `;
-        }
-        
-        function closeModal() {
-            document.getElementById('apiModal').classList.remove('active');
-            document.getElementById('additionalFields').innerHTML = '';
-            document.getElementById('apiKeyInput').type = 'password';
-        }
-        
-        function saveApiKey() {
-            const apiKey = document.getElementById('apiKeyInput').value;
+            showMessage('Testing weather configuration...', 'success');
             
-            let updateData = {};
+            // Create test settings
+            const testSettings = {
+                weather_source: source,
+                weather_location: location
+            };
             
-            if (currentApi === 'openai') {
-                updateData.openai_api_key = apiKey;
-            } else if (currentApi === 'bing') {
-                updateData.bing_api_key = apiKey;
-            } else if (currentApi === 'home_assistant') {
-                updateData.home_assistant_url = apiKey;
-                updateData.home_assistant_token = document.getElementById('haTokenInput').value;
+            if (apiKey) {
+                testSettings.weather_api_key = apiKey;
             }
             
-            fetch('/api/settings', {
+            fetch('/api/weather/test', {
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(updateData)
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(testSettings)
             })
-            .then(response => response.json())
+            .then(r => r.json())
             .then(data => {
                 if (data.success) {
-                    closeModal();
-                    loadSettings();
-                    showNotification('Settings saved successfully!');
+                    document.getElementById('weatherPreview').style.display = 'block';
+                    document.getElementById('weatherPreviewContent').innerHTML = `
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <div>
+                                <div style="font-size: 24px; font-weight: bold;">${data.current.temp}°C</div>
+                                <div>${data.current.description}</div>
+                                <div style="font-size: 12px; opacity: 0.7;">${data.current.location}</div>
+                            </div>
+                            <div style="text-align: right;">
+                                <div>💧 ${data.current.humidity}%</div>
+                                <div>🌪️ ${data.current.wind_speed} km/h</div>
+                                ${data.current.radar_available ? '<div>📡 Radar Available</div>' : ''}
+                            </div>
+                        </div>
+                    `;
+                    showMessage('Weather test successful!', 'success');
+                } else {
+                    showMessage('Weather test failed: ' + (data.error || 'Unknown error'), 'error');
+                    document.getElementById('weatherPreview').style.display = 'none';
                 }
             })
-            .catch(error => {
-                console.error('Error:', error);
-                showNotification('Error saving settings', 'error');
+            .catch(err => {
+                showMessage('Weather test failed', 'error');
+                document.getElementById('weatherPreview').style.display = 'none';
             });
         }
-        
-        function showNotification(message, type = 'success') {
-            const notification = document.createElement('div');
-            notification.style.cssText = `
-                position: fixed;
-                bottom: 20px;
-                left: 50%;
-                transform: translateX(-50%);
-                padding: 16px 24px;
-                background: ${type === 'success' ? '#34a853' : '#ea4335'};
-                color: white;
-                border-radius: 4px;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.2);
-                z-index: 2000;
-            `;
-            notification.textContent = message;
-            document.body.appendChild(notification);
+
+        function saveSettings() {
+            const settings = {
+                // Voice settings
+                voice_provider: document.getElementById('voiceProvider').value,
+                wake_words: document.getElementById('wakeWords').value.split(',').map(w => w.trim()),
+                voice_enabled: document.getElementById('voiceEnabled').checked,
+                
+                // Weather settings
+                weather_source: document.getElementById('weatherSource').value,
+                weather_location: document.getElementById('weatherLocation').value,
+                
+                // Home Assistant
+                home_assistant_url: document.getElementById('haUrl').value,
+                
+                // System settings
+                kiosk_mode: document.getElementById('kioskMode').checked,
+                auto_start_browser: document.getElementById('autoStart').checked,
+                display_timeout: parseInt(document.getElementById('displayTimeout').value),
+                
+                // Apps
+                apps: {
+                    netflix: {
+                        url: document.getElementById('netflixUrl').value,
+                        enabled: document.getElementById('netflixEnabled').checked
+                    },
+                    youtube: {
+                        url: document.getElementById('youtubeUrl').value,
+                        enabled: document.getElementById('youtubeEnabled').checked
+                    },
+                    spotify: {
+                        url: document.getElementById('spotifyUrl').value,
+                        enabled: document.getElementById('spotifyEnabled').checked
+                    },
+                    xbox_cloud: {
+                        url: document.getElementById('xboxUrl').value,
+                        enabled: document.getElementById('xboxEnabled').checked
+                    },
+                    prime_video: {
+                        url: document.getElementById('primeUrl').value,
+                        enabled: document.getElementById('primeEnabled').checked
+                    },
+                    google_photos: {
+                        url: document.getElementById('photosUrl').value,
+                        enabled: document.getElementById('photosEnabled').checked
+                    }
+                }
+            };
+            
+            // Only update API keys if new values are entered
+            const openaiKey = document.getElementById('openaiKey').value;
+            if (openaiKey && openaiKey !== '') {
+                settings.openai_api_key = openaiKey;
+            }
+            
+            const weatherKey = document.getElementById('weatherApiKey').value;
+            if (weatherKey && weatherKey !== '') {
+                settings.weather_api_key = weatherKey;
+            }
+            
+            const bingKey = document.getElementById('bingKey').value;
+            if (bingKey && bingKey !== '') {
+                settings.bing_api_key = bingKey;
+            }
+            
+            const haToken = document.getElementById('haToken').value;
+            if (haToken && haToken !== '') {
+                settings.home_assistant_token = haToken;
+            }
+
+            console.log('Saving settings:', settings);
+
+            fetch('/api/settings', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(settings)
+            })
+            .then(r => r.json())
+            .then(data => {
+                console.log('Save response:', data);
+                if (data.success) {
+                    showMessage('Settings saved successfully!', 'success');
+                    setTimeout(() => {
+                        location.reload();
+                    }, 2000);
+                } else {
+                    showMessage('Error: ' + (data.error || 'Failed to save'), 'error');
+                }
+            })
+            .catch(err => {
+                console.error('Save error:', err);
+                showMessage('Error saving settings', 'error');
+            });
+        }
+
+        function showMessage(message, type) {
+            const messageDiv = document.getElementById('statusMessage');
+            messageDiv.textContent = message;
+            messageDiv.className = 'status-message show ' + type;
             
             setTimeout(() => {
-                notification.remove();
-            }, 3000);
+                messageDiv.className = 'status-message';
+            }, 5000);
         }
-        
-        function checkForUpdates() {
-            showNotification('Checking for updates...');
-            setTimeout(() => {
-                showNotification('System is up to date');
-            }, 2000);
+
+        function checkHealth() {
+            fetch('/api/health')
+                .then(r => r.json())
+                .then(data => {
+                    showMessage('System Status: ' + data.status + ' | Version: ' + (data.version || '2.1.0'), 'success');
+                })
+                .catch(err => showMessage('Health check failed', 'error'));
         }
-        
+
         function restartSystem() {
-            if (confirm('Are you sure you want to restart BingHome?')) {
-                showNotification('Restarting system...');
-                // Call restart API endpoint
+            if (confirm('Restart BingHome system?')) {
+                fetch('/api/restart', {method: 'POST'})
+                    .then(r => r.json())
+                    .then(data => showMessage(data.message || 'Restarting...', 'success'))
+                    .catch(err => showMessage('Restart failed', 'error'));
             }
         }
-        
-        function openAccountModal() {
-            showNotification('Google account integration coming soon!');
+
+        function testSettings() {
+            checkHealth();
+            testWeatherConfig();
         }
-        
-        function openAssistantSettings() {
-            showNotification('Voice settings coming soon!');
-        }
-        
-        // Handle toggle switches
-        document.getElementById('wakeWordToggle').addEventListener('change', function(e) {
-            const enabled = e.target.checked;
-            // Save wake word setting
-            showNotification(enabled ? 'Wake word enabled' : 'Wake word disabled');
-        });
-        
-        document.getElementById('activityToggle').addEventListener('change', function(e) {
-            const enabled = e.target.checked;
-            showNotification(enabled ? 'Activity history enabled' : 'Activity history disabled');
-        });
-        
-        document.getElementById('guestToggle').addEventListener('change', function(e) {
-            const enabled = e.target.checked;
-            showNotification(enabled ? 'Guest mode enabled' : 'Guest mode disabled');
-        });
     </script>
 </body>
 </html>

@@ -1,0 +1,58 @@
+{
+  "voice_provider": "local",
+  "voice_model": "vosk",
+  "openai_api_key": "",
+  "wake_words": [
+    "hey bing",
+    "okay bing"
+  ],
+  "tts_engine": "pyttsx3",
+  "tts_rate": 150,
+  "tts_volume": 0.9,
+  "language": "en-US",
+  "apps": {
+    "netflix": {
+      "url": "https://www.netflix.com",
+      "enabled": true
+    },
+    "youtube": {
+      "url": "https://www.youtube.com",
+      "enabled": true
+    },
+    "spotify": {
+      "url": "https://open.spotify.com",
+      "enabled": true
+    },
+    "xbox_cloud": {
+      "url": "https://www.xbox.com/play",
+      "enabled": true
+    },
+    "prime_video": {
+      "url": "https://www.primevideo.com",
+      "enabled": true
+    },
+    "google_photos": {
+      "url": "https://photos.google.com",
+      "enabled": true
+    }
+  },
+  "azure_speech_key": "",
+  "google_cloud_key": "",
+  "amazon_polly_key": "",
+  "bing_api_key": "",
+  "weather_api_key": "926956abba1df5e4d3e5d7a08dbf2468",
+  "home_assistant_url": "http://localhost:8123",
+  "home_assistant_token": "",
+  "kiosk_mode": false,
+  "auto_start_browser": false,
+  "network_interface": "auto",
+  "gpio_pins": {
+    "dht22": 4,
+    "gas_sensor": 17,
+    "light_sensor": 27
+  },
+  "voice_enabled": true,
+  "weather_source": "openweather",
+  "weather_location": "Gold Coast, QLD",
+  "display_timeout": 0
+}

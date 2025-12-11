@@ -1,0 +1,984 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BingHome Hub</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #000000;
+            --bg-secondary: #0a0a0a;
+            --bg-tile: #141414;
+            --accent: #00ff88;
+            --accent-dim: #00cc66;
+            --text-primary: #ffffff;
+            --text-secondary: #999999;
+            --border: rgba(255, 255, 255, 0.08);
+            --glass: rgba(255, 255, 255, 0.03);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Top Bar */
+        .top-bar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 8px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 50px;
+            flex-shrink: 0;
+        }
+
+        .network-status {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .network-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: var(--glass);
+            border-radius: 15px;
+            font-size: 13px;
+        }
+
+        .sensor-status {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .sensor-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 13px;
+        }
+
+        .sensor-value {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Main Layout */
+        .main-container {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 2px;
+            background: var(--bg-secondary);
+            overflow: hidden;
+        }
+
+        /* Widget Tiles */
+        .widget-tile {
+            background: var(--bg-primary);
+            position: relative;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .widget-tile:hover {
+            transform: scale(1.02);
+            z-index: 10;
+        }
+
+        /* Google Photos Widget */
+        .photos-widget {
+            grid-row: 1;
+            grid-column: 1;
+            padding: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+        }
+
+        .photos-content {
+            text-align: center;
+        }
+
+        .photos-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        /* Weather Widget */
+        .weather-widget {
+            grid-row: 1;
+            grid-column: 2;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+        }
+
+        .weather-toggle {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: var(--glass);
+            border: 1px solid var(--border);
+            border-radius: 15px;
+            padding: 5px 10px;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .weather-toggle:hover {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .weather-current {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .weather-temp {
+            font-size: 48px;
+            font-weight: 300;
+            color: var(--accent);
+        }
+
+        .weather-condition {
+            text-align: right;
+        }
+
+        .weather-icon {
+            font-size: 48px;
+            margin-bottom: 10px;
+        }
+
+        .weather-desc {
+            font-size: 16px;
+            color: var(--text-secondary);
+        }
+
+        .weather-location {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        .weather-forecast {
+            display: flex;
+            gap: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+        }
+
+        .forecast-day {
+            flex: 1;
+            text-align: center;
+        }
+
+        .forecast-day-name {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+        }
+
+        .forecast-temp {
+            font-size: 14px;
+        }
+
+        .weather-radar {
+            width: 100%;
+            height: 100%;
+            border-radius: 10px;
+            overflow: hidden;
+            display: none;
+        }
+
+        .weather-radar.active {
+            display: block;
+        }
+
+        .weather-radar iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        /* Apps Widget */
+        .apps-widget {
+            grid-row: 2;
+            grid-column: span 2;
+            padding: 15px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .apps-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .apps-title {
+            font-size: 18px;
+            font-weight: 500;
+        }
+
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            gap: 15px;
+            flex: 1;
+            align-content: center;
+        }
+
+        .app-tile {
+            aspect-ratio: 1;
+            background: var(--bg-tile);
+            border-radius: 15px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            position: relative;
+        }
+
+        .app-tile:hover {
+            background: var(--glass);
+            border-color: var(--accent);
+            transform: translateY(-3px);
+        }
+
+        .app-tile.disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .app-icon {
+            font-size: 32px;
+            margin-bottom: 8px;
+        }
+
+        .app-name {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        /* Voice Assistant Overlay */
+        .voice-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .voice-overlay.active {
+            display: flex;
+        }
+
+        .voice-container {
+            text-align: center;
+        }
+
+        .voice-animation {
+            width: 150px;
+            height: 150px;
+            margin: 0 auto 30px;
+            background: radial-gradient(circle, var(--accent), transparent);
+            border-radius: 50%;
+            animation: pulse 2s ease-in-out infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 0.8; }
+            50% { transform: scale(1.2); opacity: 1; }
+        }
+
+        .voice-text {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .voice-command {
+            font-size: 18px;
+            color: var(--accent);
+            margin-top: 20px;
+            min-height: 30px;
+        }
+
+        /* Settings Button */
+        .settings-btn {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            background: var(--bg-tile);
+            border: 2px solid var(--border);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            transition: all 0.3s ease;
+            z-index: 100;
+        }
+
+        .settings-btn:hover {
+            background: var(--accent);
+            color: var(--bg-primary);
+            transform: rotate(90deg);
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-container {
+                grid-template-columns: 1fr;
+                grid-template-rows: auto auto 1fr;
+            }
+
+            .apps-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .apps-widget {
+                grid-column: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Top Bar -->
+    <div class="top-bar">
+        <div class="network-status">
+            <div class="network-item" id="ethernetStatus" style="display: none;">
+                <span>🔌</span>
+                <span>Ethernet</span>
+            </div>
+            <div class="network-item" id="wifiStatus" style="display: none;">
+                <span>📶</span>
+                <span id="wifiName">WiFi</span>
+                <span id="wifiSignal"></span>
+            </div>
+        </div>
+        
+        <div class="sensor-status">
+            <div class="sensor-item">
+                <span>🌡️</span>
+                <span class="sensor-value" id="tempValue">--</span>
+                <span>°C</span>
+            </div>
+            <div class="sensor-item">
+                <span>💧</span>
+                <span class="sensor-value" id="humidityValue">--</span>
+                <span>%</span>
+            </div>
+            <div class="sensor-item">
+                <span>🌬️</span>
+                <span class="sensor-value" id="airQuality">Good</span>
+            </div>
+            <div class="sensor-item">
+                <span>💡</span>
+                <span class="sensor-value" id="lightLevel">Bright</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Container -->
+    <div class="main-container">
+        <!-- Google Photos Widget -->
+        <div class="widget-tile photos-widget" onclick="launchApp('google_photos')">
+            <div class="photos-content">
+                <div class="photos-icon">📸</div>
+                <div style="font-size: 18px; margin-bottom: 8px;">Google Photos</div>
+                <div style="font-size: 14px; color: var(--text-secondary);">Your memories</div>
+            </div>
+        </div>
+
+        <!-- Weather Widget -->
+        <div class="widget-tile weather-widget">
+            <div class="weather-toggle" id="weatherToggle" onclick="toggleWeatherView()">
+                <span id="weatherToggleText">Radar</span>
+            </div>
+            
+            <div id="weatherCurrent" class="weather-current">
+                <div>
+                    <div class="weather-temp" id="weatherTemp">--°</div>
+                    <div class="weather-location" id="weatherLocation">Loading...</div>
+                </div>
+                <div class="weather-condition">
+                    <div class="weather-icon" id="weatherIcon">☀️</div>
+                    <div class="weather-desc" id="weatherDesc">--</div>
+                </div>
+            </div>
+            
+            <div id="weatherForecast" class="weather-forecast">
+                <!-- Forecast will be populated by JavaScript -->
+            </div>
+            
+            <div id="weatherRadar" class="weather-radar">
+                <iframe 
+                    id="radarFrame"
+                    src=""
+                    title="Weather Radar"
+                    allowfullscreen>
+                </iframe>
+            </div>
+        </div>
+
+        <!-- Apps Widget -->
+        <div class="widget-tile apps-widget">
+            <div class="apps-header">
+                <div class="apps-title">Applications</div>
+            </div>
+            <div class="apps-grid">
+                <!-- Streaming Apps -->
+                <div class="app-tile" onclick="launchApp('netflix')">
+                    <div class="app-icon">🎬</div>
+                    <div class="app-name">Netflix</div>
+                </div>
+                <div class="app-tile" onclick="launchApp('prime_video')">
+                    <div class="app-icon">📺</div>
+                    <div class="app-name">Prime Video</div>
+                </div>
+                <div class="app-tile" onclick="launchApp('youtube')">
+                    <div class="app-icon">▶️</div>
+                    <div class="app-name">YouTube</div>
+                </div>
+                <div class="app-tile" onclick="launchApp('disney_plus')">
+                    <div class="app-icon">🏰</div>
+                    <div class="app-name">Disney+</div>
+                </div>
+                
+                <!-- Gaming -->
+                <div class="app-tile" onclick="launchApp('xbox_cloud')">
+                    <div class="app-icon">🎮</div>
+                    <div class="app-name">Xbox Cloud</div>
+                </div>
+                <div class="app-tile" onclick="launchApp('steam')">
+                    <div class="app-icon">🎯</div>
+                    <div class="app-name">Steam</div>
+                </div>
+                
+                <!-- Music -->
+                <div class="app-tile" onclick="launchApp('spotify')">
+                    <div class="app-icon">🎵</div>
+                    <div class="app-name">Spotify</div>
+                </div>
+                <div class="app-tile" onclick="launchApp('apple_music')">
+                    <div class="app-icon">🍎</div>
+                    <div class="app-name">Apple Music</div>
+                </div>
+                
+                <!-- Smart Home -->
+                <div class="app-tile" onclick="openDevices()">
+                    <div class="app-icon">🏠</div>
+                    <div class="app-name">Devices</div>
+                </div>
+                <div class="app-tile" onclick="openTimers()">
+                    <div class="app-icon">⏰</div>
+                    <div class="app-name">Timers</div>
+                </div>
+                <div class="app-tile" onclick="openLights()">
+                    <div class="app-icon">💡</div>
+                    <div class="app-name">Lights</div>
+                </div>
+                <div class="app-tile" onclick="openSecurity()">
+                    <div class="app-icon">🔒</div>
+                    <div class="app-name">Security</div>
+                </div>
+                
+                <!-- Productivity -->
+                <div class="app-tile" onclick="openNews()">
+                    <div class="app-icon">📰</div>
+                    <div class="app-name">News</div>
+                </div>
+                <div class="app-tile" onclick="openWeather()">
+                    <div class="app-icon">🌤️</div>
+                    <div class="app-name">Weather</div>
+                </div>
+                <div class="app-tile" onclick="openCalendar()">
+                    <div class="app-icon">📅</div>
+                    <div class="app-name">Calendar</div>
+                </div>
+                <div class="app-tile" onclick="openSettings()">
+                    <div class="app-icon">⚙️</div>
+                    <div class="app-name">Settings</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voice Assistant Overlay -->
+    <div class="voice-overlay" id="voiceOverlay">
+        <div class="voice-container">
+            <div class="voice-animation"></div>
+            <div class="voice-text" id="voiceStatus">Listening...</div>
+            <div class="voice-command" id="voiceCommand"></div>
+        </div>
+    </div>
+
+    <!-- Settings Button -->
+    <button class="settings-btn" onclick="openSettings()">⚙️</button>
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+    
+    <script>
+        // Global variables
+        const socket = io();
+        let settings = {};
+        let recognition = null;
+        let weatherView = 'current';
+        let currentWeatherData = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            initializeHub();
+            setupVoiceRecognition();
+            startDataUpdates();
+        });
+
+        function initializeHub() {
+            // Load settings
+            fetch('/api/settings')
+                .then(response => response.json())
+                .then(data => {
+                    settings = data;
+                    console.log('Settings loaded:', settings);
+                    updateAppStates();
+                })
+                .catch(error => console.error('Settings load error:', error));
+
+            // Update weather
+            updateWeather();
+            
+            // Update network status
+            updateNetworkStatus();
+            
+            // Update sensor data
+            updateSensorData();
+        }
+
+        function updateAppStates() {
+            // Update app tiles based on settings
+            if (settings.apps) {
+                Object.keys(settings.apps).forEach(appKey => {
+                    const app = settings.apps[appKey];
+                    const appTile = document.querySelector(`.app-tile[onclick*="${appKey}"]`);
+                    if (appTile) {
+                        if (!app.enabled) {
+                            appTile.classList.add('disabled');
+                        } else {
+                            appTile.classList.remove('disabled');
+                        }
+                    }
+                });
+            }
+        }
+
+        // Socket handlers
+        socket.on('connect', function() {
+            console.log('Connected to BingHome Hub');
+        });
+
+        socket.on('sensor_update', function(data) {
+            updateSensorDisplay(data);
+        });
+
+        socket.on('network_update', function(data) {
+            updateNetworkDisplay(data);
+        });
+
+        socket.on('wake_word_detected', function() {
+            showVoiceOverlay();
+        });
+
+        socket.on('voice_response', function(data) {
+            if (data.command) {
+                document.getElementById('voiceCommand').textContent = `"${data.command}"`;
+            }
+            if (data.response) {
+                document.getElementById('voiceStatus').textContent = data.response;
+            }
+            setTimeout(hideVoiceOverlay, 3000);
+        });
+
+        // Voice Recognition
+        function setupVoiceRecognition() {
+            if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+                const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+                recognition = new SpeechRecognition();
+                recognition.continuous = true;
+                recognition.interimResults = false;
+                recognition.lang = 'en-US';
+
+                recognition.onresult = function(event) {
+                    const last = event.results.length - 1;
+                    const command = event.results[last][0].transcript.toLowerCase();
+                    
+                    // Check for wake word
+                    const wakeWords = settings.wake_words || ['hey bing', 'okay bing'];
+                    for (let wake of wakeWords) {
+                        if (command.includes(wake)) {
+                            showVoiceOverlay();
+                            const actualCommand = command.replace(wake, '').trim();
+                            if (actualCommand) {
+                                processVoiceCommand(actualCommand);
+                            }
+                            break;
+                        }
+                    }
+                };
+
+                recognition.onerror = function(event) {
+                    console.error('Voice recognition error:', event.error);
+                };
+
+                // Start recognition if enabled
+                if (settings.voice_enabled !== false) {
+                    try {
+                        recognition.start();
+                    } catch (e) {
+                        console.log('Voice recognition already started or not available');
+                    }
+                }
+            }
+        }
+
+        function showVoiceOverlay() {
+            document.getElementById('voiceOverlay').classList.add('active');
+            document.getElementById('voiceStatus').textContent = 'Listening...';
+            document.getElementById('voiceCommand').textContent = '';
+        }
+
+        function hideVoiceOverlay() {
+            document.getElementById('voiceOverlay').classList.remove('active');
+        }
+
+        function processVoiceCommand(command) {
+            document.getElementById('voiceCommand').textContent = `"${command}"`;
+            
+            socket.emit('voice_command', {
+                command: command
+            });
+        }
+
+        // Network Status
+        function updateNetworkStatus() {
+            fetch('/api/network_status')
+                .then(response => response.json())
+                .then(data => updateNetworkDisplay(data))
+                .catch(error => console.error('Network status error:', error));
+        }
+
+        function updateNetworkDisplay(data) {
+            const ethernetEl = document.getElementById('ethernetStatus');
+            const wifiEl = document.getElementById('wifiStatus');
+            
+            if (data.ethernet && data.ethernet.connected) {
+                ethernetEl.style.display = 'flex';
+                wifiEl.style.display = 'none';
+            } else if (data.wifi && data.wifi.connected) {
+                wifiEl.style.display = 'flex';
+                ethernetEl.style.display = 'none';
+                document.getElementById('wifiName').textContent = data.wifi.ssid || 'WiFi';
+                if (data.wifi.signal) {
+                    document.getElementById('wifiSignal').textContent = `${data.wifi.signal}%`;
+                }
+            } else {
+                wifiEl.style.display = 'flex';
+                ethernetEl.style.display = 'none';
+                document.getElementById('wifiName').textContent = 'No Connection';
+                document.getElementById('wifiSignal').textContent = '';
+            }
+        }
+
+        // Sensor Data
+        function updateSensorData() {
+            fetch('/api/sensor_data')
+                .then(response => response.json())
+                .then(data => updateSensorDisplay(data))
+                .catch(error => console.error('Sensor data error:', error));
+        }
+
+        function updateSensorDisplay(data) {
+            document.getElementById('tempValue').textContent = 
+                data.temperature ? data.temperature.toFixed(1) : '--';
+            document.getElementById('humidityValue').textContent = 
+                data.humidity ? data.humidity.toFixed(1) : '--';
+            document.getElementById('airQuality').textContent = 
+                data.air_quality || 'Unknown';
+            document.getElementById('lightLevel').textContent = 
+                data.light_level ? data.light_level.charAt(0).toUpperCase() + data.light_level.slice(1) : 'Unknown';
+        }
+
+        // Weather
+        function updateWeather() {
+            fetch('/api/weather/comprehensive')
+                .then(response => response.json())
+                .then(data => {
+                    currentWeatherData = data;
+                    updateWeatherDisplay(data);
+                })
+                .catch(error => {
+                    console.error('Weather error:', error);
+                    // Fallback to basic weather API
+                    fetch('/api/weather')
+                        .then(response => response.json())
+                        .then(data => {
+                            currentWeatherData = data;
+                            updateWeatherDisplayFallback(data);
+                        });
+                });
+        }
+
+        function updateWeatherDisplay(data) {
+            if (data.current) {
+                document.getElementById('weatherTemp').textContent = `${data.current.temp}°`;
+                document.getElementById('weatherDesc').textContent = data.current.description || '--';
+                document.getElementById('weatherLocation').textContent = data.current.location || 'Your Location';
+                
+                // Update icon based on condition
+                const iconMap = {
+                    'Clear': '☀️',
+                    'Clouds': '☁️',
+                    'Rain': '🌧️',
+                    'Snow': '❄️',
+                    'Thunderstorm': '⛈️',
+                    'Drizzle': '🌦️',
+                    'Mist': '🌫️',
+                    'Partly Cloudy': '⛅'
+                };
+                document.getElementById('weatherIcon').textContent = 
+                    iconMap[data.current.condition] || '🌤️';
+            }
+            
+            // Update forecast
+            if (data.forecast && data.forecast.length > 0) {
+                const forecastEl = document.getElementById('weatherForecast');
+                forecastEl.innerHTML = data.forecast.slice(0, 3).map(day => `
+                    <div class="forecast-day">
+                        <div class="forecast-day-name">${day.day_short || day.day_name?.slice(0,3) || 'Day'}</div>
+                        <div class="forecast-temp">${day.temp_min}°/${day.temp_max}°</div>
+                    </div>
+                `).join('');
+            }
+
+            // Update radar availability
+            if (data.radar && data.radar.available) {
+                document.getElementById('weatherToggle').style.display = 'block';
+                document.getElementById('radarFrame').src = data.radar.url || '';
+            } else {
+                document.getElementById('weatherToggle').style.display = 'none';
+            }
+        }
+
+        function updateWeatherDisplayFallback(data) {
+            if (data.current) {
+                document.getElementById('weatherTemp').textContent = `${data.current.temp}°`;
+                document.getElementById('weatherDesc').textContent = data.current.description || '--';
+                document.getElementById('weatherLocation').textContent = data.current.location || 'Your Location';
+                
+                const iconMap = {
+                    'Clear': '☀️',
+                    'Clouds': '☁️', 
+                    'Rain': '🌧️',
+                    'Snow': '❄️',
+                    'Thunderstorm': '⛈️'
+                };
+                document.getElementById('weatherIcon').textContent = 
+                    iconMap[data.current.condition] || '🌤️';
+            }
+            
+            if (data.forecast) {
+                const forecastEl = document.getElementById('weatherForecast');
+                forecastEl.innerHTML = data.forecast.slice(0, 3).map(day => `
+                    <div class="forecast-day">
+                        <div class="forecast-day-name">${day.date ? new Date(day.date).toLocaleDateString('en', {weekday: 'short'}) : 'Day'}</div>
+                        <div class="forecast-temp">${day.temp_min || day.temp_max || '--'}°</div>
+                    </div>
+                `).join('');
+            }
+        }
+
+        function toggleWeatherView() {
+            const currentEl = document.getElementById('weatherCurrent');
+            const forecastEl = document.getElementById('weatherForecast');
+            const radarEl = document.getElementById('weatherRadar');
+            const toggleText = document.getElementById('weatherToggleText');
+            
+            if (weatherView === 'current') {
+                currentEl.style.display = 'none';
+                forecastEl.style.display = 'none';
+                radarEl.classList.add('active');
+                toggleText.textContent = 'Current';
+                weatherView = 'radar';
+            } else {
+                currentEl.style.display = 'flex';
+                forecastEl.style.display = 'flex';
+                radarEl.classList.remove('active');
+                toggleText.textContent = 'Radar';
+                weatherView = 'current';
+            }
+        }
+
+        // App Launcher Functions
+        function launchApp(appName) {
+            if (settings.apps && settings.apps[appName] && settings.apps[appName].enabled) {
+                const url = settings.apps[appName].url;
+                window.open(url, '_blank');
+            } else {
+                // Fallback URLs
+                const fallbackUrls = {
+                    'netflix': 'https://www.netflix.com',
+                    'prime_video': 'https://www.primevideo.com',
+                    'youtube': 'https://www.youtube.com/tv',
+                    'disney_plus': 'https://www.disneyplus.com',
+                    'xbox_cloud': 'https://www.xbox.com/play',
+                    'steam': 'https://store.steampowered.com',
+                    'spotify': 'https://open.spotify.com',
+                    'apple_music': 'https://music.apple.com',
+                    'google_photos': 'https://photos.google.com'
+                };
+                
+                if (fallbackUrls[appName]) {
+                    window.open(fallbackUrls[appName], '_blank');
+                }
+            }
+        }
+
+        function openDevices() {
+            // Navigate to devices page or show devices overlay
+            window.location.href = '/devices';
+        }
+
+        function openTimers() {
+            // Navigate to timers page or show timers overlay
+            window.location.href = '/timers';
+        }
+
+        function openLights() {
+            // Navigate to lights control
+            window.location.href = '/lights';
+        }
+
+        function openSecurity() {
+            // Navigate to security control
+            window.location.href = '/security';
+        }
+
+        function openNews() {
+            // Navigate to news page
+            window.location.href = '/news';
+        }
+
+        function openWeather() {
+            // Navigate to full weather page
+            window.location.href = '/weather';
+        }
+
+        function openCalendar() {
+            // Open calendar app
+            window.open('https://calendar.google.com', '_blank');
+        }
+
+        function openSettings() {
+            window.location.href = '/settings';
+        }
+
+        // Auto-refresh functions
+        function startDataUpdates() {
+            // Update sensors every 5 seconds
+            setInterval(updateSensorData, 5000);
+            
+            // Update weather every 10 minutes
+            setInterval(updateWeather, 600000);
+            
+            // Update network status every 30 seconds
+            setInterval(updateNetworkStatus, 30000);
+        }
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(e) {
+            switch(e.key) {
+                case 'Escape':
+                    hideVoiceOverlay();
+                    break;
+                case 'F5':
+                    e.preventDefault();
+                    location.reload();
+                    break;
+                case 's':
+                    if (e.ctrlKey) {
+                        e.preventDefault();
+                        openSettings();
+                    }
+                    break;
+            }
+        });
+
+        // Touch gesture handling for navigation
+        let touchStartX = 0;
+        let touchStartY = 0;
+
+        document.addEventListener('touchstart', function(e) {
+            touchStartX = e.touches[0].clientX;
+            touchStartY = e.touches[0].clientY;
+        }, { passive: true });
+
+        document.addEventListener('touchend', function(e) {
+            if (!touchStartX || !touchStartY) return;
+
+            let touchEndX = e.changedTouches[0].clientX;
+            let touchEndY = e.changedTouches[0].clientY;
+
+            let deltaX = touchStartX - touchEndX;
+            let deltaY = touchStartY - touchEndY;
+
+            // Pinch up gesture to refresh
+            if (Math.abs(deltaY) > Math.abs(deltaX) && deltaY > 50) {
+                location.reload();
+            }
+
+            touchStartX = 0;
+            touchStartY = 0;
+        }, { passive: true });
+    </script>
+</body>
+</html>
