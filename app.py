@@ -238,7 +238,7 @@ class BingHomeHub:
     def read_sensors(self):
         """Read all sensor data"""
         import random
-        
+
         data = {
             'timestamp': datetime.now().isoformat(),
             'temperature': None,
@@ -247,7 +247,7 @@ class BingHomeHub:
             'light_level': 'unknown',
             'air_quality': 'good'
         }
-        
+
         if not RPI_AVAILABLE:
             # Simulate sensor data
             data.update({
@@ -258,29 +258,64 @@ class BingHomeHub:
                 'air_quality': random.choice(['excellent', 'good', 'moderate'])
             })
             return data
-        
+
         try:
             if hasattr(self, 'sensors'):
-                # Read DHT22
+                # Read DHT22 with retry logic
                 if 'dht22' in self.sensors:
                     dht = self.sensors['dht22']
-                    data['temperature'] = dht.temperature
-                    data['humidity'] = dht.humidity
-                
+                    max_retries = 3
+                    retry_delay = 2
+
+                    for attempt in range(max_retries):
+                        try:
+                            # DHT sensors need time between reads
+                            temperature = dht.temperature
+                            humidity = dht.humidity
+
+                            # Validate readings
+                            if temperature is not None and humidity is not None:
+                                data['temperature'] = round(temperature, 1)
+                                data['humidity'] = round(humidity, 1)
+                                logger.debug(f"DHT22 read successful: {temperature}°C, {humidity}%")
+                                break
+                            else:
+                                logger.warning(f"DHT22 returned None values (attempt {attempt + 1}/{max_retries})")
+
+                        except RuntimeError as e:
+                            # DHT sensors often throw RuntimeError for checksum/timing issues
+                            logger.warning(f"DHT22 read failed (attempt {attempt + 1}/{max_retries}): {e}")
+                            if attempt < max_retries - 1:
+                                time.sleep(retry_delay)
+                        except Exception as e:
+                            logger.error(f"DHT22 unexpected error (attempt {attempt + 1}/{max_retries}): {e}")
+                            if attempt < max_retries - 1:
+                                time.sleep(retry_delay)
+
+                    # If all retries failed, log final error
+                    if data['temperature'] is None or data['humidity'] is None:
+                        logger.error("DHT22 sensor failed to read after all retries. Check wiring and power.")
+
                 # Read gas sensor
                 if 'gas_pin' in self.sensors:
-                    gas_state = GPIO.input(self.sensors['gas_pin'])
-                    data['gas_detected'] = bool(gas_state)
-                    data['air_quality'] = 'poor' if gas_state else 'good'
-                
+                    try:
+                        gas_state = GPIO.input(self.sensors['gas_pin'])
+                        data['gas_detected'] = bool(gas_state)
+                        data['air_quality'] = 'poor' if gas_state else 'good'
+                    except Exception as e:
+                        logger.error(f"Gas sensor read error: {e}")
+
                 # Read light sensor
                 if 'light_pin' in self.sensors:
-                    light_state = GPIO.input(self.sensors['light_pin'])
-                    data['light_level'] = 'bright' if light_state else 'dark'
-                    
+                    try:
+                        light_state = GPIO.input(self.sensors['light_pin'])
+                        data['light_level'] = 'bright' if light_state else 'dark'
+                    except Exception as e:
+                        logger.error(f"Light sensor read error: {e}")
+
         except Exception as e:
             logger.error(f"Sensor read error: {e}")
-        
+
         return data
     
     def get_network_status(self):
