@@ -132,7 +132,7 @@ install_dependencies() {
 # Install Node.js for better web performance
 install_nodejs() {
     echo -e "\n${BLUE}Installing Node.js for enhanced performance...${NC}"
-    
+
     if ! command -v node &> /dev/null; then
         curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
         sudo apt-get install -y nodejs
@@ -140,6 +140,104 @@ install_nodejs() {
     else
         echo -e "${GREEN}✓ Node.js already installed${NC}"
     fi
+}
+
+# Install Docker for Home Assistant
+install_docker() {
+    echo -e "\n${BLUE}Installing Docker for Home Assistant...${NC}"
+
+    if ! command -v docker &> /dev/null; then
+        echo -e "${BLUE}Installing Docker...${NC}"
+        curl -fsSL https://get.docker.com -o get-docker.sh
+        sudo sh get-docker.sh
+        rm get-docker.sh
+
+        # Add user to docker group
+        sudo usermod -aG docker $USER
+
+        # Enable Docker service
+        sudo systemctl enable docker
+        sudo systemctl start docker
+
+        echo -e "${GREEN}✓ Docker installed${NC}"
+        echo -e "${YELLOW}Note: You may need to log out and back in for Docker permissions${NC}"
+    else
+        echo -e "${GREEN}✓ Docker already installed${NC}"
+    fi
+
+    # Install Docker Compose
+    if ! command -v docker-compose &> /dev/null; then
+        echo -e "${BLUE}Installing Docker Compose...${NC}"
+        sudo apt-get install -y docker-compose || {
+            # Fallback to pip installation
+            sudo pip3 install docker-compose
+        }
+        echo -e "${GREEN}✓ Docker Compose installed${NC}"
+    else
+        echo -e "${GREEN}✓ Docker Compose already installed${NC}"
+    fi
+}
+
+# Install Home Assistant
+install_home_assistant() {
+    echo -e "\n${BLUE}Setting up Home Assistant...${NC}"
+
+    HA_DIR="$HOME/homeassistant"
+    mkdir -p "$HA_DIR"
+
+    # Create docker-compose file for Home Assistant
+    cat > "$HA_DIR/docker-compose.yml" << 'EOF'
+version: '3'
+services:
+  homeassistant:
+    container_name: homeassistant
+    image: "ghcr.io/home-assistant/home-assistant:stable"
+    volumes:
+      - ./config:/config
+      - /etc/localtime:/etc/localtime:ro
+    restart: unless-stopped
+    privileged: true
+    network_mode: host
+    environment:
+      - TZ=Australia/Brisbane
+EOF
+
+    echo -e "${GREEN}✓ Home Assistant configuration created${NC}"
+
+    # Create systemd service for Home Assistant
+    sudo tee /etc/systemd/system/homeassistant-docker.service > /dev/null << EOF
+[Unit]
+Description=Home Assistant Docker Container
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=$HA_DIR
+ExecStart=/usr/bin/docker-compose up -d
+ExecStop=/usr/bin/docker-compose down
+User=$USER
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+    sudo systemctl daemon-reload
+    sudo systemctl enable homeassistant-docker.service
+
+    echo -e "${GREEN}✓ Home Assistant service created${NC}"
+
+    # Start Home Assistant
+    echo -e "${BLUE}Starting Home Assistant (this may take a few minutes)...${NC}"
+    cd "$HA_DIR"
+    docker-compose up -d || {
+        echo -e "${YELLOW}⚠ Failed to start Home Assistant automatically${NC}"
+        echo -e "${YELLOW}  You can start it manually with: cd $HA_DIR && docker-compose up -d${NC}"
+    }
+
+    echo -e "${GREEN}✓ Home Assistant installation complete${NC}"
+    echo -e "${CYAN}Access Home Assistant at: http://localhost:8123${NC}"
 }
 
 # Setup project
@@ -570,6 +668,8 @@ main() {
     update_system
     install_dependencies
     install_nodejs
+    install_docker
+    install_home_assistant
     setup_project
     setup_python_env
     download_vosk_model
@@ -610,11 +710,20 @@ main() {
     echo -e "  ✓ Home automation"
     
     echo -e "\n${CYAN}Next Steps:${NC}"
-    echo -e "  1. Open ${GREEN}http://$IP:5000${NC} in your browser"
-    echo -e "  2. Click the settings button (⚙️)"
-    echo -e "  3. Configure your API keys (optional)"
-    echo -e "  4. Connect to Home Assistant (optional)"
-    echo -e "  5. Say 'Hey Bing' to activate voice control"
+    echo -e "  1. ${YELLOW}IMPORTANT:${NC} Log out and back in for Docker permissions"
+    echo -e "  2. Open ${GREEN}http://$IP:8123${NC} to complete Home Assistant setup"
+    echo -e "  3. Open ${GREEN}http://$IP:5000${NC} to access BingHome Hub"
+    echo -e "  4. Click the settings button (⚙️) in BingHome"
+    echo -e "  5. Configure your API keys (optional)"
+    echo -e "  6. Enter Home Assistant URL and create a long-lived access token"
+    echo -e "  7. Say 'Hey Bing' to activate voice control"
+
+    echo -e "\n${CYAN}Home Assistant Setup:${NC}"
+    echo -e "  ${GREEN}http://localhost:8123${NC}"
+    echo -e "  • First time setup will take 2-5 minutes"
+    echo -e "  • Create an account and onboard devices"
+    echo -e "  • Generate a long-lived access token in your profile"
+    echo -e "  • Add the token to BingHome Hub settings"
     
     echo -e "\n${YELLOW}Note: Reboot recommended for all features:${NC}"
     echo -e "  ${GREEN}sudo reboot${NC}"
