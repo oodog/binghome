@@ -1,0 +1,37 @@
+# Environment variables with secrets
+.env
+
+# Settings file contains tokens after OAuth
+settings.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Logs
+logs/
+*.log
+
+# Virtual environments
+venv/
+env/
+ENV/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Backup files
+*.backup
+*.save
+
+# Test outputs
+sensor_test_output.txt
