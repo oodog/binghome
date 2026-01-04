@@ -145,6 +145,12 @@ class BingHomeHub:
     def load_settings(self):
         """Load settings from JSON file"""
         default_settings = {
+            "temp_offset": 0,
+            "google_photos_connected": False,
+            "google_photos_access_token": "",
+            "google_photos_refresh_token": "",
+            "google_photos_album": "",
+            "google_photos_interval": 10,
             "voice_provider": "local",
             "voice_enabled": True,
             "wake_words": ["hey bing", "okay bing"],
@@ -275,9 +281,11 @@ class BingHomeHub:
 
                             # Validate readings
                             if temperature is not None and humidity is not None:
-                                data['temperature'] = round(temperature, 1)
+                                # Apply calibration offset
+                                temp_offset = self.settings.get('temp_offset', 0)
+                                data['temperature'] = round(temperature + temp_offset, 1)
                                 data['humidity'] = round(humidity, 1)
-                                logger.debug(f"DHT22 read successful: {temperature}°C, {humidity}%")
+                                logger.debug(f"DHT22 read successful: {temperature}°C (raw) -> {data['temperature']}°C (calibrated), {humidity}%")
                                 break
                             else:
                                 logger.warning(f"DHT22 returned None values (attempt {attempt + 1}/{max_retries})")
@@ -506,7 +514,8 @@ def api_settings():
         try:
             # Hide sensitive keys in response
             safe_settings = binghome.settings.copy()
-            for key in ['openai_api_key', 'weather_api_key', 'bing_api_key', 'home_assistant_token']:
+            for key in ['openai_api_key', 'weather_api_key', 'bing_api_key', 'home_assistant_token', 
+                       'google_photos_access_token', 'google_photos_refresh_token']:
                 if key in safe_settings and safe_settings[key]:
                     safe_settings[key + '_configured'] = True
                     safe_settings[key] = ''
@@ -590,6 +599,203 @@ def api_media(action):
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Media control error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/google_photos/auth')
+def google_photos_auth():
+    """Initiate Google Photos OAuth flow"""
+    try:
+        # Google OAuth configuration
+        client_id = os.environ.get('GOOGLE_CLIENT_ID', '')
+        
+        # Build redirect URI - ensure HTTPS for ngrok
+        host = request.host
+        scheme = 'https' if 'ngrok' in host else request.scheme
+        redirect_uri = f'{scheme}://{host}/api/google_photos/callback'
+        
+        logger.info(f"OAuth initiated - Host: {host}, Scheme: {scheme}, Redirect URI: {redirect_uri}")
+        
+        # Check if accessing via IP address (which Google doesn't allow)
+        import re
+        if re.match(r'^https?://\d+\.\d+\.\d+\.\d+', request.host_url):
+            return """<html><body style='font-family: sans-serif; padding: 20px;'>
+            <h2>⚠️ Cannot Use IP Address</h2>
+            <p>Google OAuth requires a domain name, not an IP address.</p>
+            <h3>Please access BingHome using one of these instead:</h3>
+            <ul>
+                <li><strong>Hostname:</strong> <a href='http://raspberrypi.local:5000/settings'>http://raspberrypi.local:5000</a></li>
+                <li><strong>Localhost:</strong> <a href='http://localhost:5000/settings'>http://localhost:5000</a> (if local)</li>
+                <li><strong>Custom domain:</strong> Set up a free domain at <a href='https://www.duckdns.org' target='_blank'>duckdns.org</a></li>
+            </ul>
+            <p>See <a href='https://github.com/oodog/binghome/blob/master/GOOGLE_PHOTOS_SETUP.md' target='_blank'>GOOGLE_PHOTOS_SETUP.md</a> for details.</p>
+            <button onclick='window.close()'>Close</button>
+            </body></html>"""
+        
+        if not client_id:
+            return """<html><body style='font-family: sans-serif; padding: 20px;'>
+            <h2>Google Photos Setup Required</h2>
+            <p>Please set up Google OAuth credentials:</p>
+            <ol>
+                <li>Go to <a href='https://console.cloud.google.com/apis/credentials' target='_blank'>Google Cloud Console</a></li>
+                <li>Create OAuth 2.0 Client ID</li>
+                <li>Add this redirect URI: <code>""" + redirect_uri + """</code></li>
+                <li>Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env file</li>
+            </ol>
+            <p><strong>Note:</strong> Make sure you're accessing BingHome via hostname (not IP address)!</p>
+            <button onclick='window.close()'>Close</button>
+            </body></html>"""
+        
+        auth_url = (
+            'https://accounts.google.com/o/oauth2/v2/auth?'
+            f'client_id={client_id}&'
+            f'redirect_uri={redirect_uri}&'
+            'response_type=code&'
+            'scope=https://www.googleapis.com/auth/photoslibrary.readonly&'
+            'access_type=offline&'
+            'prompt=consent'
+        )
+        return redirect(auth_url)
+    except Exception as e:
+        logger.error(f"Google Photos auth error: {e}")
+        return f"<html><body><h2>Error</h2><p>{str(e)}</p><button onclick='window.close()'>Close</button></body></html>"
+
+@app.route('/api/google_photos/callback')
+def google_photos_callback():
+    """Handle Google Photos OAuth callback"""
+    try:
+        code = request.args.get('code')
+        if not code:
+            return "<html><body><h2>Authorization Failed</h2><p>No code received</p><button onclick='window.close()'>Close</button></body></html>"
+        
+        client_id = os.environ.get('GOOGLE_CLIENT_ID', '')
+        client_secret = os.environ.get('GOOGLE_CLIENT_SECRET', '')
+        
+        # Build redirect URI - must match exactly what was used in auth request
+        host = request.host
+        scheme = 'https' if 'ngrok' in host else request.scheme
+        redirect_uri = f'{scheme}://{host}/api/google_photos/callback'
+        
+        logger.info(f"OAuth callback - Host: {host}, Scheme: {scheme}, Redirect URI: {redirect_uri}")
+        
+        # Exchange code for tokens
+        import requests
+        token_response = requests.post('https://oauth2.googleapis.com/token', data={
+            'code': code,
+            'client_id': client_id,
+            'client_secret': client_secret,
+            'redirect_uri': redirect_uri,
+            'grant_type': 'authorization_code'
+        })
+        
+        if token_response.status_code == 200:
+            tokens = token_response.json()
+            settings = binghome.settings.copy()
+            settings['google_photos_connected'] = True
+            settings['google_photos_access_token'] = tokens.get('access_token', '')
+            settings['google_photos_refresh_token'] = tokens.get('refresh_token', '')
+            binghome.save_settings(settings)
+            
+            return """<html><body>
+            <h2>✅ Successfully Connected to Google Photos!</h2>
+            <p>You can now close this window and return to settings.</p>
+            <script>setTimeout(() => window.close(), 2000);</script>
+            </body></html>"""
+        else:
+            return f"<html><body><h2>Token Exchange Failed</h2><p>{token_response.text}</p><button onclick='window.close()'>Close</button></body></html>"
+    except Exception as e:
+        logger.error(f"Google Photos callback error: {e}")
+        return f"<html><body><h2>Error</h2><p>{str(e)}</p><button onclick='window.close()'>Close</button></body></html>"
+
+@app.route('/api/google_photos/status')
+def google_photos_status():
+    """Check Google Photos connection status"""
+    try:
+        connected = binghome.settings.get('google_photos_connected', False)
+        return jsonify({'connected': connected})
+    except Exception as e:
+        return jsonify({'connected': False, 'error': str(e)})
+
+@app.route('/api/google_photos/albums')
+def google_photos_albums():
+    """Get list of Google Photos albums"""
+    try:
+        import requests
+        access_token = binghome.settings.get('google_photos_access_token', '')
+        
+        logger.info(f"Albums request - Token present: {bool(access_token)}")
+        
+        if not access_token:
+            logger.error("No access token found")
+            return jsonify({'success': False, 'error': 'Not connected'}), 401
+        
+        headers = {'Authorization': f'Bearer {access_token}'}
+        response = requests.get('https://photoslibrary.googleapis.com/v1/albums', headers=headers)
+        
+        logger.info(f"Albums API response: {response.status_code}")
+        
+        if response.status_code == 200:
+            data = response.json()
+            albums = data.get('albums', [])
+            logger.info(f"Found {len(albums)} albums")
+            return jsonify({'success': True, 'albums': albums})
+        else:
+            error_msg = response.text
+            logger.error(f"Albums API error: {response.status_code} - {error_msg}")
+            return jsonify({'success': False, 'error': f'API error: {response.status_code}', 'details': error_msg}), response.status_code
+    except Exception as e:
+        logger.error(f"Google Photos albums error: {e}", exc_info=True)
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/google_photos/photos')
+def google_photos_photos():
+    """Get photos from selected album"""
+    try:
+        import requests
+        access_token = binghome.settings.get('google_photos_access_token', '')
+        album_id = binghome.settings.get('google_photos_album', '')
+        
+        if not access_token:
+            return jsonify({'success': False, 'error': 'Not connected'}), 401
+        
+        if not album_id:
+            return jsonify({'success': False, 'error': 'No album selected'}), 400
+        
+        headers = {'Authorization': f'Bearer {access_token}', 'Content-Type': 'application/json'}
+        response = requests.post(
+            'https://photoslibrary.googleapis.com/v1/mediaItems:search',
+            headers=headers,
+            json={'albumId': album_id, 'pageSize': 100}
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            media_items = data.get('mediaItems', [])
+            photos = [{
+                'id': item['id'],
+                'url': item['baseUrl'] + '=w1920-h1080',
+                'filename': item.get('filename', ''),
+                'mimeType': item.get('mimeType', '')
+            } for item in media_items if item.get('mimeType', '').startswith('image/')]
+            return jsonify({'success': True, 'photos': photos})
+        else:
+            return jsonify({'success': False, 'error': 'Failed to fetch photos'}), response.status_code
+    except Exception as e:
+        logger.error(f"Google Photos photos error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/google_photos/disconnect', methods=['POST'])
+def google_photos_disconnect():
+    """Disconnect Google Photos"""
+    try:
+        settings = binghome.settings.copy()
+        settings['google_photos_connected'] = False
+        settings['google_photos_access_token'] = ''
+        settings['google_photos_refresh_token'] = ''
+        settings['google_photos_album'] = ''
+        binghome.save_settings(settings)
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Google Photos disconnect error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
 @app.route('/api/health')

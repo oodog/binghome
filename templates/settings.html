@@ -228,7 +228,29 @@
     </div>
 
     <div class="settings-section">
-        <h2>🎤 Voice Control</h2>
+        <h2>�️ Sensor Calibration</h2>
+        <div class="form-group">
+            <label>Temperature Calibration Offset (°C)</label>
+            <input type="number" id="tempOffset" step="0.1" placeholder="0.0">
+            <div style="font-size: 12px; color: #888; margin-top: 5px;">
+                If your sensor reads high, enter a negative value (e.g., -6 if it reads 32°C but should be 26°C)
+            </div>
+        </div>
+        <div class="form-group">
+            <div id="currentTempDisplay" style="background: rgba(255,255,255,0.05); padding: 15px; border-radius: 5px;">
+                <div style="font-size: 14px; color: #888; margin-bottom: 5px;">Current Reading:</div>
+                <div style="font-size: 24px; color: #00ff88;" id="rawTemp">--°C</div>
+                <div style="font-size: 14px; color: #888; margin-top: 10px;">After Calibration:</div>
+                <div style="font-size: 24px; color: #fff;" id="calibratedTemp">--°C</div>
+            </div>
+        </div>
+        <div class="form-group">
+            <button class="btn btn-secondary" onclick="refreshSensorData()">Refresh Sensor Data</button>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h2>�🎤 Voice Control</h2>
         <div class="form-group">
             <label>Voice Provider</label>
             <select id="voiceProvider">
@@ -279,7 +301,37 @@
     </div>
 
     <div class="settings-section">
-        <h2>📱 Applications</h2>
+        <h2>� Google Photos Integration</h2>
+        <div class="form-group">
+            <label>Status</label>
+            <div id="googlePhotosStatus" style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 5px;">
+                <span id="photosStatusText">Not connected</span>
+            </div>
+        </div>
+        <div class="form-group" id="photosSignInSection">
+            <button class="btn" onclick="signInToGooglePhotos()">Sign in to Google Photos</button>
+            <div style="font-size: 12px; color: #888; margin-top: 5px;">
+                You'll need to authorize BingHome to access your Google Photos albums
+            </div>
+        </div>
+        <div class="form-group" id="albumSelectionSection" style="display: none;">
+            <label>Select Album for Slideshow</label>
+            <select id="googlePhotosAlbum">
+                <option value="">Loading albums...</option>
+            </select>
+        </div>
+        <div class="form-group" id="albumSettingsSection" style="display: none;">
+            <label>Slideshow Interval (seconds)</label>
+            <input type="number" id="photosInterval" value="10" min="5" max="300">
+        </div>
+        <div class="form-group" id="photosActionsSection" style="display: none;">
+            <button class="btn btn-secondary" onclick="refreshAlbums()">Refresh Albums</button>
+            <button class="btn btn-secondary" onclick="disconnectGooglePhotos()">Disconnect</button>
+        </div>
+    </div>
+
+    <div class="settings-section">
+        <h2>�📱 Applications</h2>
         <div class="form-row">
             <div class="form-group">
                 <label>Netflix URL</label>
@@ -395,6 +447,12 @@
                 .then(settings => {
                     currentSettings = settings;
                     console.log('Loaded settings:', settings);
+                    
+                    // Sensor calibration
+                    document.getElementById('tempOffset').value = settings.temp_offset || 0;
+                    
+                    // Google Photos
+                    loadGooglePhotosStatus(settings);
                     
                     // Voice settings
                     document.getElementById('voiceProvider').value = settings.voice_provider || 'local';
@@ -537,6 +595,13 @@
 
         function saveSettings() {
             const settings = {
+                // Sensor calibration
+                temp_offset: parseFloat(document.getElementById('tempOffset').value) || 0,
+                
+                // Google Photos settings
+                google_photos_album: document.getElementById('googlePhotosAlbum') ? document.getElementById('googlePhotosAlbum').value : '',
+                google_photos_interval: document.getElementById('photosInterval') ? parseInt(document.getElementById('photosInterval').value) : 10,
+                
                 // Voice settings
                 voice_provider: document.getElementById('voiceProvider').value,
                 wake_words: document.getElementById('wakeWords').value.split(',').map(w => w.trim()),
@@ -660,6 +725,135 @@
         function testSettings() {
             checkHealth();
             testWeatherConfig();
+        }
+
+        function refreshSensorData() {
+            fetch('/api/sensor_data')
+                .then(r => r.json())
+                .then(data => {
+                    const rawTemp = data.temperature;
+                    const offset = parseFloat(document.getElementById('tempOffset').value) || 0;
+                    const calibratedTemp = rawTemp !== null ? (rawTemp + offset).toFixed(1) : '--';
+                    
+                    document.getElementById('rawTemp').textContent = rawTemp !== null ? rawTemp.toFixed(1) + '°C' : '--°C';
+                    document.getElementById('calibratedTemp').textContent = calibratedTemp + '°C';
+                    
+                    showMessage('Sensor data refreshed', 'success');
+                })
+                .catch(err => {
+                    showMessage('Failed to refresh sensor data', 'error');
+                });
+        }
+
+        // Auto-refresh sensor data on page load and when offset changes
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshSensorData();
+            document.getElementById('tempOffset').addEventListener('input', function() {
+                refreshSensorData();
+            });
+        });
+
+        // Google Photos functions
+        function loadGooglePhotosStatus(settings) {
+            const connected = settings.google_photos_connected || false;
+            const album = settings.google_photos_album || '';
+            const interval = settings.google_photos_interval || 10;
+            
+            if (connected) {
+                document.getElementById('photosStatusText').innerHTML = '✅ Connected';
+                document.getElementById('photosSignInSection').style.display = 'none';
+                document.getElementById('albumSelectionSection').style.display = 'block';
+                document.getElementById('albumSettingsSection').style.display = 'block';
+                document.getElementById('photosActionsSection').style.display = 'block';
+                document.getElementById('photosInterval').value = interval;
+                loadAlbums(album);
+            } else {
+                document.getElementById('photosStatusText').innerHTML = '❌ Not connected';
+                document.getElementById('photosSignInSection').style.display = 'block';
+                document.getElementById('albumSelectionSection').style.display = 'none';
+                document.getElementById('albumSettingsSection').style.display = 'none';
+                document.getElementById('photosActionsSection').style.display = 'none';
+            }
+        }
+
+        function signInToGooglePhotos() {
+            showMessage('Opening Google Photos authorization...', 'success');
+            // Open OAuth flow in new window
+            const width = 600;
+            const height = 700;
+            const left = (screen.width - width) / 2;
+            const top = (screen.height - height) / 2;
+            const authWindow = window.open(
+                '/api/google_photos/auth',
+                'GooglePhotosAuth',
+                `width=${width},height=${height},left=${left},top=${top}`
+            );
+            
+            // Poll for completion
+            const checkAuth = setInterval(() => {
+                fetch('/api/google_photos/status')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.connected) {
+                            clearInterval(checkAuth);
+                            if (authWindow && !authWindow.closed) {
+                                authWindow.close();
+                            }
+                            showMessage('Google Photos connected successfully!', 'success');
+                            location.reload();
+                        }
+                    })
+                    .catch(() => {});
+            }, 1000);
+            
+            // Stop checking after 2 minutes
+            setTimeout(() => clearInterval(checkAuth), 120000);
+        }
+
+        function loadAlbums(selectedAlbum) {
+            fetch('/api/google_photos/albums')
+                .then(r => r.json())
+                .then(data => {
+                    const select = document.getElementById('googlePhotosAlbum');
+                    select.innerHTML = '<option value="">-- Select an album --</option>';
+                    
+                    if (data.success && data.albums) {
+                        data.albums.forEach(album => {
+                            const option = document.createElement('option');
+                            option.value = album.id;
+                            option.textContent = `${album.title} (${album.mediaItemsCount || 0} items)`;
+                            if (album.id === selectedAlbum) {
+                                option.selected = true;
+                            }
+                            select.appendChild(option);
+                        });
+                    }
+                })
+                .catch(err => {
+                    showMessage('Failed to load albums', 'error');
+                });
+        }
+
+        function refreshAlbums() {
+            showMessage('Refreshing albums...', 'success');
+            const currentAlbum = document.getElementById('googlePhotosAlbum').value;
+            loadAlbums(currentAlbum);
+        }
+
+        function disconnectGooglePhotos() {
+            if (confirm('Disconnect Google Photos? This will remove access to your photos.')) {
+                fetch('/api/google_photos/disconnect', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            showMessage('Google Photos disconnected', 'success');
+                            location.reload();
+                        } else {
+                            showMessage('Failed to disconnect', 'error');
+                        }
+                    })
+                    .catch(() => showMessage('Disconnect failed', 'error'));
+            }
         }
     </script>
 </body>

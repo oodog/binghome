@@ -32,18 +32,19 @@ binghome/
 ```markdown
 # BingHome - Smart Home Control System
 
-[![Version](https://img.shields.io/badge/version-2.1.0-blue.svg)](https://github.com/oodog/binghome)
+[![Version](https://img.shields.io/badge/version-2.2.0-blue.svg)](https://github.com/oodog/binghome)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Raspberry%20Pi-red.svg)](https://www.raspberrypi.org/)
 
-A modern smart home control system with voice recognition, optimized for Raspberry Pi 5.
+A modern smart home control system with voice recognition, Google Photos integration, and sensor calibration, optimized for Raspberry Pi 5.
 
 ## ✨ Features
 
 - 🎤 **Multiple Voice Engines**: Whisper, Vosk, or Google Speech
 - 🤖 **ChatGPT Integration**: Natural language understanding
 - 🔐 **OAuth Support**: Sign in with ChatGPT account
-- 🌡️ **Sensor Monitoring**: Temperature, humidity, gas, light
+- 🌡️ **Sensor Monitoring**: Temperature, humidity, gas, light with calibration
+- 📸 **Google Photos**: Rotating photo slideshow from your albums
 - 🏠 **Home Assistant**: Full integration support
 - 📱 **Responsive UI**: Works on any device
 - 🔄 **Auto Fallback**: Switches between local and cloud voice
@@ -75,10 +76,11 @@ chmod +x install.sh
 
 1. **Access the web interface**: `http://<your-pi-ip>:5000`
 2. **Click the settings icon** (⚙️)
-3. **Add your API keys**:
-   - OpenAI API key or sign in with ChatGPT
-   - Bing News API key (optional)
-   - Home Assistant token (optional)
+3. **Configure your settings**:
+   - **Sensor Calibration**: Adjust temperature offset if readings are off
+   - **Google Photos**: Connect your account for photo slideshow ([Setup Guide](GOOGLE_PHOTOS_SETUP.md))
+   - **API Keys**: Add OpenAI, Bing News, Home Assistant tokens
+   - **Voice Mode**: Choose between Auto, Vosk, Whisper, or Google
 4. **Select voice mode**:
    - Auto: Tries local first, falls back to cloud
    - Vosk: Offline, lightweight (200MB RAM)
@@ -94,8 +96,26 @@ Say "Hey Bing" followed by:
 - "What's the humidity?"
 - "Check the gas sensor"
 - "Set temperature to 22 degrees"
+🆕 New in Version 2.2.0
+
+### Temperature Sensor Calibration
+- Calibrate your DHT22 sensor readings in the Settings page
+- Real-time preview showing raw vs calibrated temperature
+- Perfect for sensors that run consistently high or low
+
+### Google Photos Integration
+- Display a rotating slideshow from your Google Photos albums
+- Easy OAuth setup with step-by-step guide
+- Configurable slideshow interval (5-300 seconds)
+- Smooth fade transitions between photos
+- Works with ngrok for easy HTTPS access
+
+**Setup Instructions**: See [Google Photos Setup Guide](GOOGLE_PHOTOS_SETUP.md) and [ngrok Setup Guide](NGROK_SETUP.md)
 
 ## 📚 Documentation
+
+- [Google Photos Setup](GOOGLE_PHOTOS_SETUP.md) - Complete OAuth configuration guide
+- [ngrok Setup](NGROK_SETUP.md) - Quick HTTPS tunnel for Google OAuth## 📚 Documentation
 
 - [Hardware Setup Guide](docs/HARDWARE.md)
 - [API Documentation](docs/API.md)

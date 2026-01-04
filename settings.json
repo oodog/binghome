@@ -32,7 +32,7 @@
       "enabled": true
     },
     "google_photos": {
-      "url": "https://photos.google.com",
+      "url": "https://photos.google.com/album/AF1QipNvAyG8-79AeB10XZ_kPYvVLFSqbjnsOKtw_l9K",
       "enabled": true
     }
   },
@@ -54,5 +54,11 @@
   "voice_enabled": true,
   "weather_source": "openweather",
   "weather_location": "Gold Coast, QLD",
-  "display_timeout": 0
+  "display_timeout": 0,
+  "temp_offset": -7,
+  "google_photos_connected": false,
+  "google_photos_access_token": "",
+  "google_photos_refresh_token": "",
+  "google_photos_album": "",
+  "google_photos_interval": 10
 }

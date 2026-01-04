@@ -113,15 +113,23 @@
             align-items: center;
             justify-content: center;
             background: linear-gradient(135deg, #1a1a1a, #2a2a2a);
+            position: relative;
+            overflow: hidden;
         }
 
         .photos-content {
             text-align: center;
+            z-index: 1;
         }
 
         .photos-icon {
             font-size: 48px;
             margin-bottom: 15px;
+        }
+
+        #photosImage {
+            transition: opacity 0.5s ease-in-out;
+            opacity: 0;
         }
 
         /* Weather Widget */
@@ -422,12 +430,13 @@
     <!-- Main Container -->
     <div class="main-container">
         <!-- Google Photos Widget -->
-        <div class="widget-tile photos-widget" onclick="launchApp('google_photos')">
-            <div class="photos-content">
+        <div class="widget-tile photos-widget" id="photosWidget">
+            <div class="photos-content" id="photosContent">
                 <div class="photos-icon">📸</div>
                 <div style="font-size: 18px; margin-bottom: 8px;">Google Photos</div>
                 <div style="font-size: 14px; color: var(--text-secondary);">Your memories</div>
             </div>
+            <img id="photosImage" style="display: none; width: 100%; height: 100%; object-fit: cover; position: absolute; top: 0; left: 0;" alt="Photo">
         </div>
 
         <!-- Weather Widget -->
@@ -572,6 +581,7 @@
             initializeHub();
             setupVoiceRecognition();
             startDataUpdates();
+            initializePhotos();
         });
 
         function initializeHub() {
@@ -933,6 +943,87 @@
             // Update network status every 30 seconds
             setInterval(updateNetworkStatus, 30000);
         }
+
+        // Google Photos Slideshow
+        let photosCache = [];
+        let currentPhotoIndex = 0;
+        let photosInterval = null;
+
+        function initializePhotos() {
+            fetch('/api/settings')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.google_photos_connected && data.google_photos_album) {
+                        loadPhotos(data.google_photos_interval || 10);
+                    }
+                })
+                .catch(error => console.error('Photos init error:', error));
+        }
+
+        function loadPhotos(intervalSeconds) {
+            fetch('/api/google_photos/photos')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success && data.photos && data.photos.length > 0) {
+                        photosCache = data.photos;
+                        startPhotoSlideshow(intervalSeconds);
+                        
+                        // Hide default content, show photo
+                        document.getElementById('photosContent').style.display = 'none';
+                    }
+                })
+                .catch(error => {
+                    console.error('Photos load error:', error);
+                    // Keep showing default icon
+                });
+        }
+
+        function startPhotoSlideshow(intervalSeconds) {
+            // Stop any existing interval
+            if (photosInterval) {
+                clearInterval(photosInterval);
+            }
+
+            // Show first photo immediately
+            showNextPhoto();
+
+            // Start interval for rotating photos
+            photosInterval = setInterval(() => {
+                showNextPhoto();
+            }, intervalSeconds * 1000);
+        }
+
+        function showNextPhoto() {
+            if (photosCache.length === 0) return;
+
+            const photoImg = document.getElementById('photosImage');
+            const photo = photosCache[currentPhotoIndex];
+            
+            // Fade out
+            photoImg.style.opacity = '0';
+            
+            setTimeout(() => {
+                photoImg.src = photo.url;
+                photoImg.style.display = 'block';
+                // Fade in
+                photoImg.style.opacity = '1';
+            }, 300);
+
+            // Move to next photo
+            currentPhotoIndex = (currentPhotoIndex + 1) % photosCache.length;
+        }
+
+        // Click photo widget to open Google Photos
+        document.addEventListener('DOMContentLoaded', function() {
+            const photosWidget = document.getElementById('photosWidget');
+            if (photosWidget) {
+                photosWidget.addEventListener('click', function() {
+                    if (settings.apps && settings.apps.google_photos) {
+                        launchApp('google_photos');
+                    }
+                });
+            }
+        });
 
         // Keyboard shortcuts
         document.addEventListener('keydown', function(e) {
