@@ -31,7 +31,7 @@ except ImportError:
 
 from adafruit_platformdetect.constants import boards, chips
 
-__version__ = "3.83.1"
+__version__ = "3.86.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PlatformDetect.git"
 
 
@@ -121,9 +121,11 @@ class Board:
             board_id = boards.FTDI_FT2232H
         elif chip_id == chips.FT4232H:
             board_id = boards.FTDI_FT4232H
+        elif chip_id == chips.SPIDRIVER:
+            board_id = boards.EXCAMERA_SPIDRIVER
         elif chip_id == chips.APQ8016:
             board_id = boards.DRAGONBOARD_410C
-        elif chip_id in (chips.T210, chips.T186, chips.T194, chips.T234):
+        elif chip_id in (chips.T210, chips.T186, chips.T194, chips.T234, chips.T264):
             board_id = self._tegra_id()
         elif chip_id == chips.HFU540:
             board_id = self._sifive_id()
@@ -162,7 +164,11 @@ class Board:
         elif chip_id == chips.T527:
             board_id = self._armbian_id() or self._allwinner_variants_id()
         elif chip_id == chips.H618:
-            board_id = self._armbian_id() or self._allwinner_variants_id()
+            board_id = (
+                self._armbian_id()
+                or self._allwinner_variants_id()
+                or self._orange_pi_id()
+            )
         elif chip_id == chips.H616:
             board_id = self._armbian_id() or self._allwinner_variants_id()
         elif chip_id == chips.A33:
@@ -174,7 +180,7 @@ class Board:
         elif chip_id == chips.RZV2H:
             board_id = self._armbian_id() or self._renesas_variants_id()
         elif chip_id == chips.RK3308:
-            board_id = self._rock_pi_id()
+            board_id = self._rock_pi_id() or self._banana_pi_id()
         elif chip_id == chips.RK3399:
             board_id = (
                 self._rock_pi_id()
@@ -210,7 +216,9 @@ class Board:
                 or self._vicharak_id()
             )
         elif chip_id == chips.RK3588S:
-            board_id = self._orange_pi_id() or self._armbian_id()
+            board_id = (
+                self._orange_pi_id() or self._armbian_id() or self._ameridroid_id()
+            )
         elif chip_id == chips.RYZEN_V1605B:
             board_id = self._udoo_id()
         elif chip_id == chips.PENTIUM_N3710:
@@ -243,6 +251,8 @@ class Board:
             board_id = self._rv1106_id()
         elif chip_id == chips.SUNRISE_X3:
             board_id = boards.RDK_X3
+        elif chip_id == chips.SUNRISE_X5:
+            board_id = boards.RDK_X5
         elif chip_id == chips.QCM6490:
             board_id = boards.PARTICLE_TACHYON
         self._board_id = board_id
@@ -535,9 +545,18 @@ class Board:
             return boards.ORANGE_PI_5
         if "Orange Pi 3B" in board_value:
             return boards.ORANGE_PI_3B
+        if "OrangePi Zero 2W" in board_value:
+            return boards.ORANGE_PI_ZERO_2W
         return None
 
     # pylint: enable=too-many-return-statements
+
+    def _banana_pi_id(self) -> Optional[str]:
+        """Check what type of Banana Pi board."""
+        board_value = self.detector.get_device_model()
+        if "bpi-p2pro" in board_value:
+            return boards.BANANA_PI_P2_PRO
+        return None
 
     def _sama5_id(self) -> Optional[str]:
         """Check what type sama5 board."""
@@ -978,6 +997,8 @@ class Board:
         board = None
         if board_value and "Luckfox Pico Max" in board_value:
             board = boards.LUCKFOX_PICO_MAX
+        elif board_value and "Luckfox Pico Ultra" in board_value:
+            board = boards.LUCKFOX_PICO_ULTRA
         return board
 
     @property
@@ -1297,6 +1318,11 @@ class Board:
     def ftdi_ft2232h(self) -> bool:
         """Check whether the current board is an FTDI FT2232H."""
         return self.id == boards.FTDI_FT2232H
+
+    @property
+    def excamera_spidriver(self) -> bool:
+        """Check whether the current board is an Excamera SPIDriver."""
+        return self.id == boards.EXCAMERA_SPIDRIVER
 
     @property
     def ftdi_ft4232h(self) -> bool:

@@ -36,7 +36,7 @@ license='MIT'
 
 """
 
-__version__ = "4.1.13"
+__version__ = "4.1.15"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_Requests.git"
 
 import errno

@@ -42,7 +42,7 @@
   "bing_api_key": "",
   "weather_api_key": "926956abba1df5e4d3e5d7a08dbf2468",
   "home_assistant_url": "http://localhost:8123",
-  "home_assistant_token": "",
+  "home_assistant_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiIwMjEzOGNmNTdjODA0MWYwYjU0NWQxZTk5NDgxODU2NiIsImlhdCI6MTc2NjgwNzQwNSwiZXhwIjoyMDgyMTY3NDA1fQ.W-ncPl3KF-tNKTWA8ZYX7dNtoEfTYjHPqxr1_kAD7bY",
   "kiosk_mode": false,
   "auto_start_browser": false,
   "network_interface": "auto",

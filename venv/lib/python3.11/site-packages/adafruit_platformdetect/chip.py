@@ -29,7 +29,7 @@ except ImportError:
 
 from adafruit_platformdetect.constants import chips
 
-__version__ = "3.83.1"
+__version__ = "3.86.0"
 __repo__ = "https://github.com/adafruit/Adafruit_CircuitPython_PlatformDetect.git"
 
 
@@ -108,6 +108,9 @@ class Chip:
                     "BLINKA_MCP2221 environment variable "
                     + "set, but no MCP2221 device found"
                 )
+            if os.environ.get("BLINKA_SPIDRIVER"):
+                self._chip_id = chips.SPIDRIVER
+                return self._chip_id
             if os.environ.get("BLINKA_OS_AGNOSTIC"):
                 # we don't need to look for this chip, it's just a flag
                 self._chip_id = chips.OS_AGNOSTIC
@@ -349,6 +352,9 @@ class Chip:
         if self.detector.check_dt_compatible_value("hobot,x3"):
             return chips.SUNRISE_X3
 
+        if self.detector.check_dt_compatible_value("Horizon, x5"):
+            return chips.SUNRISE_X5
+
         if self.detector.check_dt_compatible_value("particle,tachyon"):
             return chips.QCM6490
 
@@ -421,6 +427,8 @@ class Chip:
                 linux_id = chips.EXYNOS5422
             if compatible and "cvitek,cv180x" in compatible:
                 linux_id = chips.CV1800B
+            if compatible and "xlnx,zynqmp" in compatible:
+                linux_id = chips.ZYNQMP
             cpu_model = self.detector.get_cpuinfo_field("cpu model")
 
             if cpu_model is not None:

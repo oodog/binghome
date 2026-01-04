@@ -217,7 +217,7 @@ class BingHomeHub:
             
             # DHT22 sensor
             dht_pin = self.settings["gpio_pins"]["dht22"]
-            self.sensors['dht22'] = adafruit_dht.DHT22(getattr(board, f'D{dht_pin}'))
+            self.sensors['dht22'] = adafruit_dht.DHT22(getattr(board, f'D{dht_pin}'), use_pulseio=False)
             
             # Gas sensor
             gas_pin = self.settings["gpio_pins"]["gas_sensor"]
