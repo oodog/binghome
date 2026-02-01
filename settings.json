@@ -16,7 +16,7 @@
       "enabled": true
     },
     "youtube": {
-      "url": "https://www.youtube.com",
+      "url": "https://www.youtube.com/tv",
       "enabled": true
     },
     "spotify": {
@@ -32,7 +32,7 @@
       "enabled": true
     },
     "google_photos": {
-      "url": "https://photos.google.com/album/AF1QipNvAyG8-79AeB10XZ_kPYvVLFSqbjnsOKtw_l9K",
+      "url": "https://photos.google.com",
       "enabled": true
     }
   },
@@ -55,10 +55,11 @@
   "weather_source": "openweather",
   "weather_location": "Gold Coast, QLD",
   "display_timeout": 0,
-  "temp_offset": -7,
+  "temp_offset": -4,
   "google_photos_connected": false,
   "google_photos_access_token": "",
   "google_photos_refresh_token": "",
   "google_photos_album": "",
-  "google_photos_interval": 10
+  "google_photos_interval": 5,
+  "google_photos_shared_url": "https://photos.app.goo.gl/paFCk596duXJwMnU8"
 }

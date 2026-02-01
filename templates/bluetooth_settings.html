@@ -1,0 +1,520 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BingHome - Bluetooth Settings</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0a0a0a 0%, #1a1a1a 100%);
+            color: #fff;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 30px;
+        }
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        h1 { color: #fff; }
+        .back-btn {
+            background: rgba(255,255,255,0.1);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .home-btn {
+            background: #0078d7;
+            color: #fff;
+            padding: 10px 20px;
+            border-radius: 5px;
+            text-decoration: none;
+        }
+        .card {
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+        }
+        .card h2 {
+            color: #00ff88;
+            margin-bottom: 15px;
+            font-size: 18px;
+        }
+        .device-list {
+            list-style: none;
+            padding: 0;
+        }
+        .device-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            margin-bottom: 10px;
+            border: 1px solid rgba(255,255,255,0.1);
+        }
+        .device-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .device-name {
+            font-weight: 500;
+            font-size: 16px;
+        }
+        .device-mac {
+            font-size: 12px;
+            color: #888;
+            font-family: monospace;
+        }
+        .device-type {
+            font-size: 11px;
+            color: #00ff88;
+            text-transform: uppercase;
+        }
+        .device-status {
+            font-size: 12px;
+            padding: 4px 10px;
+            border-radius: 12px;
+            margin-left: 10px;
+        }
+        .device-status.connected {
+            background: rgba(0,255,136,0.2);
+            color: #00ff88;
+        }
+        .device-status.paired {
+            background: rgba(0,120,215,0.2);
+            color: #0078d7;
+        }
+        .device-status.available {
+            background: rgba(255,255,255,0.1);
+            color: #aaa;
+        }
+        .btn {
+            background: #0078d7;
+            color: #fff;
+            border: none;
+            padding: 8px 16px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        .btn:hover {
+            background: #006bbd;
+        }
+        .btn:disabled {
+            background: #555;
+            cursor: not-allowed;
+        }
+        .btn-danger {
+            background: #dc3545;
+        }
+        .btn-danger:hover {
+            background: #c82333;
+        }
+        .btn-success {
+            background: #28a745;
+        }
+        .btn-success:hover {
+            background: #218838;
+        }
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+        .status-message {
+            padding: 12px 16px;
+            margin: 15px 0;
+            border-radius: 8px;
+            display: none;
+        }
+        .status-message.show {
+            display: block;
+        }
+        .status-message.success {
+            background: rgba(0,255,136,0.15);
+            border: 1px solid #00ff88;
+            color: #00ff88;
+        }
+        .status-message.error {
+            background: rgba(255,68,68,0.15);
+            border: 1px solid #ff4444;
+            color: #ff4444;
+        }
+        .status-message.info {
+            background: rgba(0,120,215,0.15);
+            border: 1px solid #0078d7;
+            color: #0078d7;
+        }
+        .scan-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .scan-status {
+            font-size: 14px;
+            color: #888;
+        }
+        .empty-state {
+            text-align: center;
+            padding: 30px;
+            color: #666;
+        }
+        .empty-state .icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+        .loading-spinner {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin-right: 8px;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        .bluetooth-icon {
+            font-size: 24px;
+            margin-right: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <a href="/settings" class="back-btn">← Settings</a>
+            <span class="bluetooth-icon">📶</span>
+            <h1>Bluetooth</h1>
+        </div>
+        <a href="/" class="home-btn">Home</a>
+    </div>
+
+    <div id="statusMessage" class="status-message"></div>
+
+    <!-- Connected Devices -->
+    <div class="card">
+        <h2>🔗 Connected Devices</h2>
+        <ul class="device-list" id="connectedDevices">
+            <li class="empty-state">
+                <div class="icon">📱</div>
+                <div>No devices connected</div>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Paired Devices -->
+    <div class="card">
+        <h2>📋 Paired Devices</h2>
+        <ul class="device-list" id="pairedDevices">
+            <li class="empty-state">
+                <div class="icon">🔌</div>
+                <div>No paired devices</div>
+            </li>
+        </ul>
+    </div>
+
+    <!-- Scan for New Devices -->
+    <div class="card">
+        <div class="scan-header">
+            <h2>🔍 Available Devices</h2>
+            <div>
+                <span class="scan-status" id="scanStatus"></span>
+                <button class="btn" id="scanBtn" onclick="scanDevices()">
+                    Scan for Devices
+                </button>
+            </div>
+        </div>
+        <ul class="device-list" id="availableDevices">
+            <li class="empty-state">
+                <div class="icon">📡</div>
+                <div>Click "Scan for Devices" to find nearby Bluetooth devices</div>
+            </li>
+        </ul>
+    </div>
+
+    <script>
+        let isScanning = false;
+        let isPairing = false;
+
+        function showMessage(msg, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = msg;
+            el.className = 'status-message show ' + type;
+            
+            if (type !== 'info') {
+                setTimeout(() => {
+                    el.className = 'status-message';
+                }, 5000);
+            }
+        }
+
+        function getDeviceIcon(type) {
+            const icons = {
+                'audio-card': '🔊',
+                'audio-headset': '🎧',
+                'audio-headphones': '🎧',
+                'phone': '📱',
+                'computer': '💻',
+                'keyboard': '⌨️',
+                'mouse': '🖱️',
+                'input-keyboard': '⌨️',
+                'input-mouse': '🖱️',
+                'input-gaming': '🎮',
+                'camera': '📷',
+                'printer': '🖨️',
+                'default': '📶'
+            };
+            return icons[type] || icons['default'];
+        }
+
+        function loadPairedDevices() {
+            fetch('/api/bluetooth/paired')
+                .then(r => r.json())
+                .then(data => {
+                    const connectedList = document.getElementById('connectedDevices');
+                    const pairedList = document.getElementById('pairedDevices');
+                    
+                    if (data.success && data.devices && data.devices.length > 0) {
+                        const connected = data.devices.filter(d => d.connected);
+                        const paired = data.devices.filter(d => !d.connected);
+                        
+                        // Show connected devices
+                        if (connected.length > 0) {
+                            connectedList.innerHTML = connected.map(device => `
+                                <li class="device-item">
+                                    <div class="device-info">
+                                        <span class="device-name">${getDeviceIcon(device.type)} ${device.name || 'Unknown Device'}</span>
+                                        <span class="device-mac">${device.mac}</span>
+                                        ${device.type ? `<span class="device-type">${device.type}</span>` : ''}
+                                    </div>
+                                    <div class="btn-group">
+                                        <span class="device-status connected">Connected</span>
+                                        <button class="btn btn-danger" onclick="disconnectDevice('${device.mac}')">Disconnect</button>
+                                    </div>
+                                </li>
+                            `).join('');
+                        } else {
+                            connectedList.innerHTML = '<li class="empty-state"><div class="icon">📱</div><div>No devices connected</div></li>';
+                        }
+                        
+                        // Show paired but not connected devices
+                        if (paired.length > 0) {
+                            pairedList.innerHTML = paired.map(device => `
+                                <li class="device-item">
+                                    <div class="device-info">
+                                        <span class="device-name">${getDeviceIcon(device.type)} ${device.name || 'Unknown Device'}</span>
+                                        <span class="device-mac">${device.mac}</span>
+                                        ${device.type ? `<span class="device-type">${device.type}</span>` : ''}
+                                    </div>
+                                    <div class="btn-group">
+                                        <button class="btn btn-success" onclick="connectDevice('${device.mac}')">Connect</button>
+                                        <button class="btn btn-danger" onclick="removeDevice('${device.mac}')">Remove</button>
+                                    </div>
+                                </li>
+                            `).join('');
+                        } else {
+                            pairedList.innerHTML = '<li class="empty-state"><div class="icon">🔌</div><div>No paired devices (not connected)</div></li>';
+                        }
+                    } else {
+                        connectedList.innerHTML = '<li class="empty-state"><div class="icon">📱</div><div>No devices connected</div></li>';
+                        pairedList.innerHTML = '<li class="empty-state"><div class="icon">🔌</div><div>No paired devices</div></li>';
+                    }
+                })
+                .catch(err => {
+                    console.error('Error loading paired devices:', err);
+                    showMessage('Failed to load paired devices', 'error');
+                });
+        }
+
+        function scanDevices() {
+            if (isScanning) return;
+            
+            isScanning = true;
+            const scanBtn = document.getElementById('scanBtn');
+            const scanStatus = document.getElementById('scanStatus');
+            const availableList = document.getElementById('availableDevices');
+            
+            scanBtn.disabled = true;
+            scanBtn.innerHTML = '<span class="loading-spinner"></span>Scanning...';
+            scanStatus.textContent = '';
+            availableList.innerHTML = '<li class="empty-state"><div class="loading-spinner" style="width:32px;height:32px;border-width:3px;"></div><div>Scanning for nearby devices...</div></li>';
+            
+            fetch('/api/bluetooth/scan', { method: 'POST' })
+                .then(r => r.json())
+                .then(data => {
+                    isScanning = false;
+                    scanBtn.disabled = false;
+                    scanBtn.innerHTML = 'Scan for Devices';
+                    
+                    if (data.success && data.devices && data.devices.length > 0) {
+                        scanStatus.textContent = `${data.devices.length} device(s) found`;
+                        availableList.innerHTML = data.devices.map(device => `
+                            <li class="device-item">
+                                <div class="device-info">
+                                    <span class="device-name">${getDeviceIcon(device.type)} ${device.name || 'Unknown Device'}</span>
+                                    <span class="device-mac">${device.mac}</span>
+                                    ${device.rssi ? `<span class="device-type">Signal: ${device.rssi} dBm</span>` : ''}
+                                </div>
+                                <button class="btn" onclick="pairDevice('${device.mac}', '${(device.name || 'Unknown').replace(/'/g, "\\'")}')">Pair</button>
+                            </li>
+                        `).join('');
+                    } else {
+                        scanStatus.textContent = 'No devices found';
+                        availableList.innerHTML = '<li class="empty-state"><div class="icon">📡</div><div>No new devices found nearby</div></li>';
+                    }
+                })
+                .catch(err => {
+                    isScanning = false;
+                    scanBtn.disabled = false;
+                    scanBtn.innerHTML = 'Scan for Devices';
+                    scanStatus.textContent = 'Scan failed';
+                    showMessage('Failed to scan for devices: ' + err, 'error');
+                });
+        }
+
+        function pairDevice(mac, name) {
+            if (isPairing) {
+                showMessage('Already pairing a device...', 'info');
+                return;
+            }
+            
+            isPairing = true;
+            showMessage('Pairing with ' + name + '...', 'info');
+            
+            fetch('/api/bluetooth/pair', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({mac: mac})
+            })
+            .then(r => r.json())
+            .then(data => {
+                isPairing = false;
+                if (data.success) {
+                    showMessage('Successfully paired with ' + name, 'success');
+                    loadPairedDevices();
+                    // Remove from available list
+                    scanDevices();
+                } else {
+                    showMessage('Failed to pair: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(err => {
+                isPairing = false;
+                showMessage('Pairing error: ' + err, 'error');
+            });
+        }
+
+        function connectDevice(mac) {
+            showMessage('Connecting...', 'info');
+            
+            fetch('/api/bluetooth/connect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({mac: mac})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('Device connected!', 'success');
+                    loadPairedDevices();
+                } else {
+                    showMessage('Failed to connect: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(err => {
+                showMessage('Connection error: ' + err, 'error');
+            });
+        }
+
+        function disconnectDevice(mac) {
+            showMessage('Disconnecting...', 'info');
+            
+            fetch('/api/bluetooth/disconnect', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({mac: mac})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('Device disconnected', 'success');
+                    loadPairedDevices();
+                } else {
+                    showMessage('Failed to disconnect: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(err => {
+                showMessage('Disconnect error: ' + err, 'error');
+            });
+        }
+
+        function removeDevice(mac) {
+            if (!confirm('Remove this device? You will need to pair it again to use it.')) {
+                return;
+            }
+            
+            showMessage('Removing device...', 'info');
+            
+            fetch('/api/bluetooth/remove', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({mac: mac})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showMessage('Device removed', 'success');
+                    loadPairedDevices();
+                } else {
+                    showMessage('Failed to remove: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(err => {
+                showMessage('Remove error: ' + err, 'error');
+            });
+        }
+
+        // Load paired devices on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadPairedDevices();
+        });
+    </script>
+
+    <!-- Persistent Home Button -->
+    <div onclick="window.location.href='/'" style="
+        position: fixed;
+        bottom: 15px;
+        left: 15px;
+        width: 50px;
+        height: 50px;
+        background: #00ff88;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 9999;
+        font-size: 24px;
+        box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+    ">🏠</div>
+</body>
+</html>

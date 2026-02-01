@@ -870,25 +870,33 @@
 
         // App Launcher Functions
         function launchApp(appName) {
-            if (settings.apps && settings.apps[appName] && settings.apps[appName].enabled) {
-                const url = settings.apps[appName].url;
-                window.open(url, '_blank');
+            // External apps - open directly in browser
+            const externalApps = {
+                'netflix': 'https://www.netflix.com',
+                'youtube': 'https://www.youtube.com',
+                'spotify': 'https://open.spotify.com',
+                'prime': 'https://www.primevideo.com',
+                'prime_video': 'https://www.primevideo.com',
+                'xbox': 'https://www.xbox.com/play',
+                'xbox_cloud': 'https://www.xbox.com/play',
+                'disney_plus': 'https://www.disneyplus.com'
+            };
+            
+            if (externalApps[appName]) {
+                window.location.href = externalApps[appName];
             } else {
-                // Fallback URLs
-                const fallbackUrls = {
-                    'netflix': 'https://www.netflix.com',
-                    'prime_video': 'https://www.primevideo.com',
-                    'youtube': 'https://www.youtube.com/tv',
-                    'disney_plus': 'https://www.disneyplus.com',
-                    'xbox_cloud': 'https://www.xbox.com/play',
-                    'steam': 'https://store.steampowered.com',
-                    'spotify': 'https://open.spotify.com',
-                    'apple_music': 'https://music.apple.com',
-                    'google_photos': 'https://photos.google.com'
+                const pages = {
+                    'devices': '/devices',
+                    'timers': '/timers',
+                    'routines': '/routines',
+                    'shopping': '/shopping',
+                    'calendar': '/calendar',
+                    'intercom': '/intercom',
+                    'settings': '/settings',
+                    'news': '/news'
                 };
-                
-                if (fallbackUrls[appName]) {
-                    window.open(fallbackUrls[appName], '_blank');
+                if (pages[appName]) {
+                    window.location.href = pages[appName];
                 }
             }
         }

@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1024, height=600, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Security Cameras - BingHome</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tile: #1a1a25;
+            --accent: #00ff88;
+            --text-primary: #ffffff;
+            --text-secondary: #888899;
+            --border: rgba(255, 255, 255, 0.1);
+            --danger: #ff4757;
+            --success: #00ff88;
+            --warning: #ffa502;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            width: 1024px;
+            height: 600px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 50px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 10px;
+        }
+
+        .btn {
+            padding: 8px 16px;
+            border-radius: 20px;
+            border: none;
+            cursor: pointer;
+            font-size: 12px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tile);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn-danger {
+            background: var(--danger);
+            color: white;
+        }
+
+        .content {
+            display: flex;
+            height: calc(600px - 50px);
+        }
+
+        /* Tabs */
+        .tabs {
+            display: flex;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab {
+            padding: 12px 20px;
+            cursor: pointer;
+            border-bottom: 2px solid transparent;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        .tab-content.active {
+            display: flex;
+        }
+
+        /* Camera Grid */
+        .camera-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .camera-card {
+            background: var(--bg-tile);
+            border-radius: 10px;
+            overflow: hidden;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .camera-card:hover {
+            border-color: var(--accent);
+        }
+
+        .camera-card.selected {
+            border-color: var(--accent);
+        }
+
+        .camera-thumbnail {
+            width: 100%;
+            height: 100px;
+            background: var(--bg-secondary);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+            font-size: 32px;
+        }
+
+        .camera-thumbnail img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .camera-card-info {
+            padding: 10px;
+        }
+
+        .camera-card-name {
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .camera-card-vendor {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .camera-status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .camera-status-dot.online { background: var(--success); }
+        .camera-status-dot.offline { background: var(--danger); }
+
+        .no-cameras {
+            grid-column: 1 / -1;
+            text-align: center;
+            padding: 50px;
+            color: var(--text-secondary);
+        }
+
+        /* Add Camera Panel */
+        .side-panel {
+            width: 320px;
+            background: var(--bg-secondary);
+            border-left: 1px solid var(--border);
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        .panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+            color: var(--accent);
+        }
+
+        .form-group {
+            margin-bottom: 12px;
+        }
+
+        .form-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-bottom: 5px;
+            display: block;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 10px;
+            background: var(--bg-tile);
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            color: var(--text-primary);
+            font-size: 13px;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .vendor-select {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 8px;
+            margin-bottom: 15px;
+        }
+
+        .vendor-btn {
+            padding: 10px;
+            background: var(--bg-tile);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 11px;
+        }
+
+        .vendor-btn.selected {
+            border-color: var(--accent);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .vendor-icon {
+            font-size: 20px;
+            margin-bottom: 5px;
+        }
+
+        /* Discovery Panel */
+        .discovery-list {
+            max-height: 250px;
+            overflow-y: auto;
+        }
+
+        .discovery-item {
+            background: var(--bg-tile);
+            border-radius: 8px;
+            padding: 10px;
+            margin-bottom: 8px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .discovery-info {
+            font-size: 12px;
+        }
+
+        .discovery-ip {
+            font-weight: 600;
+        }
+
+        .discovery-vendor {
+            color: var(--text-secondary);
+            font-size: 11px;
+        }
+
+        /* Live View */
+        .live-view {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 15px;
+        }
+
+        .live-container {
+            flex: 1;
+            background: var(--bg-tile);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .live-container video, .live-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .live-placeholder {
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .live-placeholder-icon {
+            font-size: 64px;
+            opacity: 0.3;
+            margin-bottom: 15px;
+        }
+
+        .live-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal {
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            padding: 20px;
+            width: 90%;
+            max-width: 400px;
+            max-height: 80%;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+
+        .modal-title {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        /* Status Message */
+        .status-message {
+            position: fixed;
+            bottom: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 12px;
+            display: none;
+            z-index: 100;
+        }
+
+        .status-message.success {
+            background: rgba(0, 255, 136, 0.2);
+            color: var(--success);
+            display: block;
+        }
+
+        .status-message.error {
+            background: rgba(255, 71, 87, 0.2);
+            color: var(--danger);
+            display: block;
+        }
+
+        /* Loading */
+        .loading-spinner {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        /* Home button */
+        .home-button {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            width: 45px;
+            height: 45px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            font-size: 22px;
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <button class="back-btn" onclick="window.location.href='/settings'">&#9664;</button>
+            <span class="header-title">Security Cameras</span>
+        </div>
+        <div class="header-actions">
+            <button class="btn btn-secondary" onclick="discoverCameras()">Discover</button>
+            <button class="btn btn-primary" onclick="showAddModal()">+ Add Camera</button>
+        </div>
+    </div>
+
+    <div class="tabs">
+        <div class="tab active" onclick="switchTab('cameras')">My Cameras</div>
+        <div class="tab" onclick="switchTab('live')">Live View</div>
+    </div>
+
+    <!-- My Cameras Tab -->
+    <div class="tab-content active" id="camerasTab">
+        <div class="camera-grid" id="cameraGrid">
+            <div class="no-cameras" id="noCameras">
+                <div style="font-size: 48px; opacity: 0.3; margin-bottom: 15px;">📹</div>
+                <div>No security cameras configured</div>
+                <div style="font-size: 12px; margin-top: 10px;">Click "Add Camera" to get started</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live View Tab -->
+    <div class="tab-content" id="liveTab">
+        <div class="live-view">
+            <div class="live-container" id="liveContainer">
+                <div class="live-placeholder" id="livePlaceholder">
+                    <div class="live-placeholder-icon">📹</div>
+                    <div>Select a camera to view</div>
+                </div>
+                <img id="liveImage" style="display: none;">
+            </div>
+            <div class="live-controls">
+                <select class="form-select" id="cameraSelect" style="width: 200px;" onchange="selectLiveCamera()">
+                    <option value="">Select Camera</option>
+                </select>
+                <button class="btn btn-primary" id="refreshBtn" onclick="refreshLiveView()">Refresh</button>
+                <button class="btn btn-secondary" onclick="testConnection()">Test</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add Camera Modal -->
+    <div class="modal-overlay" id="addModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Add Security Camera</span>
+                <button class="modal-close" onclick="hideAddModal()">&times;</button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Camera Name</label>
+                <input type="text" class="form-input" id="cameraName" placeholder="Front Door Camera">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Vendor</label>
+                <div class="vendor-select">
+                    <div class="vendor-btn selected" onclick="selectVendor('generic')" data-vendor="generic">
+                        <div class="vendor-icon">📷</div>
+                        <div>Generic</div>
+                    </div>
+                    <div class="vendor-btn" onclick="selectVendor('hikvision')" data-vendor="hikvision">
+                        <div class="vendor-icon">🎥</div>
+                        <div>Hikvision</div>
+                    </div>
+                    <div class="vendor-btn" onclick="selectVendor('reolink')" data-vendor="reolink">
+                        <div class="vendor-icon">🎬</div>
+                        <div>Reolink</div>
+                    </div>
+                    <div class="vendor-btn" onclick="selectVendor('tapo')" data-vendor="tapo">
+                        <div class="vendor-icon">📸</div>
+                        <div>TP-Link Tapo</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-group" id="ipGroup">
+                <label class="form-label">IP Address</label>
+                <input type="text" class="form-input" id="cameraIP" placeholder="192.168.1.100">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Port</label>
+                <input type="number" class="form-input" id="cameraPort" value="554" placeholder="554">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Username</label>
+                <input type="text" class="form-input" id="cameraUser" placeholder="admin">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Password</label>
+                <input type="password" class="form-input" id="cameraPass" placeholder="password">
+            </div>
+
+            <div class="form-group" id="rtspGroup">
+                <label class="form-label">RTSP URL (auto-generated or custom)</label>
+                <input type="text" class="form-input" id="rtspUrl" placeholder="rtsp://user:pass@ip:port/stream">
+            </div>
+
+            <div style="display: flex; gap: 10px; margin-top: 15px;">
+                <button class="btn btn-secondary" style="flex: 1;" onclick="testRtspUrl()">Test Connection</button>
+                <button class="btn btn-primary" style="flex: 1;" onclick="addCamera()">Add Camera</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Discovery Modal -->
+    <div class="modal-overlay" id="discoveryModal">
+        <div class="modal">
+            <div class="modal-header">
+                <span class="modal-title">Discover Cameras</span>
+                <button class="modal-close" onclick="hideDiscoveryModal()">&times;</button>
+            </div>
+
+            <div id="discoveryStatus" style="text-align: center; padding: 20px;">
+                <div class="loading-spinner" style="margin: 0 auto 10px;"></div>
+                <div>Scanning network...</div>
+            </div>
+
+            <div class="discovery-list" id="discoveryList" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div id="statusMessage" class="status-message"></div>
+
+    <div class="home-button" onclick="window.location.href='/'">🏠</div>
+
+    <script>
+        let cameras = [];
+        let selectedVendor = 'generic';
+        let selectedCamera = null;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            loadCameras();
+            setupVendorListeners();
+        });
+
+        function loadCameras() {
+            fetch('/api/security-cameras')
+                .then(r => r.json())
+                .then(data => {
+                    cameras = data.cameras || [];
+                    renderCameraGrid();
+                    updateCameraSelect();
+                })
+                .catch(e => {
+                    console.error('Load cameras error:', e);
+                });
+        }
+
+        function renderCameraGrid() {
+            const grid = document.getElementById('cameraGrid');
+            const noCams = document.getElementById('noCameras');
+
+            if (cameras.length === 0) {
+                noCams.style.display = 'block';
+                return;
+            }
+
+            noCams.style.display = 'none';
+            grid.innerHTML = cameras.map(cam => `
+                <div class="camera-card" onclick="viewCamera('${cam.id}')">
+                    <div class="camera-thumbnail">
+                        ${cam.thumbnail ? `<img src="${cam.thumbnail}">` : '📹'}
+                    </div>
+                    <div class="camera-card-info">
+                        <div class="camera-card-name">
+                            <span class="camera-status-dot ${cam.enabled ? 'online' : 'offline'}"></span>
+                            ${cam.name}
+                        </div>
+                        <div class="camera-card-vendor">${cam.vendor}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function updateCameraSelect() {
+            const select = document.getElementById('cameraSelect');
+            select.innerHTML = '<option value="">Select Camera</option>' +
+                cameras.map(cam => `<option value="${cam.id}">${cam.name}</option>`).join('');
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
+
+            if (tab === 'cameras') {
+                document.querySelector('.tab:nth-child(1)').classList.add('active');
+                document.getElementById('camerasTab').classList.add('active');
+            } else {
+                document.querySelector('.tab:nth-child(2)').classList.add('active');
+                document.getElementById('liveTab').classList.add('active');
+            }
+        }
+
+        function showAddModal() {
+            document.getElementById('addModal').classList.add('active');
+            document.getElementById('cameraName').value = '';
+            document.getElementById('cameraIP').value = '';
+            document.getElementById('cameraPort').value = '554';
+            document.getElementById('cameraUser').value = 'admin';
+            document.getElementById('cameraPass').value = '';
+            document.getElementById('rtspUrl').value = '';
+            selectVendor('generic');
+        }
+
+        function hideAddModal() {
+            document.getElementById('addModal').classList.remove('active');
+        }
+
+        function selectVendor(vendor) {
+            selectedVendor = vendor;
+            document.querySelectorAll('.vendor-btn').forEach(btn => {
+                btn.classList.toggle('selected', btn.dataset.vendor === vendor);
+            });
+            updateRtspUrl();
+        }
+
+        function setupVendorListeners() {
+            ['cameraIP', 'cameraPort', 'cameraUser', 'cameraPass'].forEach(id => {
+                document.getElementById(id).addEventListener('input', updateRtspUrl);
+            });
+        }
+
+        function updateRtspUrl() {
+            const ip = document.getElementById('cameraIP').value;
+            const port = document.getElementById('cameraPort').value;
+            const user = document.getElementById('cameraUser').value;
+            const pass = document.getElementById('cameraPass').value;
+
+            if (!ip) return;
+
+            let pattern = '';
+            switch (selectedVendor) {
+                case 'hikvision':
+                    pattern = `rtsp://${user}:${pass}@${ip}:${port}/Streaming/Channels/101`;
+                    break;
+                case 'reolink':
+                    pattern = `rtsp://${user}:${pass}@${ip}:${port}/h264Preview_01_main`;
+                    break;
+                case 'tapo':
+                    pattern = `rtsp://${user}:${pass}@${ip}:${port}/stream1`;
+                    break;
+                default:
+                    pattern = `rtsp://${user}:${pass}@${ip}:${port}/live`;
+            }
+
+            document.getElementById('rtspUrl').value = pattern;
+        }
+
+        function testRtspUrl() {
+            const url = document.getElementById('rtspUrl').value;
+            if (!url) {
+                showStatus('Please enter an RTSP URL', 'error');
+                return;
+            }
+
+            showStatus('Testing connection...', 'success');
+
+            fetch('/api/security-cameras/test', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({rtsp_url: url})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showStatus('Connection successful!', 'success');
+                } else {
+                    showStatus('Connection failed: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(e => {
+                showStatus('Test error: ' + e, 'error');
+            });
+        }
+
+        function addCamera() {
+            const name = document.getElementById('cameraName').value;
+            const rtspUrl = document.getElementById('rtspUrl').value;
+
+            if (!name || !rtspUrl) {
+                showStatus('Please fill in camera name and RTSP URL', 'error');
+                return;
+            }
+
+            fetch('/api/security-cameras', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    name: name,
+                    rtsp_url: rtspUrl,
+                    vendor: selectedVendor
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    hideAddModal();
+                    loadCameras();
+                    showStatus('Camera added successfully', 'success');
+                } else {
+                    showStatus('Failed to add camera: ' + (data.error || 'Unknown error'), 'error');
+                }
+            })
+            .catch(e => {
+                showStatus('Error adding camera: ' + e, 'error');
+            });
+        }
+
+        function viewCamera(cameraId) {
+            selectedCamera = cameras.find(c => c.id === cameraId);
+            if (selectedCamera) {
+                document.getElementById('cameraSelect').value = cameraId;
+                switchTab('live');
+                refreshLiveView();
+            }
+        }
+
+        function selectLiveCamera() {
+            const cameraId = document.getElementById('cameraSelect').value;
+            if (cameraId) {
+                selectedCamera = cameras.find(c => c.id === cameraId);
+                refreshLiveView();
+            }
+        }
+
+        function refreshLiveView() {
+            if (!selectedCamera) {
+                showStatus('Please select a camera', 'error');
+                return;
+            }
+
+            showStatus('Loading camera...', 'success');
+
+            fetch(`/api/security-cameras/${selectedCamera.id}/snapshot`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success && data.url) {
+                        const img = document.getElementById('liveImage');
+                        img.src = data.url + '?t=' + Date.now();
+                        img.style.display = 'block';
+                        document.getElementById('livePlaceholder').style.display = 'none';
+                        showStatus('Camera loaded', 'success');
+                    } else {
+                        showStatus('Failed to load camera: ' + (data.error || 'Unknown error'), 'error');
+                    }
+                })
+                .catch(e => {
+                    showStatus('Error loading camera: ' + e, 'error');
+                });
+        }
+
+        function testConnection() {
+            if (!selectedCamera) {
+                showStatus('Please select a camera', 'error');
+                return;
+            }
+
+            showStatus('Testing connection...', 'success');
+
+            fetch('/api/security-cameras/test', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({rtsp_url: selectedCamera.rtsp_url})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showStatus('Connection OK!', 'success');
+                } else {
+                    showStatus('Connection failed: ' + (data.error || 'Unknown'), 'error');
+                }
+            })
+            .catch(e => {
+                showStatus('Test error: ' + e, 'error');
+            });
+        }
+
+        function discoverCameras() {
+            document.getElementById('discoveryModal').classList.add('active');
+            document.getElementById('discoveryStatus').style.display = 'block';
+            document.getElementById('discoveryList').style.display = 'none';
+
+            fetch('/api/security-cameras/discover')
+                .then(r => r.json())
+                .then(data => {
+                    document.getElementById('discoveryStatus').style.display = 'none';
+                    const list = document.getElementById('discoveryList');
+                    list.style.display = 'block';
+
+                    if (data.cameras && data.cameras.length > 0) {
+                        list.innerHTML = data.cameras.map(cam => `
+                            <div class="discovery-item">
+                                <div class="discovery-info">
+                                    <div class="discovery-ip">${cam.ip}</div>
+                                    <div class="discovery-vendor">${cam.vendor || 'Unknown vendor'}</div>
+                                </div>
+                                <button class="btn btn-primary" onclick="addDiscoveredCamera('${cam.ip}')">Add</button>
+                            </div>
+                        `).join('');
+                    } else {
+                        list.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--text-secondary);">No cameras found on network</div>';
+                    }
+                })
+                .catch(e => {
+                    document.getElementById('discoveryStatus').innerHTML = '<div style="color: var(--danger);">Discovery failed: ' + e + '</div>';
+                });
+        }
+
+        function hideDiscoveryModal() {
+            document.getElementById('discoveryModal').classList.remove('active');
+        }
+
+        function addDiscoveredCamera(ip) {
+            hideDiscoveryModal();
+            showAddModal();
+            document.getElementById('cameraIP').value = ip;
+            updateRtspUrl();
+        }
+
+        function showStatus(message, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = message;
+            el.className = `status-message ${type}`;
+
+            setTimeout(() => {
+                el.className = 'status-message';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

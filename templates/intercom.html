@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Intercom - BingHome</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tile: #1a1a25;
+            --accent: #00ff88;
+            --text-primary: #ffffff;
+            --text-secondary: #888899;
+            --border: rgba(255, 255, 255, 0.08);
+            --danger: #ff4757;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .back-btn {
+            width: 40px;
+            height: 40px;
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .content {
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+
+        .broadcast-card {
+            background: linear-gradient(135deg, var(--bg-tile), var(--bg-secondary));
+            border-radius: 20px;
+            padding: 30px;
+            text-align: center;
+            margin-bottom: 30px;
+        }
+
+        .broadcast-icon {
+            width: 80px;
+            height: 80px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 20px;
+            font-size: 36px;
+        }
+
+        .broadcast-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 10px;
+        }
+
+        .broadcast-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 20px;
+        }
+
+        .broadcast-btn {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border: none;
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .broadcast-btn:hover {
+            transform: scale(1.05);
+        }
+
+        .broadcast-btn:active {
+            transform: scale(0.95);
+        }
+
+        .broadcast-btn.recording {
+            background: var(--danger);
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .device-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .device-card {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .device-card:hover {
+            border-color: var(--accent);
+        }
+
+        .device-card.selected {
+            border-color: var(--accent);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .device-icon {
+            font-size: 32px;
+            margin-bottom: 10px;
+        }
+
+        .device-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .device-location {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .quick-messages {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+
+        .quick-msg {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-msg:hover {
+            background: var(--bg-secondary);
+        }
+
+        .quick-msg-icon {
+            font-size: 24px;
+            margin-bottom: 8px;
+        }
+
+        .quick-msg-text {
+            font-size: 13px;
+        }
+
+        /* Home Button */
+        .home-button { display: none !important; /* Hidden - using nav-overlay */
+        }
+
+        .old-home-button-hidden {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            width: 50px;
+            height: 50px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            font-size: 24px;
+            color: var(--bg-primary);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+        }
+
+        /* Recording overlay */
+        .recording-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .recording-overlay.active {
+            display: flex;
+        }
+
+        .recording-content {
+            text-align: center;
+        }
+
+        .recording-animation {
+            width: 120px;
+            height: 120px;
+            background: var(--danger);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 0 auto 25px;
+            animation: pulse 1s infinite;
+            font-size: 48px;
+        }
+
+        .recording-text {
+            font-size: 24px;
+            margin-bottom: 10px;
+        }
+
+        .recording-time {
+            font-size: 48px;
+            font-weight: 300;
+            color: var(--accent);
+            margin-bottom: 30px;
+        }
+
+        .stop-btn {
+            background: var(--bg-tile);
+            border: 2px solid var(--danger);
+            color: var(--danger);
+            padding: 15px 40px;
+            border-radius: 30px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button class="back-btn" onclick="window.location.href='/'">◀</button>
+        <div class="header-title">Intercom & Broadcast</div>
+    </div>
+
+    <div class="content">
+        <!-- Broadcast Card -->
+        <div class="broadcast-card">
+            <div class="broadcast-icon">📢</div>
+            <div class="broadcast-title">Broadcast Message</div>
+            <div class="broadcast-desc">Send a voice message to all devices in your home</div>
+            <button class="broadcast-btn" id="broadcastBtn" onclick="startBroadcast()">
+                Hold to Broadcast
+            </button>
+        </div>
+
+        <!-- Select Devices -->
+        <div class="section">
+            <div class="section-title">Or Select Specific Rooms</div>
+            <div class="device-grid">
+                <div class="device-card" onclick="toggleDevice(this, 'living_room')">
+                    <div class="device-icon">🛋️</div>
+                    <div class="device-name">Living Room</div>
+                    <div class="device-location">BingHome Hub</div>
+                </div>
+                <div class="device-card" onclick="toggleDevice(this, 'kitchen')">
+                    <div class="device-icon">🍳</div>
+                    <div class="device-name">Kitchen</div>
+                    <div class="device-location">Speaker</div>
+                </div>
+                <div class="device-card" onclick="toggleDevice(this, 'bedroom')">
+                    <div class="device-icon">🛏️</div>
+                    <div class="device-name">Bedroom</div>
+                    <div class="device-location">Display</div>
+                </div>
+                <div class="device-card" onclick="toggleDevice(this, 'office')">
+                    <div class="device-icon">💼</div>
+                    <div class="device-name">Office</div>
+                    <div class="device-location">Speaker</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Messages -->
+        <div class="section">
+            <div class="section-title">Quick Messages</div>
+            <div class="quick-messages">
+                <div class="quick-msg" onclick="sendQuickMessage('dinner')">
+                    <div class="quick-msg-icon">🍽️</div>
+                    <div class="quick-msg-text">Dinner's ready!</div>
+                </div>
+                <div class="quick-msg" onclick="sendQuickMessage('leaving')">
+                    <div class="quick-msg-icon">👋</div>
+                    <div class="quick-msg-text">I'm leaving now</div>
+                </div>
+                <div class="quick-msg" onclick="sendQuickMessage('wake')">
+                    <div class="quick-msg-icon">⏰</div>
+                    <div class="quick-msg-text">Time to wake up!</div>
+                </div>
+                <div class="quick-msg" onclick="sendQuickMessage('custom')">
+                    <div class="quick-msg-icon">✏️</div>
+                    <div class="quick-msg-text">Custom message</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Home Button -->
+    <!-- Old home button removed - using nav-overlay instead -->
+
+    <!-- Recording Overlay -->
+    <div class="recording-overlay" id="recordingOverlay">
+        <div class="recording-content">
+            <div class="recording-animation">🎙️</div>
+            <div class="recording-text">Recording...</div>
+            <div class="recording-time" id="recordingTime">0:00</div>
+            <button class="stop-btn" onclick="stopBroadcast()">Stop & Send</button>
+        </div>
+    </div>
+
+    <script>
+        let selectedDevices = [];
+        let isRecording = false;
+        let recordingTimer = null;
+        let recordingSeconds = 0;
+        let mediaRecorder = null;
+        let audioChunks = [];
+
+        function toggleDevice(el, deviceId) {
+            el.classList.toggle('selected');
+
+            if (selectedDevices.includes(deviceId)) {
+                selectedDevices = selectedDevices.filter(d => d !== deviceId);
+            } else {
+                selectedDevices.push(deviceId);
+            }
+        }
+
+        async function startBroadcast() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+
+                mediaRecorder.ondataavailable = e => {
+                    audioChunks.push(e.data);
+                };
+
+                mediaRecorder.onstop = () => {
+                    const audioBlob = new Blob(audioChunks, { type: 'audio/wav' });
+                    sendBroadcast(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
+
+                mediaRecorder.start();
+                isRecording = true;
+                recordingSeconds = 0;
+
+                document.getElementById('recordingOverlay').classList.add('active');
+                updateRecordingTime();
+
+                recordingTimer = setInterval(() => {
+                    recordingSeconds++;
+                    updateRecordingTime();
+
+                    // Max 60 seconds
+                    if (recordingSeconds >= 60) {
+                        stopBroadcast();
+                    }
+                }, 1000);
+
+            } catch (err) {
+                console.error('Microphone error:', err);
+                alert('Microphone access denied');
+            }
+        }
+
+        function stopBroadcast() {
+            if (mediaRecorder && isRecording) {
+                mediaRecorder.stop();
+                isRecording = false;
+                clearInterval(recordingTimer);
+                document.getElementById('recordingOverlay').classList.remove('active');
+            }
+        }
+
+        function updateRecordingTime() {
+            const mins = Math.floor(recordingSeconds / 60);
+            const secs = recordingSeconds % 60;
+            document.getElementById('recordingTime').textContent =
+                mins + ':' + secs.toString().padStart(2, '0');
+        }
+
+        function sendBroadcast(audioBlob) {
+            const formData = new FormData();
+            formData.append('audio', audioBlob, 'broadcast.wav');
+            formData.append('devices', JSON.stringify(selectedDevices.length ? selectedDevices : ['all']));
+
+            fetch('/api/intercom/broadcast', {
+                method: 'POST',
+                body: formData
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Broadcast sent successfully');
+                } else {
+                    showNotification('Broadcast failed: ' + data.error, 'error');
+                }
+            })
+            .catch(e => {
+                console.error('Broadcast error:', e);
+                showNotification('Broadcast failed', 'error');
+            });
+        }
+
+        function sendQuickMessage(type) {
+            const messages = {
+                dinner: "Dinner's ready! Come to the kitchen.",
+                leaving: "I'm leaving now. See you later!",
+                wake: "Time to wake up! It's a beautiful day."
+            };
+
+            if (type === 'custom') {
+                const text = prompt('Enter your message:');
+                if (text) {
+                    sendTextMessage(text);
+                }
+            } else if (messages[type]) {
+                sendTextMessage(messages[type]);
+            }
+        }
+
+        function sendTextMessage(text) {
+            fetch('/api/intercom/announce', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    message: text,
+                    devices: selectedDevices.length ? selectedDevices : ['all']
+                })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    showNotification('Message sent');
+                }
+            });
+        }
+
+        function showNotification(text, type = 'success') {
+            alert(text); // Simple notification, could be enhanced
+        }
+    </script>
+    <!-- Navigation Overlay -->
+</body>
+</html>

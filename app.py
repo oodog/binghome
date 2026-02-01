@@ -24,9 +24,13 @@ from flask import Flask, render_template, request, jsonify, redirect, url_for
 sys.path.insert(0, str(Path(__file__).parent))
 try:
     from core.media import MediaController
-    from core.news import NewsManager  
+    from core.news import NewsManager
     from core.timers import TimerManager
     from core.weather import WeatherService
+    from core.device_discovery import DeviceDiscovery
+    from core.google_photos import GooglePhotosService
+    from core.cameras import camera_service, security_camera_service
+    import bluetooth_utils
     logger.info("Core modules imported successfully")
 except ImportError as e:
     logger.error(f"Failed to import core modules: {e}")
@@ -34,6 +38,10 @@ except ImportError as e:
     NewsManager = None
     TimerManager = None
     WeatherService = None
+    DeviceDiscovery = None
+    GooglePhotosService = None
+    camera_service = None
+    security_camera_service = None
 
 # Hardware imports with fallback
 try:
@@ -96,6 +104,15 @@ class BingHomeHub:
             self.news = NewsManager() if NewsManager else self.create_fallback_news()
             self.timers = TimerManager() if TimerManager else self.create_fallback_timers()
             self.weather = WeatherService(self.settings) if WeatherService else self.create_fallback_weather()
+            self.devices = DeviceDiscovery(self.settings) if DeviceDiscovery else self.create_fallback_devices()
+            # Initialize Google Photos with settings callbacks
+            if GooglePhotosService:
+                self.google_photos = GooglePhotosService(
+                    lambda: self.settings,
+                    lambda s: self.save_settings(s)
+                )
+            else:
+                self.google_photos = None
             logger.info("Controllers initialized successfully")
         except Exception as e:
             logger.error(f"Error initializing controllers: {e}")
@@ -103,6 +120,7 @@ class BingHomeHub:
             self.news = self.create_fallback_news()
             self.timers = self.create_fallback_timers()
             self.weather = self.create_fallback_weather()
+            self.devices = self.create_fallback_devices()
     
     def create_fallback_media(self):
         class FallbackMedia:
@@ -128,19 +146,32 @@ class BingHomeHub:
     
     def create_fallback_weather(self):
         class FallbackWeather:
-            def __init__(self, settings=None): 
+            def __init__(self, settings=None):
                 self.settings = settings or {}
             def get_comprehensive_weather(self, location=None):
                 return {
-                    'current': {'temp': 24, 'humidity': 62, 'condition': 'Partly Cloudy', 
+                    'current': {'temp': 24, 'humidity': 62, 'condition': 'Partly Cloudy',
                                'description': 'Partly Cloudy', 'wind_speed': 12, 'location': 'Gold Coast, QLD'},
                     'forecast': [{'date': '2024-01-01', 'temp_min': 18, 'temp_max': 26, 'condition': 'Sunny', 'day_name': 'Today'}],
                     'radar': {'available': True, 'url': 'https://data.theweather.com.au/access/animators/radar/?lt=wzstate&user=10545v3&lc=qld'}
                 }
-            def get_current(self, location=None): 
+            def get_current(self, location=None):
                 return self.get_comprehensive_weather(location)['current']
             def update_settings(self, settings): pass
         return FallbackWeather()
+
+    def create_fallback_devices(self):
+        class FallbackDevices:
+            def __init__(self, settings=None):
+                self.settings = settings or {}
+            def scan_all_devices(self):
+                return {'devices': {'wifi': [], 'bluetooth': [], 'home_assistant': []}, 'summary': {'total': 0}}
+            def get_all_devices(self):
+                return {'devices': {'wifi': [], 'bluetooth': [], 'home_assistant': []}, 'summary': {'total': 0}}
+            def control_device(self, device_type, device_id, action, **kwargs):
+                return {'success': False, 'error': 'Device control not available'}
+            def update_settings(self, settings): pass
+        return FallbackDevices()
         
     def load_settings(self):
         """Load settings from JSON file"""
@@ -369,21 +400,30 @@ binghome = BingHomeHub()
 
 @app.route('/')
 def index():
-    """Main hub interface - use hub.html if available, fallback to index.html"""
+    """Main hub interface - customizable dashboard"""
     try:
-        return render_template('hub.html', settings=binghome.settings)
+        return render_template('dashboard.html', settings=binghome.settings)
     except:
         try:
-            return render_template('index.html', settings=binghome.settings)
+            return render_template('hub_v3.html', settings=binghome.settings)
         except:
-            # Fallback HTML if no templates exist
-            return f'''
-            <!DOCTYPE html>
-            <html><head><title>BingHome Hub</title>
-            <style>body{{background:#000;color:#fff;font-family:Arial;text-align:center;padding:50px;}}
-            h1{{color:#00ff88;}}</style></head>
-            <body><h1>BingHome Hub</h1><p>System Running</p><a href="/settings">Settings</a></body></html>
-            '''
+            try:
+                return render_template('hub_enhanced.html', settings=binghome.settings)
+            except:
+                try:
+                    return render_template('hub.html', settings=binghome.settings)
+                except:
+                    try:
+                        return render_template('index.html', settings=binghome.settings)
+                    except:
+                        # Fallback HTML if no templates exist
+                        return f'''
+                        <!DOCTYPE html>
+                        <html><head><title>BingHome Hub</title>
+                        <style>body{{background:#000;color:#fff;font-family:Arial;text-align:center;padding:50px;}}
+                        h1{{color:#00ff88;}}</style></head>
+                        <body><h1>BingHome Hub</h1><p>System Running</p><a href="/settings">Settings</a></body></html>
+                        '''
 
 @app.route('/settings')
 def settings_page():
@@ -393,6 +433,11 @@ def settings_page():
     except Exception as e:
         logger.error(f"Settings template error: {e}")
         return f"<h1>Settings</h1><p>Template error: {e}</p><a href='/'>Back</a>"
+
+@app.route('/bluetooth')
+def bluetooth_page():
+    """Bluetooth settings page"""
+    return render_template('bluetooth_settings.html')
 
 @app.route('/system')
 def system_page():
@@ -419,6 +464,111 @@ def wifi_page():
         return render_template('wifi_settings.html')
     except Exception as e:
         return f"<h1>WiFi Settings</h1><p>Template error: {e}</p><a href='/'>Back</a>"
+
+@app.route('/devices')
+def devices_page():
+    """Devices management page"""
+    try:
+        return render_template('devices.html')
+    except Exception as e:
+        logger.error(f"Devices template error: {e}")
+        return f"<h1>Devices</h1><p>Template error: {e}</p><a href='/'>Back</a>"
+
+@app.route('/routines')
+def routines_page():
+    """Routines/Automations page"""
+    try:
+        return render_template('routines.html')
+    except Exception as e:
+        logger.error(f"Routines template error: {e}")
+        return f"<h1>Routines</h1><p>Template error: {e}</p><a href='/'>Back</a>"
+
+@app.route('/shopping')
+def shopping_page():
+    """Shopping list page"""
+    try:
+        return render_template('shopping.html')
+    except Exception as e:
+        logger.error(f"Shopping template error: {e}")
+        return f"<h1>Shopping List</h1><p>Template error: {e}</p><a href='/'>Back</a>"
+
+@app.route('/calendar')
+def calendar_page():
+    """Calendar page"""
+    try:
+        return render_template('calendar.html')
+    except Exception as e:
+        logger.error(f"Calendar template error: {e}")
+        return f"<h1>Calendar</h1><p>Template error: {e}</p><a href='/'>Back</a>"
+
+@app.route('/intercom')
+def intercom_page():
+    """Intercom/Broadcast page"""
+    try:
+        return render_template('intercom.html')
+    except Exception as e:
+        logger.error(f"Intercom template error: {e}")
+        return f"<h1>Intercom</h1><p>Template error: {e}</p><a href='/'>Back</a>"
+
+@app.route("/app/<app_name>")
+def app_viewer(app_name):
+    """View external apps in iframe with navigation overlay"""
+    apps = {
+        "youtube": {"name": "YouTube", "url": "https://www.youtube.com/tv"},
+        "netflix": {"name": "Netflix", "url": "https://www.netflix.com/browse"},
+        "spotify": {"name": "Spotify", "url": "https://open.spotify.com"},
+        "prime": {"name": "Prime Video", "url": "https://www.primevideo.com"},
+        "xbox": {"name": "Xbox Cloud", "url": "https://www.xbox.com/play"},
+        "disney_plus": {"name": "Disney+", "url": "https://www.disneyplus.com"}
+    }
+    if app_name in apps:
+        return render_template("app_viewer.html", app_name=apps[app_name]["name"], app_url=apps[app_name]["url"])
+    return redirect("/")
+
+@app.route('/hub')
+def hub_v3_page():
+    """Enhanced hub page"""
+    try:
+        return render_template('hub_v3.html')
+    except Exception as e:
+        logger.error(f"Hub v3 template error: {e}")
+        return redirect('/')
+
+@app.route('/timers')
+def timers_page():
+    """Timers, Alarms, and Stopwatch page"""
+    try:
+        return render_template('timers.html')
+    except Exception as e:
+        logger.error(f"Timers template error: {e}")
+        return f"<h1>Timers</h1><p>Template error: {e}</p><a href='/'>Back</a>"
+
+@app.route('/dashboard')
+def dashboard_page():
+    """Customizable dashboard page"""
+    try:
+        return render_template('dashboard.html', settings=binghome.settings)
+    except Exception as e:
+        logger.error(f"Dashboard template error: {e}")
+        return redirect('/')
+
+@app.route('/camera-settings')
+def camera_settings_page():
+    """Camera settings page for Pi/USB cameras"""
+    try:
+        return render_template('camera_settings.html')
+    except Exception as e:
+        logger.error(f"Camera settings template error: {e}")
+        return f"<h1>Camera Settings</h1><p>Template error: {e}</p><a href='/settings'>Back</a>"
+
+@app.route('/security-cameras')
+def security_cameras_page():
+    """Security cameras page for RTSP streams"""
+    try:
+        return render_template('security_cameras.html')
+    except Exception as e:
+        logger.error(f"Security cameras template error: {e}")
+        return f"<h1>Security Cameras</h1><p>Template error: {e}</p><a href='/settings'>Back</a>"
 
 # ============================================
 # API Routes
@@ -719,29 +869,32 @@ def google_photos_status():
 def google_photos_albums():
     """Get list of Google Photos albums"""
     try:
-        import requests
-        access_token = binghome.settings.get('google_photos_access_token', '')
-        
-        logger.info(f"Albums request - Token present: {bool(access_token)}")
-        
-        if not access_token:
-            logger.error("No access token found")
-            return jsonify({'success': False, 'error': 'Not connected'}), 401
-        
-        headers = {'Authorization': f'Bearer {access_token}'}
-        response = requests.get('https://photoslibrary.googleapis.com/v1/albums', headers=headers)
-        
-        logger.info(f"Albums API response: {response.status_code}")
-        
-        if response.status_code == 200:
-            data = response.json()
-            albums = data.get('albums', [])
-            logger.info(f"Found {len(albums)} albums")
-            return jsonify({'success': True, 'albums': albums})
+        # Use the GooglePhotosService with automatic token refresh
+        if binghome.google_photos:
+            result = binghome.google_photos.get_albums()
+            if result['success']:
+                logger.info(f"Found {len(result.get('albums', []))} albums")
+                return jsonify(result)
+            else:
+                status_code = result.get('status_code', 500)
+                return jsonify(result), status_code
         else:
-            error_msg = response.text
-            logger.error(f"Albums API error: {response.status_code} - {error_msg}")
-            return jsonify({'success': False, 'error': f'API error: {response.status_code}', 'details': error_msg}), response.status_code
+            # Fallback to direct API call
+            import requests
+            access_token = binghome.settings.get('google_photos_access_token', '')
+            
+            if not access_token:
+                return jsonify({'success': False, 'error': 'Not connected'}), 401
+            
+            headers = {'Authorization': f'Bearer {access_token}'}
+            response = requests.get('https://photoslibrary.googleapis.com/v1/albums', headers=headers)
+            
+            if response.status_code == 200:
+                data = response.json()
+                albums = data.get('albums', [])
+                return jsonify({'success': True, 'albums': albums})
+            else:
+                return jsonify({'success': False, 'error': f'API error: {response.status_code}'}), response.status_code
     except Exception as e:
         logger.error(f"Google Photos albums error: {e}", exc_info=True)
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -750,35 +903,50 @@ def google_photos_albums():
 def google_photos_photos():
     """Get photos from selected album"""
     try:
-        import requests
-        access_token = binghome.settings.get('google_photos_access_token', '')
         album_id = binghome.settings.get('google_photos_album', '')
         
-        if not access_token:
-            return jsonify({'success': False, 'error': 'Not connected'}), 401
-        
-        if not album_id:
-            return jsonify({'success': False, 'error': 'No album selected'}), 400
-        
-        headers = {'Authorization': f'Bearer {access_token}', 'Content-Type': 'application/json'}
-        response = requests.post(
-            'https://photoslibrary.googleapis.com/v1/mediaItems:search',
-            headers=headers,
-            json={'albumId': album_id, 'pageSize': 100}
-        )
-        
-        if response.status_code == 200:
-            data = response.json()
-            media_items = data.get('mediaItems', [])
-            photos = [{
-                'id': item['id'],
-                'url': item['baseUrl'] + '=w1920-h1080',
-                'filename': item.get('filename', ''),
-                'mimeType': item.get('mimeType', '')
-            } for item in media_items if item.get('mimeType', '').startswith('image/')]
-            return jsonify({'success': True, 'photos': photos})
+        # Use the GooglePhotosService with automatic token refresh
+        if binghome.google_photos:
+            if album_id:
+                result = binghome.google_photos.get_photos_from_album(album_id)
+            else:
+                result = binghome.google_photos.get_recent_photos()
+            
+            if result['success']:
+                return jsonify(result)
+            else:
+                status_code = result.get('status_code', 500)
+                return jsonify(result), status_code
         else:
-            return jsonify({'success': False, 'error': 'Failed to fetch photos'}), response.status_code
+            # Fallback to direct API call
+            import requests
+            access_token = binghome.settings.get('google_photos_access_token', '')
+            
+            if not access_token:
+                return jsonify({'success': False, 'error': 'Not connected'}), 401
+            
+            if not album_id:
+                return jsonify({'success': False, 'error': 'No album selected'}), 400
+            
+            headers = {'Authorization': f'Bearer {access_token}', 'Content-Type': 'application/json'}
+            response = requests.post(
+                'https://photoslibrary.googleapis.com/v1/mediaItems:search',
+                headers=headers,
+                json={'albumId': album_id, 'pageSize': 100}
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                media_items = data.get('mediaItems', [])
+                photos = [{
+                    'id': item['id'],
+                    'url': item['baseUrl'] + '=w1920-h1080',
+                    'filename': item.get('filename', ''),
+                    'mimeType': item.get('mimeType', '')
+                } for item in media_items if item.get('mimeType', '').startswith('image/')]
+                return jsonify({'success': True, 'photos': photos})
+            else:
+                return jsonify({'success': False, 'error': 'Failed to fetch photos'}), response.status_code
     except Exception as e:
         logger.error(f"Google Photos photos error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -798,6 +966,233 @@ def google_photos_disconnect():
         logger.error(f"Google Photos disconnect error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
 
+@app.route('/api/google_photos/shared')
+def google_photos_shared():
+    """Get photos from a shared Google Photos album link"""
+    try:
+        from core.google_photos import fetch_shared_album_photos
+
+        # Get shared URL from settings or query param
+        shared_url = request.args.get('url') or binghome.settings.get('google_photos_shared_url', '')
+
+        if not shared_url:
+            return jsonify({'success': False, 'error': 'No shared album URL configured', 'photos': []})
+
+        result = fetch_shared_album_photos(shared_url)
+        return jsonify(result)
+    except ImportError:
+        return jsonify({'success': False, 'error': 'Google Photos module not available', 'photos': []})
+    except Exception as e:
+        logger.error(f"Shared album error: {e}")
+        return jsonify({'success': False, 'error': str(e), 'photos': []}), 500
+
+@app.route('/api/google_photos/shared/test', methods=['POST'])
+def google_photos_shared_test():
+    """Test a shared album URL"""
+    try:
+        from core.google_photos import fetch_shared_album_photos
+
+        data = request.get_json() or {}
+        shared_url = data.get('url', '')
+
+        if not shared_url:
+            return jsonify({'success': False, 'error': 'No URL provided'})
+
+        result = fetch_shared_album_photos(shared_url)
+
+        if result['success']:
+            return jsonify({
+                'success': True,
+                'count': result.get('count', len(result.get('photos', []))),
+                'message': f"Found {result.get('count', 0)} photos"
+            })
+        else:
+            return jsonify(result)
+    except Exception as e:
+        logger.error(f"Shared album test error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/devices')
+def api_devices():
+    """Get all discovered devices"""
+    try:
+        devices_data = binghome.devices.get_all_devices()
+        return jsonify(devices_data)
+    except Exception as e:
+        logger.error(f"Devices API error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/devices/scan', methods=['POST'])
+def api_devices_scan():
+    """Scan for all devices"""
+    try:
+        devices_data = binghome.devices.scan_all_devices()
+        return jsonify(devices_data)
+    except Exception as e:
+        logger.error(f"Device scan error: {e}")
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/devices/control', methods=['POST'])
+def api_devices_control():
+    """Control a device"""
+    try:
+        data = request.get_json() or {}
+        device_type = data.get('device_type')
+        device_id = data.get('device_id')
+        action = data.get('action')
+
+        if not all([device_type, device_id, action]):
+            return jsonify({'success': False, 'error': 'Missing required parameters'}), 400
+
+        # Pass additional parameters
+        kwargs = {k: v for k, v in data.items() if k not in ['device_type', 'device_id', 'action']}
+
+        result = binghome.devices.control_device(device_type, device_id, action, **kwargs)
+        return jsonify(result)
+    except Exception as e:
+        logger.error(f"Device control error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/shopping', methods=['GET', 'POST'])
+def api_shopping():
+    """Shopping list API"""
+    shopping_file = BASE_DIR / 'data' / 'shopping.json'
+    shopping_file.parent.mkdir(exist_ok=True)
+
+    if request.method == 'GET':
+        try:
+            if shopping_file.exists():
+                with open(shopping_file) as f:
+                    data = json.load(f)
+                return jsonify(data)
+            return jsonify({'items': []})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'POST':
+        try:
+            data = request.get_json() or {}
+            with open(shopping_file, 'w') as f:
+                json.dump(data, f)
+            return jsonify({'success': True})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/routines', methods=['GET', 'POST'])
+def api_routines():
+    """Routines/Automations API"""
+    routines_file = BASE_DIR / 'data' / 'routines.json'
+    routines_file.parent.mkdir(exist_ok=True)
+
+    if request.method == 'GET':
+        try:
+            if routines_file.exists():
+                with open(routines_file) as f:
+                    data = json.load(f)
+                return jsonify(data)
+            return jsonify({'routines': []})
+        except Exception as e:
+            return jsonify({'error': str(e)}), 500
+
+    elif request.method == 'POST':
+        try:
+            data = request.get_json() or {}
+            # Load existing routines
+            routines = []
+            if routines_file.exists():
+                with open(routines_file) as f:
+                    routines = json.load(f).get('routines', [])
+
+            # Add new routine
+            data['id'] = f"routine_{int(time.time())}"
+            data['created'] = datetime.now().isoformat()
+            routines.append(data)
+
+            with open(routines_file, 'w') as f:
+                json.dump({'routines': routines}, f)
+            return jsonify({'success': True, 'id': data['id']})
+        except Exception as e:
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/photos/list')
+def api_photos_list():
+    """List local photos for slideshow"""
+    photos_dir = BASE_DIR / 'static' / 'photos'
+    photos_dir.mkdir(parents=True, exist_ok=True)
+
+    photos = []
+    supported = {'.jpg', '.jpeg', '.png', '.gif', '.webp'}
+
+    try:
+        for file_path in photos_dir.rglob('*'):
+            if file_path.suffix.lower() in supported:
+                photos.append({
+                    'url': f'/static/photos/{file_path.relative_to(photos_dir)}',
+                    'name': file_path.name
+                })
+        return jsonify({'photos': photos})
+    except Exception as e:
+        return jsonify({'photos': [], 'error': str(e)})
+
+@app.route('/api/intercom/announce', methods=['POST'])
+def api_intercom_announce():
+    """Text-to-speech announcement"""
+    try:
+        data = request.get_json() or {}
+        message = data.get('message', '')
+        devices = data.get('devices', ['all'])
+
+        if not message:
+            return jsonify({'success': False, 'error': 'No message provided'})
+
+        # Use TTS to speak the message
+        try:
+            import pyttsx3
+            engine = pyttsx3.init()
+            engine.setProperty('rate', binghome.settings.get('tts_rate', 150))
+            engine.setProperty('volume', binghome.settings.get('tts_volume', 0.9))
+            engine.say(message)
+            engine.runAndWait()
+        except Exception as e:
+            logger.error(f"TTS error: {e}")
+            # Fallback to espeak
+            subprocess.run(['espeak', message], capture_output=True)
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/intercom/broadcast', methods=['POST'])
+def api_intercom_broadcast():
+    """Audio broadcast to devices"""
+    try:
+        if 'audio' not in request.files:
+            return jsonify({'success': False, 'error': 'No audio file'})
+
+        audio = request.files['audio']
+        devices = json.loads(request.form.get('devices', '["all"]'))
+
+        # Save audio temporarily
+        audio_path = BASE_DIR / 'data' / 'broadcast.wav'
+        audio_path.parent.mkdir(exist_ok=True)
+        audio.save(str(audio_path))
+
+        # Play audio
+        try:
+            subprocess.run(['aplay', str(audio_path)], capture_output=True)
+        except Exception as e:
+            logger.error(f"Audio playback error: {e}")
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)})
+
+@app.route('/api/calendar/events')
+def api_calendar_events():
+    """Get calendar events"""
+    # Placeholder - would integrate with Google Calendar or iCloud
+    return jsonify({'events': []})
+
 @app.route('/api/health')
 def api_health():
     """System health check"""
@@ -809,7 +1204,7 @@ def api_health():
             'apps_configured': len(binghome.settings.get('apps', {})),
             'startup_complete': binghome.startup_complete,
             'timestamp': datetime.now().isoformat(),
-            'version': '2.1.0'
+            'version': '3.0.0'
         })
     except Exception as e:
         logger.error(f"Health check error: {e}")
@@ -824,6 +1219,273 @@ def api_restart():
     except Exception as e:
         logger.error(f"Restart error: {e}")
         return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============================================
+# Bluetooth API Routes
+# ============================================
+
+@app.route('/api/bluetooth/paired')
+def api_bluetooth_paired():
+    """Get list of paired Bluetooth devices"""
+    try:
+        devices = bluetooth_utils.get_paired_devices()
+        return jsonify({'success': True, 'devices': devices})
+    except Exception as e:
+        logger.error(f"Bluetooth paired error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/bluetooth/scan', methods=['POST'])
+def api_bluetooth_scan():
+    """Scan for nearby Bluetooth devices"""
+    try:
+        devices = bluetooth_utils.scan_for_devices()
+        return jsonify({'success': True, 'devices': devices})
+    except Exception as e:
+        logger.error(f"Bluetooth scan error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/bluetooth/pair', methods=['POST'])
+def api_bluetooth_pair():
+    """Pair with a Bluetooth device"""
+    try:
+        data = request.get_json()
+        mac = data.get('mac')
+        if not mac:
+            return jsonify({'success': False, 'error': 'MAC address required'}), 400
+        
+        success, message = bluetooth_utils.pair_device(mac)
+        return jsonify({'success': success, 'message': message if success else None, 'error': message if not success else None})
+    except Exception as e:
+        logger.error(f"Bluetooth pair error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/bluetooth/connect', methods=['POST'])
+def api_bluetooth_connect():
+    """Connect to a paired Bluetooth device"""
+    try:
+        data = request.get_json()
+        mac = data.get('mac')
+        if not mac:
+            return jsonify({'success': False, 'error': 'MAC address required'}), 400
+        
+        success, message = bluetooth_utils.connect_device(mac)
+        return jsonify({'success': success, 'message': message if success else None, 'error': message if not success else None})
+    except Exception as e:
+        logger.error(f"Bluetooth connect error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/bluetooth/disconnect', methods=['POST'])
+def api_bluetooth_disconnect():
+    """Disconnect a Bluetooth device"""
+    try:
+        data = request.get_json()
+        mac = data.get('mac')
+        if not mac:
+            return jsonify({'success': False, 'error': 'MAC address required'}), 400
+        
+        success, message = bluetooth_utils.disconnect_device(mac)
+        return jsonify({'success': success, 'message': message if success else None, 'error': message if not success else None})
+    except Exception as e:
+        logger.error(f"Bluetooth disconnect error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/bluetooth/remove', methods=['POST'])
+def api_bluetooth_remove():
+    """Remove/unpair a Bluetooth device"""
+    try:
+        data = request.get_json()
+        mac = data.get('mac')
+        if not mac:
+            return jsonify({'success': False, 'error': 'MAC address required'}), 400
+
+        success, message = bluetooth_utils.remove_device(mac)
+        return jsonify({'success': success, 'message': message if success else None, 'error': message if not success else None})
+    except Exception as e:
+        logger.error(f"Bluetooth remove error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+# ============================================
+# Camera API Routes
+# ============================================
+
+@app.route('/api/cameras/detect')
+def api_cameras_detect():
+    """Detect local cameras (Pi Camera, USB)"""
+    try:
+        if camera_service:
+            cameras = camera_service.detect_cameras()
+            return jsonify({'cameras': cameras})
+        return jsonify({'cameras': [], 'error': 'Camera service not available'})
+    except Exception as e:
+        logger.error(f"Camera detect error: {e}")
+        return jsonify({'cameras': [], 'error': str(e)}), 500
+
+@app.route('/api/cameras/snapshot')
+def api_cameras_snapshot():
+    """Capture snapshot from a camera"""
+    try:
+        camera_id = request.args.get('camera_id')
+        if camera_service:
+            snapshot_path, error = camera_service.get_camera_snapshot(camera_id)
+            if snapshot_path:
+                # Copy to static folder for web access
+                import shutil
+                static_path = BASE_DIR / 'static' / 'snapshots'
+                static_path.mkdir(parents=True, exist_ok=True)
+                dest_path = static_path / 'camera_snapshot.jpg'
+                shutil.copy(snapshot_path, dest_path)
+                return jsonify({'success': True, 'url': '/static/snapshots/camera_snapshot.jpg'})
+            return jsonify({'success': False, 'error': error or 'Failed to capture'})
+        return jsonify({'success': False, 'error': 'Camera service not available'})
+    except Exception as e:
+        logger.error(f"Camera snapshot error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/cameras/stream/start', methods=['POST'])
+def api_cameras_stream_start():
+    """Start camera stream"""
+    try:
+        camera_id = request.args.get('camera_id')
+        if camera_service:
+            success, message = camera_service.start_mjpeg_stream(camera_id)
+            return jsonify({'success': success, 'message': message})
+        return jsonify({'success': False, 'error': 'Camera service not available'})
+    except Exception as e:
+        logger.error(f"Camera stream start error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/cameras/stream/stop', methods=['POST'])
+def api_cameras_stream_stop():
+    """Stop camera stream"""
+    try:
+        if camera_service:
+            success, message = camera_service.stop_stream()
+            return jsonify({'success': success, 'message': message})
+        return jsonify({'success': False, 'error': 'Camera service not available'})
+    except Exception as e:
+        logger.error(f"Camera stream stop error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/security-cameras', methods=['GET', 'POST'])
+def api_security_cameras():
+    """Get or add security cameras"""
+    if request.method == 'GET':
+        try:
+            if security_camera_service:
+                cameras = security_camera_service.get_cameras()
+                return jsonify({'cameras': cameras})
+            return jsonify({'cameras': []})
+        except Exception as e:
+            logger.error(f"Security cameras GET error: {e}")
+            return jsonify({'cameras': [], 'error': str(e)}), 500
+
+    elif request.method == 'POST':
+        try:
+            data = request.get_json() or {}
+            name = data.get('name')
+            rtsp_url = data.get('rtsp_url')
+            vendor = data.get('vendor', 'generic')
+
+            if not name or not rtsp_url:
+                return jsonify({'success': False, 'error': 'Name and RTSP URL required'}), 400
+
+            if security_camera_service:
+                camera = security_camera_service.add_camera(name, rtsp_url, vendor)
+                return jsonify({'success': True, 'camera': camera})
+            return jsonify({'success': False, 'error': 'Security camera service not available'})
+        except Exception as e:
+            logger.error(f"Security cameras POST error: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/security-cameras/<camera_id>', methods=['GET', 'DELETE', 'PUT'])
+def api_security_camera(camera_id):
+    """Get, update, or delete a specific security camera"""
+    if request.method == 'GET':
+        try:
+            if security_camera_service:
+                camera = security_camera_service.get_camera(camera_id)
+                if camera:
+                    return jsonify({'success': True, 'camera': camera})
+                return jsonify({'success': False, 'error': 'Camera not found'}), 404
+            return jsonify({'success': False, 'error': 'Service not available'})
+        except Exception as e:
+            logger.error(f"Security camera GET error: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    elif request.method == 'DELETE':
+        try:
+            if security_camera_service:
+                security_camera_service.remove_camera(camera_id)
+                return jsonify({'success': True})
+            return jsonify({'success': False, 'error': 'Service not available'})
+        except Exception as e:
+            logger.error(f"Security camera DELETE error: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+    elif request.method == 'PUT':
+        try:
+            data = request.get_json() or {}
+            if security_camera_service:
+                camera = security_camera_service.update_camera(camera_id, **data)
+                if camera:
+                    return jsonify({'success': True, 'camera': camera})
+                return jsonify({'success': False, 'error': 'Camera not found'}), 404
+            return jsonify({'success': False, 'error': 'Service not available'})
+        except Exception as e:
+            logger.error(f"Security camera PUT error: {e}")
+            return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/security-cameras/<camera_id>/snapshot')
+def api_security_camera_snapshot(camera_id):
+    """Capture snapshot from security camera"""
+    try:
+        if security_camera_service:
+            camera = security_camera_service.get_camera(camera_id)
+            if camera:
+                # Capture thumbnail from RTSP stream
+                static_path = BASE_DIR / 'static' / 'snapshots'
+                static_path.mkdir(parents=True, exist_ok=True)
+                output_path = str(static_path / f'security_{camera_id}.jpg')
+
+                result = security_camera_service.capture_thumbnail(camera['rtsp_url'], output_path)
+                if result:
+                    return jsonify({'success': True, 'url': f'/static/snapshots/security_{camera_id}.jpg'})
+                return jsonify({'success': False, 'error': 'Failed to capture snapshot'})
+            return jsonify({'success': False, 'error': 'Camera not found'}), 404
+        return jsonify({'success': False, 'error': 'Service not available'})
+    except Exception as e:
+        logger.error(f"Security camera snapshot error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/security-cameras/test', methods=['POST'])
+def api_security_cameras_test():
+    """Test RTSP stream connection"""
+    try:
+        data = request.get_json() or {}
+        rtsp_url = data.get('rtsp_url')
+
+        if not rtsp_url:
+            return jsonify({'success': False, 'error': 'RTSP URL required'}), 400
+
+        if security_camera_service:
+            success, message = security_camera_service.test_rtsp_stream(rtsp_url)
+            return jsonify({'success': success, 'message': message if success else None, 'error': message if not success else None})
+        return jsonify({'success': False, 'error': 'Service not available'})
+    except Exception as e:
+        logger.error(f"Security camera test error: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/security-cameras/discover')
+def api_security_cameras_discover():
+    """Discover cameras on the network"""
+    try:
+        if security_camera_service:
+            cameras = security_camera_service.discover_cameras()
+            return jsonify({'cameras': cameras})
+        return jsonify({'cameras': [], 'error': 'Service not available'})
+    except Exception as e:
+        logger.error(f"Security camera discover error: {e}")
+        return jsonify({'cameras': [], 'error': str(e)}), 500
 
 # ============================================
 # WebSocket Events (if available)

@@ -178,6 +178,9 @@
         <h2>🔗 Quick Access</h2>
         <div class="quick-links">
             <a href="/wifi" class="link-btn">📶 WiFi Settings</a>
+            <a href="/bluetooth" class="link-btn">🔷 Bluetooth</a>
+            <a href="/camera-settings" class="link-btn">📷 Camera Settings</a>
+            <a href="/security-cameras" class="link-btn">📹 Security Cameras</a>
             <a href="/system" class="link-btn">📊 System Status</a>
             <a href="#" onclick="checkHealth()" class="link-btn">❤️ Health Check</a>
             <a href="#" onclick="restartSystem()" class="link-btn">🔄 Restart</a>
@@ -301,18 +304,33 @@
     </div>
 
     <div class="settings-section">
-        <h2>� Google Photos Integration</h2>
+        <h2>📷 Google Photos Integration</h2>
+
+        <!-- Shared Album (Easy Method) -->
         <div class="form-group">
-            <label>Status</label>
+            <label>Shared Album Link (Easiest - No Sign-in Required)</label>
+            <input type="text" id="sharedAlbumUrl" placeholder="https://photos.app.goo.gl/xxxxx">
+            <div style="font-size: 12px; color: #888; margin-top: 5px;">
+                Paste a shared Google Photos album link. The album must have "Anyone with the link can view" permission.
+            </div>
+        </div>
+        <div class="form-group">
+            <button class="btn btn-secondary" onclick="testSharedAlbum()">Test Shared Album</button>
+            <span id="sharedAlbumStatus" style="margin-left: 10px; font-size: 12px;"></span>
+        </div>
+
+        <div style="border-top: 1px solid rgba(255,255,255,0.1); margin: 20px 0; padding-top: 20px;">
+            <div style="font-size: 12px; color: #888; margin-bottom: 10px;">OR use OAuth (Advanced - requires Google Cloud setup)</div>
+        </div>
+
+        <div class="form-group">
+            <label>OAuth Status</label>
             <div id="googlePhotosStatus" style="padding: 10px; background: rgba(255,255,255,0.05); border-radius: 5px;">
                 <span id="photosStatusText">Not connected</span>
             </div>
         </div>
         <div class="form-group" id="photosSignInSection">
-            <button class="btn" onclick="signInToGooglePhotos()">Sign in to Google Photos</button>
-            <div style="font-size: 12px; color: #888; margin-top: 5px;">
-                You'll need to authorize BingHome to access your Google Photos albums
-            </div>
+            <button class="btn btn-secondary" onclick="signInToGooglePhotos()">Sign in with Google (Advanced)</button>
         </div>
         <div class="form-group" id="albumSelectionSection" style="display: none;">
             <label>Select Album for Slideshow</label>
@@ -320,13 +338,25 @@
                 <option value="">Loading albums...</option>
             </select>
         </div>
-        <div class="form-group" id="albumSettingsSection" style="display: none;">
-            <label>Slideshow Interval (seconds)</label>
-            <input type="number" id="photosInterval" value="10" min="5" max="300">
+        <div class="form-group">
+            <label>Slideshow Interval: <span id="intervalDisplay">10 seconds</span></label>
+            <input type="range" id="photosIntervalSlider" min="0" max="7" value="2"
+                   style="width: 100%; margin: 10px 0;" onchange="updateIntervalDisplay()">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; color: #888;">
+                <span>2s</span>
+                <span>5s</span>
+                <span>10s</span>
+                <span>15s</span>
+                <span>20s</span>
+                <span>30s</span>
+                <span>45s</span>
+                <span>60s</span>
+            </div>
+            <input type="hidden" id="photosInterval" value="10">
         </div>
         <div class="form-group" id="photosActionsSection" style="display: none;">
             <button class="btn btn-secondary" onclick="refreshAlbums()">Refresh Albums</button>
-            <button class="btn btn-secondary" onclick="disconnectGooglePhotos()">Disconnect</button>
+            <button class="btn btn-secondary" onclick="disconnectGooglePhotos()">Disconnect OAuth</button>
         </div>
     </div>
 
@@ -437,81 +467,149 @@
     <script>
         let currentSettings = {};
 
+        // Slideshow interval mapping: slider position -> seconds
+        const intervalValues = [2, 5, 10, 15, 20, 30, 45, 60];
+
+        function updateIntervalDisplay() {
+            const slider = document.getElementById('photosIntervalSlider');
+            const display = document.getElementById('intervalDisplay');
+            const hiddenInput = document.getElementById('photosInterval');
+
+            if (!slider || !display || !hiddenInput) return;
+
+            const seconds = intervalValues[slider.value] || 10;
+            display.textContent = seconds + ' seconds';
+            hiddenInput.value = seconds;
+        }
+
+        function setIntervalFromValue(seconds) {
+            const slider = document.getElementById('photosIntervalSlider');
+            if (!slider) {
+                console.log('Slider not found');
+                return;
+            }
+
+            // Find closest match in intervalValues
+            let closestIndex = 2; // default to 10 seconds (index 2)
+            let closestDiff = Math.abs(intervalValues[0] - seconds);
+
+            for (let i = 0; i < intervalValues.length; i++) {
+                const diff = Math.abs(intervalValues[i] - seconds);
+                if (diff < closestDiff) {
+                    closestDiff = diff;
+                    closestIndex = i;
+                }
+            }
+
+            slider.value = closestIndex;
+            updateIntervalDisplay();
+        }
+
         window.onload = function() {
             loadSettings();
         };
+
+        // Helper to safely set element value
+        function setVal(id, value) {
+            const el = document.getElementById(id);
+            if (el) el.value = value;
+        }
+
+        // Helper to safely set checkbox
+        function setCheck(id, checked) {
+            const el = document.getElementById(id);
+            if (el) el.checked = checked;
+        }
+
+        // Helper to safely set text content
+        function setText(id, text) {
+            const el = document.getElementById(id);
+            if (el) el.textContent = text;
+        }
 
         function loadSettings() {
             fetch('/api/settings')
                 .then(r => r.json())
                 .then(settings => {
-                    currentSettings = settings;
-                    console.log('Loaded settings:', settings);
-                    
-                    // Sensor calibration
-                    document.getElementById('tempOffset').value = settings.temp_offset || 0;
-                    
-                    // Google Photos
-                    loadGooglePhotosStatus(settings);
-                    
-                    // Voice settings
-                    document.getElementById('voiceProvider').value = settings.voice_provider || 'local';
-                    document.getElementById('wakeWords').value = (settings.wake_words || ['hey bing', 'okay bing']).join(', ');
-                    document.getElementById('voiceEnabled').checked = settings.voice_enabled !== false;
-                    
-                    // Weather settings
-                    document.getElementById('weatherSource').value = settings.weather_source || 'openweather';
-                    document.getElementById('weatherLocation').value = settings.weather_location || 'Gold Coast, QLD';
-                    updateWeatherSourceInfo();
-                    
-                    // API Keys - Show status if configured
-                    if (settings.openai_api_key_configured || settings.openai_api_key) {
-                        document.getElementById('openaiStatus').textContent = '(configured)';
+                    try {
+                        currentSettings = settings;
+                        console.log('Loaded settings:', settings);
+
+                        // Sensor calibration
+                        setVal('tempOffset', settings.temp_offset || 0);
+
+                        // Google Photos - Shared Album URL
+                        setVal('sharedAlbumUrl', settings.google_photos_shared_url || '');
+
+                        // Slideshow interval
+                        setIntervalFromValue(settings.google_photos_interval || 10);
+
+                        // Google Photos OAuth
+                        if (typeof loadGooglePhotosStatus === 'function') {
+                            loadGooglePhotosStatus(settings);
+                        }
+
+                        // Voice settings
+                        setVal('voiceProvider', settings.voice_provider || 'local');
+                        setVal('wakeWords', (settings.wake_words || ['hey bing', 'okay bing']).join(', '));
+                        setCheck('voiceEnabled', settings.voice_enabled !== false);
+
+                        // Weather settings
+                        setVal('weatherSource', settings.weather_source || 'openweather');
+                        setVal('weatherLocation', settings.weather_location || 'Gold Coast, QLD');
+                        if (typeof updateWeatherSourceInfo === 'function') {
+                            updateWeatherSourceInfo();
+                        }
+
+                        // API Keys - Show status if configured
+                        if (settings.openai_api_key_configured || settings.openai_api_key) {
+                            setText('openaiStatus', '(configured)');
+                        }
+                        if (settings.weather_api_key_configured || settings.weather_api_key) {
+                            setText('weatherApiStatus', '(configured)');
+                        }
+                        if (settings.bing_api_key_configured || settings.bing_api_key) {
+                            setText('bingStatus', '(configured)');
+                        }
+                        if (settings.home_assistant_token_configured || settings.home_assistant_token) {
+                            setText('haStatus', '(configured)');
+                        }
+
+                        // Home Assistant URL
+                        setVal('haUrl', settings.home_assistant_url || 'http://localhost:8123');
+
+                        // Apps settings
+                        const apps = settings.apps || {};
+                        setVal('netflixUrl', apps.netflix?.url || 'https://www.netflix.com');
+                        setCheck('netflixEnabled', apps.netflix?.enabled !== false);
+
+                        setVal('youtubeUrl', apps.youtube?.url || 'https://www.youtube.com/tv');
+                        setCheck('youtubeEnabled', apps.youtube?.enabled !== false);
+
+                        setVal('spotifyUrl', apps.spotify?.url || 'https://open.spotify.com');
+                        setCheck('spotifyEnabled', apps.spotify?.enabled !== false);
+
+                        setVal('xboxUrl', apps.xbox_cloud?.url || 'https://www.xbox.com/play');
+                        setCheck('xboxEnabled', apps.xbox_cloud?.enabled !== false);
+
+                        setVal('primeUrl', apps.prime_video?.url || 'https://www.primevideo.com');
+                        setCheck('primeEnabled', apps.prime_video?.enabled !== false);
+
+                        setVal('photosUrl', apps.google_photos?.url || 'https://photos.google.com');
+                        setCheck('photosEnabled', apps.google_photos?.enabled !== false);
+
+                        // System settings
+                        setCheck('kioskMode', settings.kiosk_mode || false);
+                        setCheck('autoStart', settings.auto_start_browser || false);
+                        setVal('displayTimeout', settings.display_timeout || '0');
+
+                        console.log('Settings loaded successfully');
+                    } catch (innerErr) {
+                        console.error('Error applying settings:', innerErr);
                     }
-                    
-                    if (settings.weather_api_key_configured || settings.weather_api_key) {
-                        document.getElementById('weatherApiStatus').textContent = '(configured)';
-                    }
-                    
-                    if (settings.bing_api_key_configured || settings.bing_api_key) {
-                        document.getElementById('bingStatus').textContent = '(configured)';
-                    }
-                    
-                    if (settings.home_assistant_token_configured || settings.home_assistant_token) {
-                        document.getElementById('haStatus').textContent = '(configured)';
-                    }
-                    
-                    // Home Assistant URL
-                    document.getElementById('haUrl').value = settings.home_assistant_url || 'http://localhost:8123';
-                    
-                    // Apps settings
-                    if (settings.apps) {
-                        document.getElementById('netflixUrl').value = settings.apps.netflix?.url || 'https://www.netflix.com';
-                        document.getElementById('netflixEnabled').checked = settings.apps.netflix?.enabled !== false;
-                        
-                        document.getElementById('youtubeUrl').value = settings.apps.youtube?.url || 'https://www.youtube.com/tv';
-                        document.getElementById('youtubeEnabled').checked = settings.apps.youtube?.enabled !== false;
-                        
-                        document.getElementById('spotifyUrl').value = settings.apps.spotify?.url || 'https://open.spotify.com';
-                        document.getElementById('spotifyEnabled').checked = settings.apps.spotify?.enabled !== false;
-                        
-                        document.getElementById('xboxUrl').value = settings.apps.xbox_cloud?.url || 'https://www.xbox.com/play';
-                        document.getElementById('xboxEnabled').checked = settings.apps.xbox_cloud?.enabled !== false;
-                        
-                        document.getElementById('primeUrl').value = settings.apps.prime_video?.url || 'https://www.primevideo.com';
-                        document.getElementById('primeEnabled').checked = settings.apps.prime_video?.enabled !== false;
-                        
-                        document.getElementById('photosUrl').value = settings.apps.google_photos?.url || 'https://photos.google.com';
-                        document.getElementById('photosEnabled').checked = settings.apps.google_photos?.enabled !== false;
-                    }
-                    
-                    // System settings
-                    document.getElementById('kioskMode').checked = settings.kiosk_mode || false;
-                    document.getElementById('autoStart').checked = settings.auto_start_browser || false;
-                    document.getElementById('displayTimeout').value = settings.display_timeout || '0';
                 })
                 .catch(err => {
-                    console.error('Error loading settings:', err);
+                    console.error('Error fetching settings:', err);
                     showMessage('Error loading settings', 'error');
                 });
         }
@@ -593,12 +691,43 @@
             });
         }
 
+        function testSharedAlbum() {
+            const url = document.getElementById('sharedAlbumUrl').value;
+            const statusEl = document.getElementById('sharedAlbumStatus');
+
+            if (!url) {
+                statusEl.innerHTML = '<span style="color: #ff4444;">Please enter a shared album URL</span>';
+                return;
+            }
+
+            statusEl.innerHTML = '<span style="color: #00ff88;">Testing...</span>';
+
+            fetch('/api/google_photos/shared/test', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({url: url})
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    statusEl.innerHTML = `<span style="color: #00ff88;">✓ Found ${data.count} photos!</span>`;
+                    showMessage('Shared album working! Save settings to use it.', 'success');
+                } else {
+                    statusEl.innerHTML = `<span style="color: #ff4444;">✗ ${data.error || 'Could not access album'}</span>`;
+                }
+            })
+            .catch(err => {
+                statusEl.innerHTML = `<span style="color: #ff4444;">✗ Test failed</span>`;
+            });
+        }
+
         function saveSettings() {
             const settings = {
                 // Sensor calibration
                 temp_offset: parseFloat(document.getElementById('tempOffset').value) || 0,
-                
+
                 // Google Photos settings
+                google_photos_shared_url: document.getElementById('sharedAlbumUrl').value || '',
                 google_photos_album: document.getElementById('googlePhotosAlbum') ? document.getElementById('googlePhotosAlbum').value : '',
                 google_photos_interval: document.getElementById('photosInterval') ? parseInt(document.getElementById('photosInterval').value) : 10,
                 
@@ -856,5 +985,24 @@
             }
         }
     </script>
+
+    <!-- Persistent Home Button -->
+    <div onclick="window.location.href='/'" style="
+        position: fixed;
+        bottom: 15px;
+        left: 15px;
+        width: 50px;
+        height: 50px;
+        background: #00ff88;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+        z-index: 9999;
+        font-size: 24px;
+        box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+    ">🏠</div>
+    <!-- Navigation Overlay -->
 </body>
 </html>

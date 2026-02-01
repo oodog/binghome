@@ -780,25 +780,34 @@
 
         // App Launcher
         function launchApp(appName) {
-            if (settings.apps && settings.apps[appName]) {
-                const appFrame = document.getElementById('appFrame');
-                const iframe = document.getElementById('appIframe');
-                iframe.src = settings.apps[appName].url;
-                appFrame.classList.add('active');
+            const externalApps = {
+                'netflix': 'https://www.netflix.com',
+                'youtube': 'https://www.youtube.com',
+                'spotify': 'https://open.spotify.com',
+                'prime': 'https://www.primevideo.com',
+                'prime_video': 'https://www.primevideo.com',
+                'xbox': 'https://www.xbox.com/play',
+                'xbox_cloud': 'https://www.xbox.com/play',
+                'disney_plus': 'https://www.disneyplus.com'
+            };
+            
+            if (externalApps[appName]) {
+                window.location.href = externalApps[appName];
+            } else {
+                const pages = {
+                    'devices': '/devices',
+                    'timers': '/timers',
+                    'routines': '/routines',
+                    'shopping': '/shopping',
+                    'calendar': '/calendar',
+                    'intercom': '/intercom',
+                    'settings': '/settings',
+                    'news': '/news'
+                };
+                if (pages[appName]) {
+                    window.location.href = pages[appName];
+                }
             }
-        }
-
-        function closeApp() {
-            const appFrame = document.getElementById('appFrame');
-            const iframe = document.getElementById('appIframe');
-            appFrame.classList.remove('active');
-            setTimeout(() => {
-                iframe.src = '';
-            }, 300);
-        }
-
-        function openSettings() {
-            window.location.href = '/settings';
         }
 
         function openDevices() {

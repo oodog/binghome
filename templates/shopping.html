@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shopping List - BingHome</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tile: #1a1a25;
+            --accent: #00ff88;
+            --text-primary: #ffffff;
+            --text-secondary: #888899;
+            --border: rgba(255, 255, 255, 0.08);
+            --danger: #ff4757;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .back-btn {
+            width: 40px;
+            height: 40px;
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .item-count {
+            background: var(--accent);
+            color: var(--bg-primary);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 13px;
+            font-weight: 600;
+        }
+
+        .content {
+            padding: 20px;
+            max-width: 600px;
+            margin: 0 auto;
+            padding-bottom: 100px;
+        }
+
+        .add-item {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .add-input {
+            flex: 1;
+            padding: 14px 16px;
+            background: var(--bg-tile);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 16px;
+        }
+
+        .add-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .add-btn {
+            width: 50px;
+            height: 50px;
+            background: var(--accent);
+            border: none;
+            border-radius: 12px;
+            color: var(--bg-primary);
+            font-size: 28px;
+            cursor: pointer;
+        }
+
+        .section-title {
+            font-size: 12px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin: 20px 0 10px;
+        }
+
+        .item {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            transition: all 0.2s;
+        }
+
+        .item.checked {
+            opacity: 0.5;
+        }
+
+        .item.checked .item-text {
+            text-decoration: line-through;
+        }
+
+        .item-checkbox {
+            width: 24px;
+            height: 24px;
+            border: 2px solid var(--text-secondary);
+            border-radius: 6px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .item.checked .item-checkbox {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .item.checked .item-checkbox::after {
+            content: '✓';
+            color: var(--bg-primary);
+            font-weight: bold;
+        }
+
+        .item-text {
+            flex: 1;
+            font-size: 16px;
+        }
+
+        .item-delete {
+            color: var(--danger);
+            font-size: 20px;
+            cursor: pointer;
+            padding: 5px;
+            opacity: 0;
+            transition: opacity 0.2s;
+        }
+
+        .item:hover .item-delete {
+            opacity: 1;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 64px;
+            margin-bottom: 15px;
+            opacity: 0.5;
+        }
+
+        .clear-checked {
+            background: var(--bg-tile);
+            border: none;
+            color: var(--danger);
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 14px;
+            cursor: pointer;
+            display: block;
+            margin: 20px auto;
+        }
+
+        /* Home Button */
+        .home-button { display: none !important; /* Hidden - using nav-overlay */
+        }
+
+        .old-home-button-hidden {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            width: 50px;
+            height: 50px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            font-size: 24px;
+            color: var(--bg-primary);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+        }
+
+        /* Voice indicator */
+        .voice-tip {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .voice-tip-icon {
+            font-size: 24px;
+        }
+
+        .voice-tip-text {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button class="back-btn" onclick="window.location.href='/'">◀</button>
+        <div class="header-title">Shopping List</div>
+        <div class="item-count" id="itemCount">0 items</div>
+    </div>
+
+    <div class="content">
+        <div class="voice-tip">
+            <div class="voice-tip-icon">🎤</div>
+            <div class="voice-tip-text">Say "Hey Bing, add milk to my shopping list" to add items by voice</div>
+        </div>
+
+        <div class="add-item">
+            <input type="text" class="add-input" id="newItem" placeholder="Add an item..." onkeypress="if(event.key==='Enter')addItem()">
+            <button class="add-btn" onclick="addItem()">+</button>
+        </div>
+
+        <div id="pendingSection" style="display: none;">
+            <div class="section-title">To Buy</div>
+            <div id="pendingItems"></div>
+        </div>
+
+        <div id="checkedSection" style="display: none;">
+            <div class="section-title">Purchased</div>
+            <div id="checkedItems"></div>
+            <button class="clear-checked" onclick="clearChecked()">Clear Purchased Items</button>
+        </div>
+
+        <div class="empty-state" id="emptyState">
+            <div class="empty-icon">🛒</div>
+            <div>Your shopping list is empty</div>
+            <div style="font-size: 13px; margin-top: 10px;">Add items using the input above or voice commands</div>
+        </div>
+    </div>
+
+    <!-- Home Button -->
+    <!-- Old home button removed - using nav-overlay instead -->
+
+    <script>
+        let items = [];
+
+        function loadItems() {
+            fetch('/api/shopping')
+                .then(r => r.json())
+                .then(data => {
+                    items = data.items || [];
+                    renderItems();
+                })
+                .catch(e => {
+                    console.error('Error:', e);
+                    items = JSON.parse(localStorage.getItem('shopping_list') || '[]');
+                    renderItems();
+                });
+        }
+
+        function saveItems() {
+            localStorage.setItem('shopping_list', JSON.stringify(items));
+
+            fetch('/api/shopping', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ items })
+            }).catch(e => console.error('Save error:', e));
+        }
+
+        function renderItems() {
+            const pending = items.filter(i => !i.checked);
+            const checked = items.filter(i => i.checked);
+
+            document.getElementById('itemCount').textContent = pending.length + ' items';
+
+            document.getElementById('emptyState').style.display = items.length === 0 ? 'block' : 'none';
+
+            // Pending items
+            const pendingSection = document.getElementById('pendingSection');
+            const pendingContainer = document.getElementById('pendingItems');
+
+            if (pending.length > 0) {
+                pendingSection.style.display = 'block';
+                pendingContainer.innerHTML = pending.map((item, idx) =>
+                    createItemHTML(item, items.indexOf(item))
+                ).join('');
+            } else {
+                pendingSection.style.display = 'none';
+            }
+
+            // Checked items
+            const checkedSection = document.getElementById('checkedSection');
+            const checkedContainer = document.getElementById('checkedItems');
+
+            if (checked.length > 0) {
+                checkedSection.style.display = 'block';
+                checkedContainer.innerHTML = checked.map((item, idx) =>
+                    createItemHTML(item, items.indexOf(item))
+                ).join('');
+            } else {
+                checkedSection.style.display = 'none';
+            }
+        }
+
+        function createItemHTML(item, index) {
+            return `
+                <div class="item ${item.checked ? 'checked' : ''}" data-index="${index}">
+                    <div class="item-checkbox" onclick="toggleItem(${index})"></div>
+                    <div class="item-text">${escapeHtml(item.text)}</div>
+                    <div class="item-delete" onclick="deleteItem(${index})">✕</div>
+                </div>
+            `;
+        }
+
+        function addItem() {
+            const input = document.getElementById('newItem');
+            const text = input.value.trim();
+
+            if (text) {
+                items.unshift({
+                    id: Date.now(),
+                    text: text,
+                    checked: false,
+                    added: new Date().toISOString()
+                });
+                input.value = '';
+                saveItems();
+                renderItems();
+            }
+        }
+
+        function toggleItem(index) {
+            items[index].checked = !items[index].checked;
+            saveItems();
+            renderItems();
+        }
+
+        function deleteItem(index) {
+            items.splice(index, 1);
+            saveItems();
+            renderItems();
+        }
+
+        function clearChecked() {
+            items = items.filter(i => !i.checked);
+            saveItems();
+            renderItems();
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Load on startup
+        loadItems();
+    </script>
+    <!-- Navigation Overlay -->
+</body>
+</html>

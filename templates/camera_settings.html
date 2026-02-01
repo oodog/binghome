@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1024, height=600, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Camera Settings - BingHome</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tile: #1a1a25;
+            --accent: #00ff88;
+            --text-primary: #ffffff;
+            --text-secondary: #888899;
+            --border: rgba(255, 255, 255, 0.1);
+            --danger: #ff4757;
+            --success: #00ff88;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            width: 1024px;
+            height: 600px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 50px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .refresh-btn {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .content {
+            display: flex;
+            height: calc(600px - 50px);
+            overflow: hidden;
+        }
+
+        .camera-list {
+            width: 280px;
+            background: var(--bg-secondary);
+            border-right: 1px solid var(--border);
+            overflow-y: auto;
+            padding: 15px;
+        }
+
+        .camera-item {
+            background: var(--bg-tile);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .camera-item:hover {
+            border-color: var(--accent);
+        }
+
+        .camera-item.active {
+            border-color: var(--accent);
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .camera-item.unavailable {
+            opacity: 0.5;
+        }
+
+        .camera-name {
+            font-weight: 600;
+            font-size: 14px;
+            margin-bottom: 4px;
+        }
+
+        .camera-type {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .camera-status {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            margin-right: 6px;
+        }
+
+        .camera-status.available {
+            background: var(--success);
+        }
+
+        .camera-status.unavailable {
+            background: var(--danger);
+        }
+
+        .no-cameras {
+            text-align: center;
+            padding: 30px;
+            color: var(--text-secondary);
+        }
+
+        .preview-area {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .preview-container {
+            flex: 1;
+            background: var(--bg-tile);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .preview-container img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .preview-placeholder {
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .preview-placeholder-icon {
+            font-size: 64px;
+            opacity: 0.3;
+            margin-bottom: 15px;
+        }
+
+        .preview-controls {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+            justify-content: center;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            border-radius: 8px;
+            border: none;
+            cursor: pointer;
+            font-size: 13px;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .btn-secondary {
+            background: var(--bg-tile);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+
+        .btn:hover {
+            transform: scale(1.02);
+        }
+
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .camera-info {
+            background: var(--bg-tile);
+            border-radius: 10px;
+            padding: 15px;
+            margin-top: 15px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 12px;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: var(--text-secondary);
+        }
+
+        .loading {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: var(--text-secondary);
+        }
+
+        .loading-spinner {
+            width: 20px;
+            height: 20px;
+            border: 2px solid var(--border);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .status-message {
+            padding: 10px 15px;
+            border-radius: 8px;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+
+        .status-message.success {
+            background: rgba(0, 255, 136, 0.1);
+            color: var(--success);
+        }
+
+        .status-message.error {
+            background: rgba(255, 71, 87, 0.1);
+            color: var(--danger);
+        }
+
+        /* Home button */
+        .home-button {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            width: 45px;
+            height: 45px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            font-size: 22px;
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <button class="back-btn" onclick="window.location.href='/settings'">&#9664;</button>
+            <span class="header-title">Camera Settings</span>
+        </div>
+        <button class="refresh-btn" onclick="detectCameras()">Detect Cameras</button>
+    </div>
+
+    <div class="content">
+        <div class="camera-list" id="cameraList">
+            <div class="loading" id="loadingIndicator">
+                <div class="loading-spinner"></div>
+                <span>Detecting cameras...</span>
+            </div>
+        </div>
+
+        <div class="preview-area">
+            <div class="preview-container" id="previewContainer">
+                <div class="preview-placeholder" id="previewPlaceholder">
+                    <div class="preview-placeholder-icon">📷</div>
+                    <div>Select a camera to preview</div>
+                </div>
+                <img id="previewImage" style="display: none;">
+            </div>
+
+            <div class="preview-controls">
+                <button class="btn btn-primary" id="snapshotBtn" onclick="takeSnapshot()" disabled>Take Snapshot</button>
+                <button class="btn btn-secondary" id="streamBtn" onclick="toggleStream()" disabled>Start Stream</button>
+                <button class="btn btn-secondary" onclick="window.location.href='/security-cameras'">Security Cameras</button>
+            </div>
+
+            <div class="camera-info" id="cameraInfo" style="display: none;">
+                <div class="info-row">
+                    <span class="info-label">Name</span>
+                    <span id="infoName">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Type</span>
+                    <span id="infoType">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Device</span>
+                    <span id="infoDevice">-</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Status</span>
+                    <span id="infoStatus">-</span>
+                </div>
+            </div>
+
+            <div id="statusMessage" class="status-message" style="display: none;"></div>
+        </div>
+    </div>
+
+    <div class="home-button" onclick="window.location.href='/'">🏠</div>
+
+    <script>
+        let cameras = [];
+        let selectedCamera = null;
+        let streaming = false;
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', function() {
+            detectCameras();
+        });
+
+        function detectCameras() {
+            document.getElementById('loadingIndicator').style.display = 'flex';
+            document.getElementById('cameraList').innerHTML = '<div class="loading" id="loadingIndicator"><div class="loading-spinner"></div><span>Detecting cameras...</span></div>';
+
+            fetch('/api/cameras/detect')
+                .then(r => r.json())
+                .then(data => {
+                    cameras = data.cameras || [];
+                    renderCameraList();
+
+                    if (cameras.length === 0) {
+                        showStatus('No cameras detected. Make sure your camera is connected.', 'error');
+                    } else {
+                        showStatus(`Found ${cameras.length} camera(s)`, 'success');
+                    }
+                })
+                .catch(e => {
+                    console.error('Detection error:', e);
+                    document.getElementById('cameraList').innerHTML = '<div class="no-cameras">Failed to detect cameras</div>';
+                    showStatus('Error detecting cameras', 'error');
+                });
+        }
+
+        function renderCameraList() {
+            const list = document.getElementById('cameraList');
+
+            if (cameras.length === 0) {
+                list.innerHTML = '<div class="no-cameras">No cameras detected<br><br>Connect a USB camera or<br>enable the Pi Camera</div>';
+                return;
+            }
+
+            list.innerHTML = cameras.map((cam, idx) => `
+                <div class="camera-item ${cam.available ? '' : 'unavailable'} ${selectedCamera?.id === cam.id ? 'active' : ''}"
+                     onclick="selectCamera('${cam.id}')">
+                    <div class="camera-name">
+                        <span class="camera-status ${cam.available ? 'available' : 'unavailable'}"></span>
+                        ${cam.name}
+                    </div>
+                    <div class="camera-type">${cam.type} - ${cam.device}</div>
+                </div>
+            `).join('');
+        }
+
+        function selectCamera(cameraId) {
+            selectedCamera = cameras.find(c => c.id === cameraId);
+
+            if (!selectedCamera) return;
+
+            // Update UI
+            renderCameraList();
+
+            document.getElementById('snapshotBtn').disabled = !selectedCamera.available;
+            document.getElementById('streamBtn').disabled = !selectedCamera.available;
+
+            // Show camera info
+            document.getElementById('cameraInfo').style.display = 'block';
+            document.getElementById('infoName').textContent = selectedCamera.name;
+            document.getElementById('infoType').textContent = selectedCamera.type;
+            document.getElementById('infoDevice').textContent = selectedCamera.device;
+            document.getElementById('infoStatus').textContent = selectedCamera.available ? 'Available' : 'Unavailable';
+            document.getElementById('infoStatus').style.color = selectedCamera.available ? 'var(--success)' : 'var(--danger)';
+
+            // Auto-take snapshot for preview
+            if (selectedCamera.available) {
+                takeSnapshot();
+            }
+        }
+
+        function takeSnapshot() {
+            if (!selectedCamera) return;
+
+            showStatus('Capturing snapshot...', 'success');
+
+            fetch(`/api/cameras/snapshot?camera_id=${selectedCamera.id}`)
+                .then(r => r.json())
+                .then(data => {
+                    if (data.success) {
+                        const img = document.getElementById('previewImage');
+                        img.src = data.url + '?t=' + Date.now();
+                        img.style.display = 'block';
+                        document.getElementById('previewPlaceholder').style.display = 'none';
+                        showStatus('Snapshot captured', 'success');
+                    } else {
+                        showStatus(data.error || 'Failed to capture snapshot', 'error');
+                    }
+                })
+                .catch(e => {
+                    console.error('Snapshot error:', e);
+                    showStatus('Error capturing snapshot', 'error');
+                });
+        }
+
+        function toggleStream() {
+            if (!selectedCamera) return;
+
+            const btn = document.getElementById('streamBtn');
+
+            if (streaming) {
+                // Stop stream
+                fetch('/api/cameras/stream/stop', { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        streaming = false;
+                        btn.textContent = 'Start Stream';
+                        showStatus('Stream stopped', 'success');
+                    });
+            } else {
+                // Start stream
+                fetch(`/api/cameras/stream/start?camera_id=${selectedCamera.id}`, { method: 'POST' })
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success) {
+                            streaming = true;
+                            btn.textContent = 'Stop Stream';
+                            showStatus(data.message || 'Stream started', 'success');
+                        } else {
+                            showStatus(data.error || 'Failed to start stream', 'error');
+                        }
+                    });
+            }
+        }
+
+        function showStatus(message, type) {
+            const el = document.getElementById('statusMessage');
+            el.textContent = message;
+            el.className = `status-message ${type}`;
+            el.style.display = 'block';
+
+            setTimeout(() => {
+                el.style.display = 'none';
+            }, 3000);
+        }
+    </script>
+</body>
+</html>

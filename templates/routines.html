@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Routines - BingHome</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tile: #1a1a25;
+            --accent: #00ff88;
+            --text-primary: #ffffff;
+            --text-secondary: #888899;
+            --border: rgba(255, 255, 255, 0.08);
+            --danger: #ff4757;
+            --warning: #ffa502;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .back-btn {
+            width: 40px;
+            height: 40px;
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 24px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .add-btn {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border: none;
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .content {
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .section {
+            margin-bottom: 30px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+
+        .routine-card {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .routine-card:hover {
+            background: var(--bg-secondary);
+        }
+
+        .routine-icon {
+            width: 50px;
+            height: 50px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+        }
+
+        .routine-info {
+            flex: 1;
+        }
+
+        .routine-name {
+            font-size: 16px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .routine-trigger {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .routine-toggle {
+            width: 50px;
+            height: 28px;
+            background: var(--bg-secondary);
+            border-radius: 14px;
+            position: relative;
+            cursor: pointer;
+        }
+
+        .routine-toggle.active {
+            background: var(--accent);
+        }
+
+        .routine-toggle::after {
+            content: '';
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: left 0.2s;
+        }
+
+        .routine-toggle.active::after {
+            left: 25px;
+        }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .preset-card {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
+        }
+
+        .preset-card:hover {
+            border-color: var(--accent);
+        }
+
+        .preset-icon {
+            font-size: 36px;
+            margin-bottom: 10px;
+        }
+
+        .preset-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .preset-desc {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        /* Home Button */
+        .home-button { display: none !important; /* Hidden - using nav-overlay */
+        }
+
+        .old-home-button-hidden {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            width: 50px;
+            height: 50px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            font-size: 24px;
+            color: var(--bg-primary);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-tile);
+            border-radius: 16px;
+            padding: 25px;
+            width: 90%;
+            max-width: 500px;
+            max-height: 80vh;
+            overflow-y: auto;
+        }
+
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .modal-close {
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+        }
+
+        .form-input, .form-select {
+            width: 100%;
+            padding: 12px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+
+        .form-input:focus, .form-select:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .action-item {
+            background: var(--bg-secondary);
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .action-icon {
+            font-size: 20px;
+        }
+
+        .action-text {
+            flex: 1;
+            font-size: 13px;
+        }
+
+        .action-remove {
+            color: var(--danger);
+            cursor: pointer;
+            font-size: 18px;
+        }
+
+        .btn-primary {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button class="back-btn" onclick="window.location.href='/'">◀</button>
+        <div class="header-title">Routines</div>
+        <button class="add-btn" onclick="showCreateModal()">+ New Routine</button>
+    </div>
+
+    <div class="content">
+        <!-- My Routines -->
+        <div class="section">
+            <div class="section-title">My Routines</div>
+            <div id="routinesList">
+                <div class="routine-card" onclick="editRoutine('morning')">
+                    <div class="routine-icon">🌅</div>
+                    <div class="routine-info">
+                        <div class="routine-name">Good Morning</div>
+                        <div class="routine-trigger">Every day at 7:00 AM</div>
+                    </div>
+                    <div class="routine-toggle active" onclick="event.stopPropagation(); toggleRoutine(this)"></div>
+                </div>
+
+                <div class="routine-card" onclick="editRoutine('bedtime')">
+                    <div class="routine-icon">🌙</div>
+                    <div class="routine-info">
+                        <div class="routine-name">Bedtime</div>
+                        <div class="routine-trigger">Every day at 10:00 PM</div>
+                    </div>
+                    <div class="routine-toggle active" onclick="event.stopPropagation(); toggleRoutine(this)"></div>
+                </div>
+
+                <div class="routine-card" onclick="editRoutine('leaving')">
+                    <div class="routine-icon">🚪</div>
+                    <div class="routine-info">
+                        <div class="routine-name">Leaving Home</div>
+                        <div class="routine-trigger">Say "Hey Bing, I'm leaving"</div>
+                    </div>
+                    <div class="routine-toggle" onclick="event.stopPropagation(); toggleRoutine(this)"></div>
+                </div>
+
+                <div class="routine-card" onclick="editRoutine('arriving')">
+                    <div class="routine-icon">🏠</div>
+                    <div class="routine-info">
+                        <div class="routine-name">Arriving Home</div>
+                        <div class="routine-trigger">Say "Hey Bing, I'm home"</div>
+                    </div>
+                    <div class="routine-toggle active" onclick="event.stopPropagation(); toggleRoutine(this)"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Preset Routines -->
+        <div class="section">
+            <div class="section-title">Quick Start Presets</div>
+            <div class="preset-grid">
+                <div class="preset-card" onclick="addPreset('movie')">
+                    <div class="preset-icon">🎬</div>
+                    <div class="preset-name">Movie Time</div>
+                    <div class="preset-desc">Dim lights, turn on TV</div>
+                </div>
+                <div class="preset-card" onclick="addPreset('dinner')">
+                    <div class="preset-icon">🍽️</div>
+                    <div class="preset-name">Dinner Time</div>
+                    <div class="preset-desc">Set mood lighting</div>
+                </div>
+                <div class="preset-card" onclick="addPreset('workout')">
+                    <div class="preset-icon">💪</div>
+                    <div class="preset-name">Workout</div>
+                    <div class="preset-desc">Play music, lights bright</div>
+                </div>
+                <div class="preset-card" onclick="addPreset('relax')">
+                    <div class="preset-icon">🧘</div>
+                    <div class="preset-name">Relax</div>
+                    <div class="preset-desc">Calm music, dim lights</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Home Button -->
+    <!-- Old home button removed - using nav-overlay instead -->
+
+    <!-- Create/Edit Modal -->
+    <div class="modal" id="routineModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">Create Routine</div>
+                <button class="modal-close" onclick="closeModal()">✕</button>
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Routine Name</label>
+                <input type="text" class="form-input" id="routineName" placeholder="e.g., Good Morning">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Trigger</label>
+                <select class="form-select" id="routineTrigger" onchange="updateTriggerOptions()">
+                    <option value="time">At a specific time</option>
+                    <option value="voice">Voice command</option>
+                    <option value="sunrise">At sunrise</option>
+                    <option value="sunset">At sunset</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="timeOptions">
+                <label class="form-label">Time</label>
+                <input type="time" class="form-input" id="routineTime" value="07:00">
+            </div>
+
+            <div class="form-group" id="voiceOptions" style="display: none;">
+                <label class="form-label">Voice Phrase</label>
+                <input type="text" class="form-input" id="routineVoice" placeholder="e.g., good morning">
+            </div>
+
+            <div class="form-group">
+                <label class="form-label">Actions</label>
+                <div id="actionsList">
+                    <div class="action-item">
+                        <span class="action-icon">💡</span>
+                        <span class="action-text">Turn on living room lights</span>
+                        <span class="action-remove" onclick="removeAction(this)">✕</span>
+                    </div>
+                </div>
+                <button class="add-btn" style="margin-top: 10px; width: 100%;" onclick="showAddAction()">+ Add Action</button>
+            </div>
+
+            <button class="btn-primary" onclick="saveRoutine()">Save Routine</button>
+        </div>
+    </div>
+
+    <script>
+        let routines = [];
+
+        function loadRoutines() {
+            fetch('/api/routines')
+                .then(r => r.json())
+                .then(data => {
+                    routines = data.routines || [];
+                    renderRoutines();
+                })
+                .catch(e => console.error('Error loading routines:', e));
+        }
+
+        function renderRoutines() {
+            // Render routines list
+        }
+
+        function toggleRoutine(el) {
+            el.classList.toggle('active');
+            // Save state
+        }
+
+        function showCreateModal() {
+            document.getElementById('routineModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('routineModal').classList.remove('active');
+        }
+
+        function editRoutine(id) {
+            // Load routine and show modal
+            showCreateModal();
+        }
+
+        function updateTriggerOptions() {
+            const trigger = document.getElementById('routineTrigger').value;
+            document.getElementById('timeOptions').style.display = trigger === 'time' ? 'block' : 'none';
+            document.getElementById('voiceOptions').style.display = trigger === 'voice' ? 'block' : 'none';
+        }
+
+        function addPreset(preset) {
+            // Add preset routine
+            alert('Added ' + preset + ' routine');
+        }
+
+        function showAddAction() {
+            // Show action picker
+        }
+
+        function removeAction(el) {
+            el.parentElement.remove();
+        }
+
+        function saveRoutine() {
+            const name = document.getElementById('routineName').value;
+            const trigger = document.getElementById('routineTrigger').value;
+
+            // Save routine
+            fetch('/api/routines', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, trigger })
+            })
+            .then(r => r.json())
+            .then(data => {
+                if (data.success) {
+                    closeModal();
+                    loadRoutines();
+                }
+            });
+        }
+
+        // Load on startup
+        loadRoutines();
+    </script>
+    <!-- Navigation Overlay -->
+</body>
+</html>

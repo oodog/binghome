@@ -1,0 +1,314 @@
+<svg xmlns="http://www.w3.org/2000/svg" style="display:none">
+  <!-- Home Icon -->
+  <symbol id="icon-home" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+  </symbol>
+
+  <!-- Back Arrow Icon -->
+  <symbol id="icon-back" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/>
+  </symbol>
+
+  <!-- Settings Icon -->
+  <symbol id="icon-settings" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M19.14 12.94c.04-.31.06-.63.06-.94 0-.31-.02-.63-.06-.94l2.03-1.58c.18-.14.23-.41.12-.61l-1.92-3.32c-.12-.22-.37-.29-.59-.22l-2.39.96c-.5-.38-1.03-.7-1.62-.94l-.36-2.54c-.04-.24-.24-.41-.48-.41h-3.84c-.24 0-.43.17-.47.41l-.36 2.54c-.59.24-1.13.57-1.62.94l-2.39-.96c-.22-.08-.47 0-.59.22L2.74 8.87c-.12.21-.08.47.12.61l2.03 1.58c-.04.31-.06.63-.06.94s.02.63.06.94l-2.03 1.58c-.18.14-.23.41-.12.61l1.92 3.32c.12.22.37.29.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.24.41.48.41h3.84c.24 0 .44-.17.47-.41l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.22.08.47 0 .59-.22l1.92-3.32c.12-.22.07-.47-.12-.61l-2.01-1.58zM12 15.6c-1.98 0-3.6-1.62-3.6-3.6s1.62-3.6 3.6-3.6 3.6 1.62 3.6 3.6-1.62 3.6-3.6 3.6z"/>
+  </symbol>
+
+  <!-- Weather/Sun Icon -->
+  <symbol id="icon-sun" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M6.76 4.84l-1.8-1.79-1.41 1.41 1.79 1.79 1.42-1.41zM4 10.5H1v2h3v-2zm9-9.95h-2V3.5h2V.55zm7.45 3.91l-1.41-1.41-1.79 1.79 1.41 1.41 1.79-1.79zm-3.21 13.7l1.79 1.8 1.41-1.41-1.8-1.79-1.4 1.4zM20 10.5v2h3v-2h-3zm-8-5c-3.31 0-6 2.69-6 6s2.69 6 6 6 6-2.69 6-6-2.69-6-6-6zm-1 16.95h2V19.5h-2v2.95zm-7.45-3.91l1.41 1.41 1.79-1.8-1.41-1.41-1.79 1.8z"/>
+  </symbol>
+
+  <!-- Cloud Icon -->
+  <symbol id="icon-cloud" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M19.35 10.04C18.67 6.59 15.64 4 12 4 9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96z"/>
+  </symbol>
+
+  <!-- Rain Icon -->
+  <symbol id="icon-rain" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8zm0 18c-3.35 0-6-2.57-6-6.2 0-2.34 1.95-5.44 6-9.14 4.05 3.7 6 6.79 6 9.14 0 3.63-2.65 6.2-6 6.2z"/>
+  </symbol>
+
+  <!-- Netflix Icon -->
+  <symbol id="icon-netflix" viewBox="0 0 24 24">
+    <path fill="#E50914" d="M5.398 0v24l6.6-2.1V0H5.398zm6.6 0v21.9l6.602 2.1V0h-6.602z"/>
+  </symbol>
+
+  <!-- YouTube Icon -->
+  <symbol id="icon-youtube" viewBox="0 0 24 24">
+    <path fill="#FF0000" d="M23.498 6.186a3.016 3.016 0 0 0-2.122-2.136C19.505 3.545 12 3.545 12 3.545s-7.505 0-9.377.505A3.017 3.017 0 0 0 .502 6.186C0 8.07 0 12 0 12s0 3.93.502 5.814a3.016 3.016 0 0 0 2.122 2.136c1.871.505 9.376.505 9.376.505s7.505 0 9.377-.505a3.015 3.015 0 0 0 2.122-2.136C24 15.93 24 12 24 12s0-3.93-.502-5.814zM9.545 15.568V8.432L15.818 12l-6.273 3.568z"/>
+  </symbol>
+
+  <!-- Spotify Icon -->
+  <symbol id="icon-spotify" viewBox="0 0 24 24">
+    <path fill="#1DB954" d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z"/>
+  </symbol>
+
+  <!-- Xbox Icon -->
+  <symbol id="icon-xbox" viewBox="0 0 24 24">
+    <path fill="#107C10" d="M4.102 21.033C6.211 22.881 8.977 24 12 24c3.026 0 5.789-1.119 7.902-2.967 1.877-1.912-4.316-8.709-7.902-11.417-3.582 2.708-9.779 9.505-7.898 11.417zm11.16-14.406c2.5 2.961 7.484 10.313 6.076 12.912C23.034 17.413 24 14.842 24 12c0-4.072-2.034-7.667-5.137-9.835-.59-.396-1.871-.903-3.601 4.462zM12 2.195S8.859-.666 6.262.283C3.016 1.49 0 6.263 0 12c0 2.844.966 5.417 2.662 7.543-1.408-2.599 3.576-9.951 6.076-12.912-1.73-5.365-3.011-4.858-3.601-4.462C2.034 4.333 0 7.928 0 12z"/>
+  </symbol>
+
+  <!-- Prime Video Icon -->
+  <symbol id="icon-prime" viewBox="0 0 24 24">
+    <path fill="#00A8E1" d="M1.05 17.77c-.15-.19-.05-.46.2-.51 6.06-1.24 12.57-1.24 18.99 0 .25.05.35.32.21.51-.94 1.27-1.55 2.36-2.67 3.56-.14.15-.37.18-.54.08-4.06-2.11-8.88-2.11-12.93 0-.17.1-.4.07-.54-.08-1.12-1.2-1.73-2.29-2.72-3.56zM12 3.5c-3.31 0-6 2.24-6 5s2.69 5 6 5 6-2.24 6-5-2.69-5-6-5z"/>
+  </symbol>
+
+  <!-- Devices Icon -->
+  <symbol id="icon-devices" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M4 6h18V4H4c-1.1 0-2 .9-2 2v11H0v3h14v-3H4V6zm19 2h-6c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h6c.55 0 1-.45 1-1V9c0-.55-.45-1-1-1zm-1 9h-4v-7h4v7z"/>
+  </symbol>
+
+  <!-- Timer Icon -->
+  <symbol id="icon-timer" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M15 1H9v2h6V1zm-4 13h2V8h-2v6zm8.03-6.61l1.42-1.42c-.43-.51-.9-.99-1.41-1.41l-1.42 1.42C16.07 4.74 14.12 4 12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9 9-4.03 9-9c0-2.12-.74-4.07-1.97-5.61zM12 20c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+  </symbol>
+
+  <!-- News Icon -->
+  <symbol id="icon-news" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M22 3l-1.67 1.67L18.67 3 17 4.67 15.33 3l-1.66 1.67L12 3l-1.67 1.67L8.67 3 7 4.67 5.33 3 3.67 4.67 2 3v16c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V3zM11 19H4v-6h7v6zm9 0h-7v-2h7v2zm0-4h-7v-2h7v2zm0-4H4V8h16v3z"/>
+  </symbol>
+
+  <!-- Camera Icon -->
+  <symbol id="icon-camera" viewBox="0 0 24 24">
+    <circle fill="currentColor" cx="12" cy="12" r="3.2"/>
+    <path fill="currentColor" d="M9 2L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5z"/>
+  </symbol>
+
+  <!-- Music Icon -->
+  <symbol id="icon-music" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/>
+  </symbol>
+
+  <!-- Photos Icon -->
+  <symbol id="icon-photos" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/>
+  </symbol>
+
+  <!-- Microphone Icon -->
+  <symbol id="icon-mic" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.48 6-3.3 6-6.72h-1.7z"/>
+  </symbol>
+
+  <!-- WiFi Icon -->
+  <symbol id="icon-wifi" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M1 9l2 2c4.97-4.97 13.03-4.97 18 0l2-2C16.93 2.93 7.08 2.93 1 9zm8 8l3 3 3-3c-1.65-1.66-4.34-1.66-6 0zm-4-4l2 2c2.76-2.76 7.24-2.76 10 0l2-2C15.14 9.14 8.87 9.14 5 13z"/>
+  </symbol>
+
+  <!-- Ethernet Icon -->
+  <symbol id="icon-ethernet" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M7.77 6.76L6.23 5.48.82 12l5.41 6.52 1.54-1.28L3.42 12l4.35-5.24zM7 13h2v-2H7v2zm10-2h-2v2h2v-2zm-6 2h2v-2h-2v2zm6.77-7.52l-1.54 1.28L20.58 12l-4.35 5.24 1.54 1.28L23.18 12l-5.41-6.52z"/>
+  </symbol>
+
+  <!-- Temperature Icon -->
+  <symbol id="icon-temp" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-8c0-.55.45-1 1-1s1 .45 1 1h-1v1h1v2h-1v1h1v2h-2V5z"/>
+  </symbol>
+
+  <!-- Humidity Icon -->
+  <symbol id="icon-humidity" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8z"/>
+  </symbol>
+
+  <!-- Air Quality Icon -->
+  <symbol id="icon-air" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M14.5 17c0 1.65-1.35 3-3 3s-3-1.35-3-3h2c0 .55.45 1 1 1s1-.45 1-1-.45-1-1-1H2v-2h9.5c1.65 0 3 1.35 3 3zM19 6.5C19 4.57 17.43 3 15.5 3S12 4.57 12 6.5h2c0-.83.67-1.5 1.5-1.5s1.5.67 1.5 1.5S16.33 8 15.5 8H2v2h13.5c1.93 0 3.5-1.57 3.5-3.5zm-.5 4.5H2v2h16.5c.83 0 1.5.67 1.5 1.5s-.67 1.5-1.5 1.5v2c1.93 0 3.5-1.57 3.5-3.5S20.43 11 18.5 11z"/>
+  </symbol>
+
+  <!-- Close Icon -->
+  <symbol id="icon-close" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+  </symbol>
+
+  <!-- Shopping List Icon -->
+  <symbol id="icon-shopping" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96 0 1.1.9 2 2 2h12v-2H7.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.58-6.49c.08-.14.12-.31.12-.48 0-.55-.45-1-1-1H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2 2-.9 2-2-.9-2-2-2z"/>
+  </symbol>
+
+  <!-- Calendar Icon -->
+  <symbol id="icon-calendar" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/>
+  </symbol>
+
+  <!-- Routines Icon -->
+  <symbol id="icon-routines" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+  </symbol>
+
+  <!-- Intercom Icon -->
+  <symbol id="icon-intercom" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-2 12H6v-2h12v2zm0-3H6V9h12v2zm0-3H6V6h12v2z"/>
+  </symbol>
+
+  <!-- Sleep/Moon Icon -->
+  <symbol id="icon-sleep" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M9 2c-1.05 0-2.05.16-3 .46 4.06 1.27 7 5.06 7 9.54 0 4.48-2.94 8.27-7 9.54.95.3 1.95.46 3 .46 5.52 0 10-4.48 10-10S14.52 2 9 2z"/>
+  </symbol>
+
+  <!-- TV Icon -->
+  <symbol id="icon-tv" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"/>
+  </symbol>
+
+  <!-- Display Icon -->
+  <symbol id="icon-display" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M20 3H4c-1.1 0-2 .9-2 2v11c0 1.1.9 2 2 2h3l-1 1v2h12v-2l-1-1h3c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 13H4V5h16v11z"/>
+  </symbol>
+
+  <!-- Radar Icon -->
+  <symbol id="icon-radar" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M19.74 18.33C21.15 16.6 22 14.4 22 12c0-5.52-4.48-10-10-10S2 6.48 2 12s4.48 10 10 10c2.4 0 4.6-.85 6.33-2.26.27-.22.53-.46.78-.71l.04-.04c.05-.05.1-.1.14-.16.47-.52.9-1.08 1.27-1.68l-.82-.82zM12 20c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8c0 1.85-.63 3.54-1.69 4.9l-1.43-1.43c.69-.98 1.1-2.17 1.1-3.46 0-3.31-2.69-6-6-6s-6 2.69-6 6 2.69 6 6 6c1.3 0 2.51-.42 3.49-1.13l1.42 1.42C15.54 19.37 13.85 20 12 20zm1.92-7.49c.17-.66.02-1.38-.49-1.9l-.02-.02c-.77-.77-2-.78-2.78-.04-.01.01-.03.02-.05.04-.78.78-.78 2.05 0 2.83l.02.02c.52.51 1.25.67 1.91.49l1.51 1.51c-.6.36-1.29.58-2.04.58-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4c0 .73-.21 1.41-.56 2l-1.5-1.51z"/>
+  </symbol>
+
+  <!-- Light Bulb Icon -->
+  <symbol id="icon-light" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M9 21c0 .55.45 1 1 1h4c.55 0 1-.45 1-1v-1H9v1zm3-19C8.14 2 5 5.14 5 9c0 2.38 1.19 4.47 3 5.74V17c0 .55.45 1 1 1h6c.55 0 1-.45 1-1v-2.26c1.81-1.27 3-3.36 3-5.74 0-3.86-3.14-7-7-7z"/>
+  </symbol>
+
+  <!-- Switch Icon -->
+  <symbol id="icon-switch" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M17 7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h10c2.76 0 5-2.24 5-5s-2.24-5-5-5zm0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3z"/>
+  </symbol>
+
+  <!-- Thermostat Icon -->
+  <symbol id="icon-thermostat" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M15 13V5c0-1.66-1.34-3-3-3S9 3.34 9 5v8c-1.21.91-2 2.37-2 4 0 2.76 2.24 5 5 5s5-2.24 5-5c0-1.63-.79-3.09-2-4zm-4-2V5c0-.55.45-1 1-1s1 .45 1 1v1h-1v1h1v2h-1v1h1v1h-2z"/>
+  </symbol>
+
+  <!-- Lock Icon -->
+  <symbol id="icon-lock" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M18 8h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm-6 9c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2zm3.1-9H8.9V6c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2z"/>
+  </symbol>
+
+  <!-- Vacuum Icon -->
+  <symbol id="icon-vacuum" viewBox="0 0 24 24">
+    <circle fill="currentColor" cx="12" cy="12" r="10"/>
+    <circle fill="#000" cx="12" cy="12" r="6"/>
+    <circle fill="currentColor" cx="12" cy="12" r="2"/>
+  </symbol>
+
+  <!-- Fan Icon -->
+  <symbol id="icon-fan" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12.5 2C9.64 2 8 4.57 8 7c0 1.8.93 3.37 2.33 4.29l-.56 4.28c-.09.69.33 1.32.97 1.56.64.24 1.4-.01 1.77-.58l2.26-3.48c2.39-.53 4.23-2.63 4.23-5.07C19 4.57 15.36 2 12.5 2zm0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zM12 18.5c0-1.38-1.12-2.5-2.5-2.5h-5C3.12 16 2 17.12 2 18.5S3.12 21 4.5 21h5c1.38 0 2.5-1.12 2.5-2.5z"/>
+  </symbol>
+
+  <!-- Cover/Blinds Icon -->
+  <symbol id="icon-cover" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M20 19V3H4v16H2v2h20v-2h-2zM6 5h12v2H6V5zm0 4h12v2H6V9zm0 4h12v2H6v-2z"/>
+  </symbol>
+
+  <!-- Media Player Icon -->
+  <symbol id="icon-media" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M21 3H3c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H3V5h18v14zM10 8v8l5-4z"/>
+  </symbol>
+
+  <!-- Refresh Icon -->
+  <symbol id="icon-refresh" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+  </symbol>
+
+  <!-- Play Icon -->
+  <symbol id="icon-play" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M8 5v14l11-7z"/>
+  </symbol>
+
+  <!-- Pause Icon -->
+  <symbol id="icon-pause" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+  </symbol>
+
+  <!-- Skip Next Icon -->
+  <symbol id="icon-skip-next" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/>
+  </symbol>
+
+  <!-- Skip Previous Icon -->
+  <symbol id="icon-skip-prev" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/>
+  </symbol>
+
+  <!-- Volume Up Icon -->
+  <symbol id="icon-volume-up" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+  </symbol>
+
+  <!-- Volume Mute Icon -->
+  <symbol id="icon-volume-mute" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/>
+  </symbol>
+
+  <!-- Alarm Icon -->
+  <symbol id="icon-alarm" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M22 5.72l-4.6-3.86-1.29 1.53 4.6 3.86L22 5.72zM7.88 3.39L6.6 1.86 2 5.71l1.29 1.53 4.59-3.85zM12.5 8H11v6l4.75 2.85.75-1.23-4-2.37V8zM12 4c-4.97 0-9 4.03-9 9s4.02 9 9 9c4.97 0 9-4.03 9-9s-4.03-9-9-9zm0 16c-3.87 0-7-3.13-7-7s3.13-7 7-7 7 3.13 7 7-3.13 7-7 7z"/>
+  </symbol>
+
+  <!-- Bluetooth Icon -->
+  <symbol id="icon-bluetooth" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M17.71 7.71L12 2h-1v7.59L6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 11 14.41V22h1l5.71-5.71-4.3-4.29 4.3-4.29zM13 5.83l1.88 1.88L13 9.59V5.83zm1.88 10.46L13 18.17v-3.76l1.88 1.88z"/>
+  </symbol>
+
+  <!-- Network Icon -->
+  <symbol id="icon-network" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 6c2.62 0 4.88 1.86 5.39 4.43l.3 1.5 1.53.11c1.56.1 2.78 1.41 2.78 2.96 0 1.65-1.35 3-3 3H6c-2.21 0-4-1.79-4-4 0-2.05 1.53-3.76 3.56-3.97l1.07-.11.5-.95C8.08 7.14 9.94 6 12 6m0-2C9.11 4 6.6 5.64 5.35 8.04 2.34 8.36 0 10.91 0 14c0 3.31 2.69 6 6 6h13c2.76 0 5-2.24 5-5 0-2.64-2.05-4.78-4.65-4.96C18.67 6.59 15.64 4 12 4z"/>
+  </symbol>
+
+  <!-- Plus Icon -->
+  <symbol id="icon-plus" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/>
+  </symbol>
+
+  <!-- Minus Icon -->
+  <symbol id="icon-minus" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M19 13H5v-2h14v2z"/>
+  </symbol>
+
+  <!-- Check Icon -->
+  <symbol id="icon-check" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+  </symbol>
+
+  <!-- Delete Icon -->
+  <symbol id="icon-delete" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/>
+  </symbol>
+
+  <!-- Edit Icon -->
+  <symbol id="icon-edit" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+  </symbol>
+
+  <!-- Search Icon -->
+  <symbol id="icon-search" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+  </symbol>
+
+  <!-- Info Icon -->
+  <symbol id="icon-info" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>
+  </symbol>
+
+  <!-- Warning Icon -->
+  <symbol id="icon-warning" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+  </symbol>
+
+  <!-- Error Icon -->
+  <symbol id="icon-error" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/>
+  </symbol>
+
+  <!-- Success Icon -->
+  <symbol id="icon-success" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+  </symbol>
+
+  <!-- Sunrise Icon -->
+  <symbol id="icon-sunrise" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M3 12h4c0-2.73 1.08-5.27 2.93-7.07l1.42 1.42C10.22 7.48 9.5 9.12 9.5 11H14.5c0-1.88-.72-3.52-1.85-4.65l1.42-1.42C15.92 6.73 17 9.27 17 12h4c0-4.97-4.03-9-9-9s-9 4.03-9 9zm1 2v2h16v-2H4zm8 4c-1.34 0-2.42 1.08-2.42 2.42 0 .35.07.68.2.99h4.44c.13-.31.2-.64.2-.99C14.42 19.08 13.34 18 12 18z"/>
+  </symbol>
+
+  <!-- Sunset Icon -->
+  <symbol id="icon-sunset" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M3 12h4c0-2.73 1.08-5.27 2.93-7.07l1.42 1.42C10.22 7.48 9.5 9.12 9.5 11H14.5c0-1.88-.72-3.52-1.85-4.65l1.42-1.42C15.92 6.73 17 9.27 17 12h4c0-4.97-4.03-9-9-9s-9 4.03-9 9zm-3 2v2h16v-2H4zm8 4c-1.34 0-2.42 1.08-2.42 2.42 0 .35.07.68.2.99h4.44c.13-.31.2-.64.2-.99C14.42 19.08 13.34 18 12 18z"/>
+  </symbol>
+</svg>

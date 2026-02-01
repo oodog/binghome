@@ -1,0 +1,2263 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1024, height=600, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BingHome Hub</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tile: rgba(26, 26, 37, 0.85);
+            --bg-tile-solid: #1a1a25;
+            --accent: #00ff88;
+            --accent-glow: rgba(0, 255, 136, 0.3);
+            --text-primary: #ffffff;
+            --text-secondary: #888899;
+            --border: rgba(255, 255, 255, 0.1);
+            --danger: #ff4757;
+            --warning: #ffa502;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            width: 1024px;
+            height: 600px;
+            overflow: hidden;
+            user-select: none;
+        }
+
+        /* Background Photo */
+        .background-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 0;
+            background-size: cover;
+            background-position: center;
+            transition: opacity 1s ease;
+        }
+
+        .background-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, rgba(0,0,0,0.3) 0%, rgba(0,0,0,0.7) 100%);
+            z-index: 1;
+        }
+
+        /* Main Container */
+        .dashboard {
+            position: relative;
+            z-index: 2;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        /* Status Bar - Compact for 7-inch */
+        .status-bar {
+            background: rgba(18, 18, 26, 0.9);
+            backdrop-filter: blur(20px);
+            padding: 4px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 36px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .status-left, .status-center, .status-right {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .status-center {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+
+        .time-display {
+            font-size: 16px;
+            font-weight: 500;
+        }
+
+        .date-display {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+            font-size: 12px;
+        }
+
+        .status-value {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Widget Grid - Optimized for 7-inch 1024x600 */
+        .widget-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(8, 1fr);
+            grid-template-rows: repeat(5, 1fr);
+            gap: 8px;
+            padding: 10px;
+            overflow: hidden;
+            height: calc(600px - 36px); /* Full height minus status bar */
+        }
+
+        /* Widgets - Compact for 7-inch */
+        .widget {
+            background: var(--bg-tile);
+            backdrop-filter: blur(10px);
+            border-radius: 12px;
+            border: 1px solid var(--border);
+            overflow: hidden;
+            position: relative;
+            transition: all 0.2s ease;
+            cursor: pointer;
+        }
+
+        .widget:hover {
+            border-color: var(--accent);
+            transform: scale(1.02);
+            z-index: 10;
+        }
+
+        .widget:active {
+            transform: scale(0.98);
+        }
+
+        /* Edit Mode */
+        .widget.editing {
+            cursor: move;
+            animation: wiggle 0.3s infinite;
+        }
+
+        @keyframes wiggle {
+            0%, 100% { transform: rotate(-0.5deg); }
+            50% { transform: rotate(0.5deg); }
+        }
+
+        .widget.editing:hover {
+            transform: rotate(-0.5deg) scale(1.02);
+        }
+
+        .widget-delete {
+            position: absolute;
+            top: -10px;
+            right: -10px;
+            width: 28px;
+            height: 28px;
+            background: var(--danger);
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            font-weight: bold;
+            z-index: 200;
+            cursor: pointer;
+            border: 2px solid white;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+        }
+
+        .widget-delete:hover {
+            background: #ff1a1a;
+            transform: scale(1.1);
+        }
+
+        .widget.editing .widget-delete {
+            display: flex;
+        }
+
+        .widget-resize {
+            position: absolute;
+            bottom: 0;
+            right: 0;
+            width: 24px;
+            height: 24px;
+            cursor: se-resize;
+            display: none;
+            z-index: 150;
+            background: linear-gradient(135deg, transparent 50%, var(--accent) 50%);
+            border-radius: 0 0 16px 0;
+        }
+
+        .widget.editing .widget-resize {
+            display: block;
+        }
+
+        .widget.dragging {
+            opacity: 0.8;
+            z-index: 1000;
+            box-shadow: 0 10px 40px rgba(0, 255, 136, 0.4);
+        }
+
+        .widget.resizing {
+            z-index: 1000;
+        }
+
+        .grid-placeholder {
+            background: rgba(0, 255, 136, 0.2);
+            border: 2px dashed var(--accent);
+            border-radius: 16px;
+            pointer-events: none;
+        }
+
+        /* Weather Widget - Compact for 7-inch */
+        .widget-weather {
+            grid-column: span 3;
+            grid-row: span 2;
+            padding: 0;
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Weather Radar Overlay */
+        .weather-radar {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-primary);
+            display: none;
+            z-index: 50;
+        }
+
+        .weather-radar.active {
+            display: block;
+        }
+
+        .weather-radar iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .radar-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 32px;
+            height: 32px;
+            background: rgba(0, 0, 0, 0.7);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            font-size: 18px;
+            cursor: pointer;
+            z-index: 60;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .radar-close:hover {
+            background: var(--danger);
+        }
+
+        .weather-tap-hint {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-align: center;
+            margin-top: 8px;
+            opacity: 0.7;
+        }
+
+        .weather-main {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            flex: 1;
+        }
+
+        .weather-temp {
+            font-size: 36px;
+            font-weight: 200;
+            line-height: 1;
+        }
+
+        .weather-location {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .weather-icon {
+            font-size: 32px;
+        }
+
+        .weather-desc {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: right;
+        }
+
+        .weather-details {
+            display: flex;
+            gap: 10px;
+            margin-top: 8px;
+            padding-top: 8px;
+            border-top: 1px solid var(--border);
+        }
+
+        .weather-detail {
+            text-align: center;
+            flex: 1;
+        }
+
+        .weather-detail-value {
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .weather-detail-label {
+            font-size: 9px;
+            color: var(--text-secondary);
+        }
+
+        /* Clock Widget - Compact for 7-inch */
+        .widget-clock {
+            grid-column: span 2;
+            grid-row: span 2;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 10px;
+        }
+
+        .clock-time {
+            font-size: 32px;
+            font-weight: 200;
+            letter-spacing: -1px;
+        }
+
+        .clock-date {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 3px;
+        }
+
+        /* Moon Phase Visual - Compact for 7-inch */
+        .moon-phase-container {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid var(--border);
+        }
+
+        .moon-visual {
+            position: relative;
+            width: 28px;
+            height: 28px;
+        }
+
+        .moon-sphere {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: linear-gradient(90deg, #f5f3ce 0%, #e8e4b8 50%, #d4cfa0 100%);
+            box-shadow: inset -1px -1px 4px rgba(0,0,0,0.2), 0 0 8px rgba(245, 243, 206, 0.3);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .moon-shadow {
+            position: absolute;
+            top: 0;
+            width: 50%;
+            height: 100%;
+            background: var(--bg-primary);
+            transition: all 0.5s ease;
+        }
+
+        /* New Moon - fully dark */
+        .moon-phase-new .moon-shadow {
+            left: 0;
+            width: 100%;
+            border-radius: 50%;
+        }
+
+        /* Waxing Crescent - right side lit, shadow from left */
+        .moon-phase-waxing-crescent .moon-shadow {
+            left: 0;
+            width: 75%;
+            border-radius: 0 50% 50% 0 / 0 50% 50% 0;
+        }
+
+        /* First Quarter - right half lit */
+        .moon-phase-first-quarter .moon-shadow {
+            left: 0;
+            width: 50%;
+            border-radius: 0;
+        }
+
+        /* Waxing Gibbous - mostly lit, small shadow on left */
+        .moon-phase-waxing-gibbous .moon-shadow {
+            left: 0;
+            width: 25%;
+            border-radius: 50% 0 0 50% / 50% 0 0 50%;
+        }
+
+        /* Full Moon - fully lit */
+        .moon-phase-full .moon-shadow {
+            width: 0;
+        }
+
+        /* Waning Gibbous - mostly lit, small shadow on right */
+        .moon-phase-waning-gibbous .moon-shadow {
+            left: auto;
+            right: 0;
+            width: 25%;
+            border-radius: 0 50% 50% 0 / 0 50% 50% 0;
+        }
+
+        /* Last Quarter - left half lit */
+        .moon-phase-last-quarter .moon-shadow {
+            left: auto;
+            right: 0;
+            width: 50%;
+            border-radius: 0;
+        }
+
+        /* Waning Crescent - left side lit, shadow from right */
+        .moon-phase-waning-crescent .moon-shadow {
+            left: auto;
+            right: 0;
+            width: 75%;
+            border-radius: 50% 0 0 50% / 50% 0 0 50%;
+        }
+
+        .moon-info {
+            flex: 1;
+        }
+
+        .moon-phase-name {
+            font-size: 10px;
+            font-weight: 500;
+            color: var(--text-primary);
+        }
+
+        .moon-illumination {
+            font-size: 9px;
+            color: var(--text-secondary);
+        }
+
+        /* App Tile Widget - Compact for 7-inch */
+        .widget-app {
+            grid-column: span 1;
+            grid-row: span 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 8px;
+        }
+
+        .app-icon {
+            font-size: 28px;
+            margin-bottom: 4px;
+        }
+
+        .app-icon img {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+        }
+
+        .app-name {
+            font-size: 10px;
+            color: var(--text-secondary);
+            text-align: center;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+        }
+
+        /* Photo Widget - Compact for 7-inch */
+        .widget-photo {
+            grid-column: span 3;
+            grid-row: span 2;
+            overflow: hidden;
+        }
+
+        .widget-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .photo-placeholder {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-secondary);
+        }
+
+        .photo-placeholder-icon {
+            font-size: 32px;
+            opacity: 0.5;
+            margin-bottom: 5px;
+        }
+
+        /* Quick Actions Widget - Compact for 7-inch */
+        .widget-actions {
+            grid-column: span 5;
+            grid-row: span 1;
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 5px;
+            padding: 6px;
+        }
+
+        .quick-action {
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 5px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-action:hover {
+            background: rgba(0, 255, 136, 0.1);
+        }
+
+        .quick-action:active {
+            transform: scale(0.95);
+        }
+
+        .quick-action-icon {
+            font-size: 18px;
+            margin-bottom: 2px;
+        }
+
+        .quick-action-label {
+            font-size: 8px;
+            color: var(--text-secondary);
+        }
+
+        /* Sensor Widget - Compact for 7-inch */
+        .widget-sensor {
+            grid-column: span 2;
+            grid-row: span 1;
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            gap: 8px;
+        }
+
+        .sensor-icon {
+            font-size: 18px;
+        }
+
+        .sensor-info {
+            flex: 1;
+        }
+
+        .sensor-value {
+            font-size: 16px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .sensor-label {
+            font-size: 9px;
+            color: var(--text-secondary);
+        }
+
+        /* Camera Widget - Compact for 7-inch */
+        .widget-camera {
+            grid-column: span 2;
+            grid-row: span 2;
+        }
+
+        /* Media Widget - Compact for 7-inch */
+        .widget-media {
+            grid-column: span 3;
+            grid-row: span 1;
+            display: flex;
+            align-items: center;
+            padding: 8px 10px;
+            gap: 8px;
+        }
+
+        .media-art {
+            width: 36px;
+            height: 36px;
+            background: var(--bg-secondary);
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+
+        .media-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .media-title {
+            font-size: 11px;
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .media-artist {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .media-controls {
+            display: flex;
+            gap: 5px;
+        }
+
+        .media-btn {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+        }
+
+        .media-btn:hover {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        /* Home Button */
+        .home-button { display: none !important; /* Hidden - using nav-overlay */
+        }
+
+        .old-home-button-hidden {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            width: 56px;
+            height: 56px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            font-size: 28px;
+            color: var(--bg-primary);
+            box-shadow: 0 4px 20px var(--accent-glow);
+            transition: all 0.2s;
+        }
+
+        .home-button:hover {
+            transform: scale(1.1);
+        }
+
+        .home-button:active {
+            transform: scale(0.95);
+        }
+
+        /* Edit Button - Compact for 7-inch */
+        .edit-button {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            width: 40px;
+            height: 40px;
+            background: var(--bg-tile-solid);
+            border: 2px solid var(--border);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            font-size: 18px;
+            color: var(--text-primary);
+            transition: all 0.3s;
+        }
+
+        .edit-button:hover {
+            border-color: var(--accent);
+        }
+
+        .edit-button.active {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border-color: var(--accent);
+        }
+
+        /* Settings Button - Compact for 7-inch */
+        .settings-button {
+            position: fixed;
+            bottom: 58px;
+            right: 10px;
+            width: 36px;
+            height: 36px;
+            background: var(--bg-tile-solid);
+            border: 2px solid var(--border);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            font-size: 16px;
+            color: var(--text-primary);
+            transition: all 0.3s;
+        }
+
+        .settings-button:hover {
+            border-color: var(--accent);
+            transform: rotate(45deg);
+        }
+
+        /* Voice Indicator */
+        .voice-indicator {
+            position: fixed;
+            top: 55px;
+            right: 20px;
+            width: 45px;
+            height: 45px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9998;
+            font-size: 22px;
+            animation: pulse 1.5s ease-in-out infinite;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .voice-indicator.active {
+            display: flex;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        /* Edit Panel */
+        .edit-panel {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--bg-tile-solid);
+            border-top: 1px solid var(--border);
+            padding: 15px 20px;
+            display: none;
+            z-index: 9998;
+        }
+
+        .edit-panel.active {
+            display: block;
+        }
+
+        .edit-panel-title {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 15px;
+        }
+
+        .widget-palette {
+            display: flex;
+            gap: 10px;
+            overflow-x: auto;
+            padding-bottom: 10px;
+        }
+
+        .palette-item {
+            min-width: 80px;
+            padding: 15px 10px;
+            background: var(--bg-secondary);
+            border-radius: 12px;
+            text-align: center;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .palette-item:hover {
+            border-color: var(--accent);
+        }
+
+        .palette-icon {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        .palette-name {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        /* Background Options */
+        .bg-options {
+            display: flex;
+            gap: 10px;
+            margin-top: 15px;
+        }
+
+        .bg-option {
+            width: 60px;
+            height: 40px;
+            border-radius: 8px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            background-size: cover;
+            background-position: center;
+        }
+
+        .bg-option:hover, .bg-option.active {
+            border-color: var(--accent);
+        }
+
+        .bg-option.solid {
+            background: var(--bg-primary);
+        }
+
+        /* Voice Overlay */
+        .voice-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(10px);
+        }
+
+        .voice-overlay.active {
+            display: flex;
+        }
+
+        .voice-content {
+            text-align: center;
+        }
+
+        .voice-animation {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 25px;
+            background: radial-gradient(circle, var(--accent), transparent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: pulse 2s ease-in-out infinite;
+            font-size: 48px;
+        }
+
+        .voice-status {
+            font-size: 22px;
+            margin-bottom: 10px;
+        }
+
+        .voice-command {
+            font-size: 16px;
+            color: var(--accent);
+            margin-top: 15px;
+        }
+
+        /* 4K TV Mode - Larger sizes for big screens */
+        @media (min-width: 1920px) {
+            body { width: 100%; height: 100vh; }
+            .status-bar { height: 60px; padding: 12px 30px; }
+            .time-display { font-size: 20px; }
+            .widget-grid {
+                grid-template-columns: repeat(12, 1fr);
+                grid-template-rows: repeat(6, 1fr);
+                gap: 15px;
+                padding: 20px;
+                height: calc(100vh - 60px);
+            }
+            .widget { border-radius: 20px; }
+            .weather-temp { font-size: 72px; }
+            .weather-icon { font-size: 56px; }
+            .clock-time { font-size: 64px; }
+            .clock-date { font-size: 18px; }
+            .app-icon { font-size: 56px; }
+            .app-name { font-size: 16px; }
+            .widget-app { grid-column: span 2; grid-row: span 2; }
+            .widget-weather { grid-column: span 4; grid-row: span 3; }
+            .widget-clock { grid-column: span 3; grid-row: span 2; }
+            .widget-photo { grid-column: span 4; grid-row: span 3; }
+            .edit-button { width: 60px; height: 60px; font-size: 28px; bottom: 20px; right: 20px; }
+            .settings-button { width: 50px; height: 50px; font-size: 24px; bottom: 90px; right: 20px; }
+        }
+    </style>
+</head>
+<body>
+    <!-- Background -->
+    <div class="background-layer" id="bgLayer"></div>
+    <div class="background-overlay" id="bgOverlay"></div>
+
+    <!-- Dashboard -->
+    <div class="dashboard">
+        <!-- Status Bar -->
+        <div class="status-bar">
+            <div class="status-left">
+                <div class="status-item">
+                    <span>📡</span>
+                    <span id="networkStatus">WiFi</span>
+                </div>
+            </div>
+
+            <div class="status-center">
+                <div>
+                    <div class="time-display" id="statusTime">--:--</div>
+                    <div class="date-display" id="statusDate">--</div>
+                </div>
+            </div>
+
+            <div class="status-right">
+                <div class="status-item">
+                    <span>🌡️</span>
+                    <span class="status-value" id="tempValue">--</span>°C
+                </div>
+                <div class="status-item">
+                    <span>💧</span>
+                    <span class="status-value" id="humidityValue">--</span>%
+                </div>
+            </div>
+        </div>
+
+        <!-- Widget Grid -->
+        <div class="widget-grid" id="widgetGrid">
+            <!-- Widgets loaded dynamically -->
+        </div>
+    </div>
+
+    <!-- Home Button -->
+    <!-- Old home button removed - using nav-overlay instead -->
+
+    <!-- Edit Button -->
+    <div class="edit-button" id="editBtn" onclick="toggleEditMode()">✏️</div>
+
+    <!-- Settings Button -->
+    <div class="settings-button" onclick="window.location.href='/settings'">⚙️</div>
+
+    <!-- Voice Indicator -->
+    <div class="voice-indicator" id="voiceIndicator">🎤</div>
+
+    <!-- Edit Panel -->
+    <div class="edit-panel" id="editPanel">
+        <div class="edit-panel-title">Add Widgets</div>
+        <div class="widget-palette" id="widgetPalette">
+            <div class="palette-item" onclick="addWidget('weather')">
+                <div class="palette-icon">🌤️</div>
+                <div class="palette-name">Weather</div>
+            </div>
+            <div class="palette-item" onclick="addWidget('clock')">
+                <div class="palette-icon">🕐</div>
+                <div class="palette-name">Clock</div>
+            </div>
+            <div class="palette-item" onclick="addWidget('photo')">
+                <div class="palette-icon">📷</div>
+                <div class="palette-name">Photos</div>
+            </div>
+            <div class="palette-item" onclick="addWidget('app-netflix')">
+                <div class="palette-icon">🎬</div>
+                <div class="palette-name">Netflix</div>
+            </div>
+            <div class="palette-item" onclick="addWidget('app-youtube')">
+                <div class="palette-icon">▶️</div>
+                <div class="palette-name">YouTube</div>
+            </div>
+            <div class="palette-item" onclick="addWidget('app-spotify')">
+                <div class="palette-icon">🎵</div>
+                <div class="palette-name">Spotify</div>
+            </div>
+            <div class="palette-item" onclick="addWidget('app-devices')">
+                <div class="palette-icon">🏠</div>
+                <div class="palette-name">Devices</div>
+            </div>
+            <div class="palette-item" onclick="addWidget('app-timers')">
+                <div class="palette-icon">⏰</div>
+                <div class="palette-name">Timers</div>
+            </div>
+            <div class="palette-item" onclick="addWidget('sensor-temp')">
+                <div class="palette-icon">🌡️</div>
+                <div class="palette-name">Temp</div>
+            </div>
+            <div class="palette-item" onclick="addWidget('actions')">
+                <div class="palette-icon">⚡</div>
+                <div class="palette-name">Quick Actions</div>
+            </div>
+            <div class="palette-item" onclick="addWidget('camera')">
+                <div class="palette-icon">📹</div>
+                <div class="palette-name">Camera</div>
+            </div>
+        </div>
+
+        <div class="edit-panel-title" style="margin-top: 15px;">Background</div>
+        <div class="bg-options" id="bgOptions">
+            <div class="bg-option solid active" onclick="setBackground('solid')"></div>
+            <div class="bg-option" style="background-image: url('https://source.unsplash.com/random/1920x1080/?nature')" onclick="setBackground('nature')"></div>
+            <div class="bg-option" style="background-image: url('https://source.unsplash.com/random/1920x1080/?city')" onclick="setBackground('city')"></div>
+            <div class="bg-option" style="background-image: url('https://source.unsplash.com/random/1920x1080/?space')" onclick="setBackground('space')"></div>
+            <div class="bg-option" style="background-image: url('https://source.unsplash.com/random/1920x1080/?ocean')" onclick="setBackground('ocean')"></div>
+        </div>
+
+        <div style="margin-top: 15px; display: flex; gap: 10px;">
+            <button onclick="resetLayout()" style="
+                background: var(--danger);
+                color: white;
+                border: none;
+                padding: 10px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 12px;
+            ">Reset Layout</button>
+            <button onclick="toggleEditMode()" style="
+                background: var(--accent);
+                color: var(--bg-primary);
+                border: none;
+                padding: 10px 20px;
+                border-radius: 8px;
+                cursor: pointer;
+                font-size: 12px;
+                font-weight: 600;
+            ">Done Editing</button>
+        </div>
+    </div>
+
+    <!-- Voice Overlay -->
+    <div class="voice-overlay" id="voiceOverlay">
+        <div class="voice-content">
+            <div class="voice-animation">🎤</div>
+            <div class="voice-status" id="voiceStatus">Listening...</div>
+            <div class="voice-command" id="voiceCommand"></div>
+        </div>
+    </div>
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+    <script>
+        // ============================
+        // Configuration
+        // ============================
+        const socket = io();
+        let settings = {};
+        let editMode = false;
+        let layout = null;
+        let photos = [];
+        let photoIndex = 0;
+
+        // Default layout - Optimized for 8x5 grid on 7-inch 1024x600
+        const defaultLayout = {
+            background: 'solid',
+            backgroundUrl: '',
+            widgets: [
+                { id: 'w1', type: 'weather', col: 1, row: 1, width: 3, height: 2 },
+                { id: 'w2', type: 'clock', col: 4, row: 1, width: 2, height: 2 },
+                { id: 'w3', type: 'photo', col: 6, row: 1, width: 3, height: 2 },
+                { id: 'w4', type: 'app-netflix', col: 1, row: 3, width: 1, height: 1 },
+                { id: 'w5', type: 'app-youtube', col: 2, row: 3, width: 1, height: 1 },
+                { id: 'w6', type: 'app-spotify', col: 3, row: 3, width: 1, height: 1 },
+                { id: 'w7', type: 'app-prime', col: 4, row: 3, width: 1, height: 1 },
+                { id: 'w8', type: 'app-devices', col: 5, row: 3, width: 1, height: 1 },
+                { id: 'w9', type: 'app-timers', col: 6, row: 3, width: 1, height: 1 },
+                { id: 'w10', type: 'app-routines', col: 7, row: 3, width: 1, height: 1 },
+                { id: 'w11', type: 'app-shopping', col: 8, row: 3, width: 1, height: 1 },
+                { id: 'w12', type: 'sensor-temp', col: 1, row: 4, width: 2, height: 1 },
+                { id: 'w13', type: 'actions', col: 3, row: 4, width: 5, height: 1 },
+                { id: 'w14', type: 'app-calendar', col: 1, row: 5, width: 1, height: 1 },
+                { id: 'w15', type: 'app-intercom', col: 2, row: 5, width: 1, height: 1 },
+                { id: 'w16', type: 'app-xbox', col: 3, row: 5, width: 1, height: 1 }
+            ]
+        };
+
+        // ============================
+        // Initialization
+        // ============================
+        document.addEventListener('DOMContentLoaded', function() {
+            loadSettings();
+            loadLayout();
+            startClock();
+            setupVoice();
+            setupDragDrop();
+        });
+
+        function loadSettings() {
+            fetch('/api/settings')
+                .then(r => r.json())
+                .then(data => {
+                    settings = data;
+                    updateWeather();
+                    loadPhotos();
+                })
+                .catch(e => console.error('Settings error:', e));
+        }
+
+        function loadLayout() {
+            const saved = localStorage.getItem('binghome_layout');
+            layout = saved ? JSON.parse(saved) : defaultLayout;
+            renderWidgets();
+            applyBackground();
+        }
+
+        function saveLayout() {
+            localStorage.setItem('binghome_layout', JSON.stringify(layout));
+        }
+
+        function resetLayout() {
+            if (confirm('Reset to default layout? This will remove all your customizations.')) {
+                localStorage.removeItem('binghome_layout');
+                layout = JSON.parse(JSON.stringify(defaultLayout)); // Deep copy
+                renderWidgets();
+                applyBackground();
+
+                // Re-apply edit mode
+                if (editMode) {
+                    document.querySelectorAll('.widget').forEach(w => {
+                        w.classList.add('editing');
+                    });
+                }
+            }
+        }
+
+        // ============================
+        // Widget Rendering
+        // ============================
+        function renderWidgets() {
+            const grid = document.getElementById('widgetGrid');
+            grid.innerHTML = '';
+
+            layout.widgets.forEach(widget => {
+                const el = createWidget(widget);
+                grid.appendChild(el);
+            });
+
+            // Re-initialize data after rendering
+            setTimeout(() => {
+                updateWeather();
+                updateMoonPhase();
+                loadPhotos();
+                updateCameraWidget();
+
+                // Update sensor displays if we have data
+                socket.emit('request_sensor_data');
+            }, 100);
+        }
+
+        function createWidget(config) {
+            const el = document.createElement('div');
+            el.className = `widget widget-${config.type.split('-')[0]}`;
+            el.id = config.id;
+            el.dataset.widgetId = config.id;
+            el.style.gridColumn = `${config.col} / span ${config.width}`;
+            el.style.gridRow = `${config.row} / span ${config.height}`;
+
+            if (editMode) {
+                el.classList.add('editing');
+            }
+
+            // Create content container first
+            const contentDiv = document.createElement('div');
+            contentDiv.className = 'widget-content';
+            contentDiv.style.cssText = 'width: 100%; height: 100%; position: relative;';
+
+            // Content based on type
+            let clickHandler = null;
+            switch(config.type) {
+                case 'weather':
+                    contentDiv.innerHTML = getWeatherWidgetHTML();
+                    clickHandler = () => !editMode && toggleWeatherRadar();
+                    break;
+
+                case 'clock':
+                    contentDiv.innerHTML = getClockWidgetHTML();
+                    break;
+
+                case 'photo':
+                    contentDiv.innerHTML = getPhotoWidgetHTML();
+                    break;
+
+                case 'actions':
+                    contentDiv.innerHTML = getActionsWidgetHTML();
+                    break;
+
+                case 'sensor-temp':
+                    contentDiv.innerHTML = getSensorWidgetHTML('temp');
+                    break;
+
+                case 'sensor-humidity':
+                    contentDiv.innerHTML = getSensorWidgetHTML('humidity');
+                    break;
+
+                case 'camera':
+                    contentDiv.innerHTML = getCameraWidgetHTML();
+                    clickHandler = () => !editMode && openPage('/security-cameras');
+                    break;
+
+                default:
+                    if (config.type.startsWith('app-')) {
+                        const appName = config.type.replace('app-', '');
+                        contentDiv.innerHTML = getAppWidgetHTML(appName);
+                        clickHandler = () => !editMode && launchApp(appName);
+                    }
+            }
+
+            el.appendChild(contentDiv);
+
+            // Delete button - added after content so it's on top
+            const deleteBtn = document.createElement('div');
+            deleteBtn.className = 'widget-delete';
+            deleteBtn.innerHTML = '✕';
+            deleteBtn.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                const widgetId = config.id;
+                console.log('Deleting widget:', widgetId);
+                deleteWidget(widgetId);
+            });
+            deleteBtn.addEventListener('touchend', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                e.stopImmediatePropagation();
+                const widgetId = config.id;
+                console.log('Deleting widget (touch):', widgetId);
+                deleteWidget(widgetId);
+            });
+            el.appendChild(deleteBtn);
+
+            // Resize handle
+            const resize = document.createElement('div');
+            resize.className = 'widget-resize';
+            resize.title = 'Drag to resize';
+            el.appendChild(resize);
+
+            // Set click handler for content area
+            if (clickHandler) {
+                contentDiv.addEventListener('click', function(e) {
+                    if (!editMode && !e.target.closest('.widget-delete') && !e.target.closest('.widget-resize')) {
+                        clickHandler();
+                    }
+                });
+            }
+
+            return el;
+        }
+
+        // Widget HTML templates - Compact for 7-inch
+        function getWeatherWidgetHTML() {
+            return `
+                <div style="padding: 10px; height: 100%; display: flex; flex-direction: column;">
+                    <div class="weather-main">
+                        <div>
+                            <div class="weather-temp" id="weatherTemp">--°</div>
+                            <div class="weather-location" id="weatherLocation">Loading...</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <div class="weather-icon" id="weatherIcon">☀️</div>
+                            <div class="weather-desc" id="weatherDesc">--</div>
+                        </div>
+                    </div>
+                    <div class="weather-details">
+                        <div class="weather-detail">
+                            <div class="weather-detail-value" id="weatherHumidity">--%</div>
+                            <div class="weather-detail-label">Hum</div>
+                        </div>
+                        <div class="weather-detail">
+                            <div class="weather-detail-value" id="weatherWind">--</div>
+                            <div class="weather-detail-label">Wind</div>
+                        </div>
+                        <div class="weather-detail">
+                            <div class="weather-detail-value" id="weatherFeels">--°</div>
+                            <div class="weather-detail-label">Feels</div>
+                        </div>
+                    </div>
+                </div>
+                <div class="weather-radar" id="weatherRadar">
+                    <button class="radar-close" onclick="event.stopPropagation(); closeRadar();">✕</button>
+                    <iframe id="radarFrame" src="" title="Weather Radar"></iframe>
+                </div>
+            `;
+        }
+
+        function getClockWidgetHTML() {
+            return `
+                <div style="height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 8px;">
+                    <div class="clock-time" id="clockTime">--:--</div>
+                    <div class="clock-date" id="clockDate">--</div>
+                    <div class="moon-phase-container">
+                        <div class="moon-visual">
+                            <div class="moon-sphere moon-phase-full" id="moonSphere">
+                                <div class="moon-shadow"></div>
+                            </div>
+                        </div>
+                        <div class="moon-info">
+                            <div class="moon-phase-name" id="moonPhaseName">--</div>
+                            <div class="moon-illumination" id="moonIllumination">--</div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function getPhotoWidgetHTML() {
+            return `
+                <div class="photo-placeholder" id="photoContainer">
+                    <div class="photo-placeholder-icon">📷</div>
+                    <div>Photo Slideshow</div>
+                </div>
+            `;
+        }
+
+        function getAppWidgetHTML(appName) {
+            const apps = {
+                'netflix': { icon: '🎬', name: 'Netflix' },
+                'youtube': { icon: '▶️', name: 'YouTube' },
+                'spotify': { icon: '🎵', name: 'Spotify' },
+                'prime': { icon: '📺', name: 'Prime Video' },
+                'xbox': { icon: '🎮', name: 'Xbox Cloud' },
+                'devices': { icon: '🏠', name: 'Devices' },
+                'timers': { icon: '⏰', name: 'Timers' },
+                'routines': { icon: '✓', name: 'Routines' },
+                'shopping': { icon: '🛒', name: 'Shopping' },
+                'calendar': { icon: '📅', name: 'Calendar' },
+                'intercom': { icon: '📢', name: 'Intercom' },
+                'news': { icon: '📰', name: 'News' }
+            };
+
+            const app = apps[appName] || { icon: '📱', name: appName };
+
+            return `
+                <div class="app-icon">${app.icon}</div>
+                <div class="app-name">${app.name}</div>
+            `;
+        }
+
+        function getActionsWidgetHTML() {
+            return `
+                <div class="quick-action" onclick="openPage('/devices')">
+                    <div class="quick-action-icon">🏠</div>
+                    <div class="quick-action-label">Devices</div>
+                </div>
+                <div class="quick-action" onclick="openPage('/routines')">
+                    <div class="quick-action-icon">✓</div>
+                    <div class="quick-action-label">Routines</div>
+                </div>
+                <div class="quick-action" onclick="openPage('/shopping')">
+                    <div class="quick-action-icon">🛒</div>
+                    <div class="quick-action-label">Shopping</div>
+                </div>
+                <div class="quick-action" onclick="openPage('/calendar')">
+                    <div class="quick-action-icon">📅</div>
+                    <div class="quick-action-label">Calendar</div>
+                </div>
+                <div class="quick-action" onclick="openPage('/intercom')">
+                    <div class="quick-action-icon">📢</div>
+                    <div class="quick-action-label">Intercom</div>
+                </div>
+            `;
+        }
+
+        function getSensorWidgetHTML(type) {
+            if (type === 'temp') {
+                return `
+                    <div class="sensor-icon">🌡️</div>
+                    <div class="sensor-info">
+                        <div class="sensor-value"><span id="sensorTemp">--</span>°C</div>
+                        <div class="sensor-label">Indoor Temp</div>
+                    </div>
+                `;
+            }
+            return `
+                <div class="sensor-icon">💧</div>
+                <div class="sensor-info">
+                    <div class="sensor-value"><span id="sensorHumidity">--</span>%</div>
+                    <div class="sensor-label">Humidity</div>
+                </div>
+            `;
+        }
+
+        function getCameraWidgetHTML() {
+            return `
+                <div class="camera-widget" style="height: 100%; display: flex; flex-direction: column; padding: 8px;">
+                    <div style="flex: 1; background: var(--bg-secondary); border-radius: 8px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative;">
+                        <img id="cameraPreview" style="width: 100%; height: 100%; object-fit: cover; display: none;">
+                        <div id="cameraPlaceholder" style="text-align: center; color: var(--text-secondary);">
+                            <div style="font-size: 32px; opacity: 0.5;">📹</div>
+                            <div style="font-size: 10px; margin-top: 4px;">Security Cameras</div>
+                        </div>
+                    </div>
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 6px; padding: 0 4px;">
+                        <span style="font-size: 10px; color: var(--text-secondary);" id="cameraCount">-- cameras</span>
+                        <span style="font-size: 10px; color: var(--accent);">Tap to view</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        // ============================
+        // Edit Mode
+        // ============================
+        function toggleEditMode() {
+            editMode = !editMode;
+            document.getElementById('editBtn').classList.toggle('active', editMode);
+            document.getElementById('editPanel').classList.toggle('active', editMode);
+
+            document.querySelectorAll('.widget').forEach(w => {
+                w.classList.toggle('editing', editMode);
+            });
+        }
+
+        function addWidget(type) {
+            // Determine widget size based on type - optimized for 8x5 grid on 7-inch
+            const sizes = {
+                'weather': { width: 3, height: 2 },
+                'clock': { width: 2, height: 2 },
+                'photo': { width: 3, height: 2 },
+                'camera': { width: 2, height: 2 },
+                'actions': { width: 5, height: 1 },
+                'sensor-temp': { width: 2, height: 1 },
+                'sensor-humidity': { width: 2, height: 1 },
+                'media': { width: 3, height: 1 }
+            };
+
+            const defaultSize = type.startsWith('app-') ? { width: 1, height: 1 } : { width: 1, height: 1 };
+            const size = sizes[type] || defaultSize;
+
+            // Find available position
+            const pos = findAvailablePosition(size.width, size.height);
+
+            const newWidget = {
+                id: 'w' + Date.now(),
+                type: type,
+                col: pos.col,
+                row: pos.row,
+                width: size.width,
+                height: size.height
+            };
+
+            layout.widgets.push(newWidget);
+            saveLayout();
+            renderWidgets();
+
+            // Re-apply edit mode to new widgets
+            if (editMode) {
+                document.querySelectorAll('.widget').forEach(w => {
+                    w.classList.add('editing');
+                });
+            }
+        }
+
+        function deleteWidget(id) {
+            if (!id) return;
+            layout.widgets = layout.widgets.filter(w => w.id !== id);
+            saveLayout();
+            renderWidgets();
+
+            // Re-apply edit mode
+            if (editMode) {
+                document.querySelectorAll('.widget').forEach(w => {
+                    w.classList.add('editing');
+                });
+            }
+        }
+
+        // ============================
+        // Background
+        // ============================
+        function setBackground(type) {
+            document.querySelectorAll('.bg-option').forEach(o => o.classList.remove('active'));
+            event.target.classList.add('active');
+
+            layout.background = type;
+
+            if (type === 'solid') {
+                document.getElementById('bgLayer').style.backgroundImage = 'none';
+                document.getElementById('bgOverlay').style.display = 'none';
+            } else {
+                const bgUrl = `https://source.unsplash.com/random/1920x1080/?${type}`;
+                document.getElementById('bgLayer').style.backgroundImage = `url(${bgUrl})`;
+                document.getElementById('bgOverlay').style.display = 'block';
+                layout.backgroundUrl = bgUrl;
+            }
+
+            saveLayout();
+        }
+
+        function applyBackground() {
+            if (layout.background === 'solid' || !layout.backgroundUrl) {
+                document.getElementById('bgLayer').style.backgroundImage = 'none';
+                document.getElementById('bgOverlay').style.display = 'none';
+            } else {
+                document.getElementById('bgLayer').style.backgroundImage = `url(${layout.backgroundUrl})`;
+                document.getElementById('bgOverlay').style.display = 'block';
+            }
+        }
+
+        // ============================
+        // Drag, Drop, and Resize System
+        // ============================
+        let dragState = {
+            active: false,
+            widget: null,
+            widgetId: null,
+            startX: 0,
+            startY: 0,
+            startCol: 0,
+            startRow: 0,
+            startWidth: 0,
+            startHeight: 0,
+            mode: null, // 'drag' or 'resize'
+            gridInfo: null
+        };
+
+        function setupDragDrop() {
+            const grid = document.getElementById('widgetGrid');
+
+            // Mouse events
+            document.addEventListener('mousedown', handleDragStart);
+            document.addEventListener('mousemove', handleDragMove);
+            document.addEventListener('mouseup', handleDragEnd);
+
+            // Touch events
+            document.addEventListener('touchstart', handleDragStart, { passive: false });
+            document.addEventListener('touchmove', handleDragMove, { passive: false });
+            document.addEventListener('touchend', handleDragEnd);
+        }
+
+        function getGridInfo() {
+            const grid = document.getElementById('widgetGrid');
+            const rect = grid.getBoundingClientRect();
+            const style = getComputedStyle(grid);
+            // Use 8x5 for 7-inch (1024x600), 12x6 for larger screens
+            const is4K = window.innerWidth >= 1920;
+            const cols = is4K ? 12 : 8;
+            const rows = is4K ? 6 : 5;
+            const gap = parseInt(style.gap) || 8;
+            const cellWidth = (rect.width - (cols - 1) * gap) / cols;
+            const cellHeight = (rect.height - (rows - 1) * gap) / rows;
+            return { rect, cols, rows, gap, cellWidth, cellHeight };
+        }
+
+        function handleDragStart(e) {
+            if (!editMode) return;
+
+            const touch = e.touches ? e.touches[0] : e;
+            const target = document.elementFromPoint(touch.clientX, touch.clientY);
+
+            // Check if clicking delete button
+            if (target.classList.contains('widget-delete')) {
+                return; // Let the delete handler work
+            }
+
+            const widget = target.closest('.widget');
+            const resizeHandle = target.closest('.widget-resize');
+
+            if (!widget) return;
+
+            e.preventDefault();
+
+            const widgetConfig = layout.widgets.find(w => w.id === widget.id);
+            if (!widgetConfig) return;
+
+            dragState.active = true;
+            dragState.widget = widget;
+            dragState.widgetId = widget.id;
+            dragState.startX = touch.clientX;
+            dragState.startY = touch.clientY;
+            dragState.startCol = widgetConfig.col;
+            dragState.startRow = widgetConfig.row;
+            dragState.startWidth = widgetConfig.width;
+            dragState.startHeight = widgetConfig.height;
+            dragState.gridInfo = getGridInfo();
+            dragState.mode = resizeHandle ? 'resize' : 'drag';
+
+            widget.classList.add(dragState.mode === 'resize' ? 'resizing' : 'dragging');
+        }
+
+        function handleDragMove(e) {
+            if (!dragState.active || !editMode) return;
+
+            e.preventDefault();
+            const touch = e.touches ? e.touches[0] : e;
+            const { gridInfo, startX, startY, startCol, startRow, startWidth, startHeight } = dragState;
+
+            const deltaX = touch.clientX - startX;
+            const deltaY = touch.clientY - startY;
+
+            // Calculate grid cell movement
+            const cellsX = Math.round(deltaX / (gridInfo.cellWidth + gridInfo.gap));
+            const cellsY = Math.round(deltaY / (gridInfo.cellHeight + gridInfo.gap));
+
+            const widgetConfig = layout.widgets.find(w => w.id === dragState.widgetId);
+            if (!widgetConfig) return;
+
+            if (dragState.mode === 'drag') {
+                // Move widget
+                const newCol = Math.max(1, Math.min(gridInfo.cols - widgetConfig.width + 1, startCol + cellsX));
+                const newRow = Math.max(1, Math.min(gridInfo.rows - widgetConfig.height + 1, startRow + cellsY));
+
+                if (newCol !== widgetConfig.col || newRow !== widgetConfig.row) {
+                    widgetConfig.col = newCol;
+                    widgetConfig.row = newRow;
+                    dragState.widget.style.gridColumn = `${newCol} / span ${widgetConfig.width}`;
+                    dragState.widget.style.gridRow = `${newRow} / span ${widgetConfig.height}`;
+                }
+            } else if (dragState.mode === 'resize') {
+                // Resize widget
+                const newWidth = Math.max(1, Math.min(gridInfo.cols - startCol + 1, startWidth + cellsX));
+                const newHeight = Math.max(1, Math.min(gridInfo.rows - startRow + 1, startHeight + cellsY));
+
+                if (newWidth !== widgetConfig.width || newHeight !== widgetConfig.height) {
+                    widgetConfig.width = newWidth;
+                    widgetConfig.height = newHeight;
+                    dragState.widget.style.gridColumn = `${widgetConfig.col} / span ${newWidth}`;
+                    dragState.widget.style.gridRow = `${widgetConfig.row} / span ${newHeight}`;
+                }
+            }
+        }
+
+        function handleDragEnd(e) {
+            if (!dragState.active) return;
+
+            if (dragState.widget) {
+                dragState.widget.classList.remove('dragging', 'resizing');
+            }
+
+            // Save layout
+            saveLayout();
+
+            // Reset state
+            dragState.active = false;
+            dragState.widget = null;
+            dragState.widgetId = null;
+            dragState.mode = null;
+        }
+
+        // Find first available position for a widget
+        function findAvailablePosition(width, height) {
+            // Use 8x5 for 7-inch, 12x6 for 4K
+            const is4K = window.innerWidth >= 1920;
+            const gridCols = is4K ? 12 : 8;
+            const gridRows = is4K ? 6 : 5;
+
+            const grid = Array(gridRows).fill(null).map(() => Array(gridCols).fill(false));
+
+            // Mark occupied cells
+            layout.widgets.forEach(w => {
+                for (let r = w.row - 1; r < w.row - 1 + w.height && r < gridRows; r++) {
+                    for (let c = w.col - 1; c < w.col - 1 + w.width && c < gridCols; c++) {
+                        if (r >= 0 && c >= 0) grid[r][c] = true;
+                    }
+                }
+            });
+
+            // Find first available position
+            for (let row = 0; row < gridRows; row++) {
+                for (let col = 0; col < gridCols; col++) {
+                    if (canFit(grid, col, row, width, height, gridCols, gridRows)) {
+                        return { col: col + 1, row: row + 1 };
+                    }
+                }
+            }
+
+            // Default to position 1,1 if no space found
+            return { col: 1, row: 1 };
+        }
+
+        function canFit(grid, startCol, startRow, width, height, maxCols = 8, maxRows = 5) {
+            if (startCol + width > maxCols || startRow + height > maxRows) return false;
+
+            for (let r = startRow; r < startRow + height; r++) {
+                for (let c = startCol; c < startCol + width; c++) {
+                    if (grid[r] && grid[r][c]) return false;
+                }
+            }
+            return true;
+        }
+
+        // ============================
+        // App Launching
+        // ============================
+        function launchApp(appName) {
+            // External apps - open directly in browser
+            const externalApps = {
+                'netflix': 'https://www.netflix.com',
+                'youtube': 'https://www.youtube.com',
+                'spotify': 'https://open.spotify.com',
+                'prime': 'https://www.primevideo.com',
+                'prime_video': 'https://www.primevideo.com',
+                'xbox': 'https://www.xbox.com/play',
+                'xbox_cloud': 'https://www.xbox.com/play',
+                'disney_plus': 'https://www.disneyplus.com'
+            };
+            
+            if (externalApps[appName]) {
+                window.location.href = externalApps[appName];
+            } else {
+                // Internal pages
+                const pages = {
+                    'devices': '/devices',
+                    'timers': '/timers',
+                    'routines': '/routines',
+                    'shopping': '/shopping',
+                    'calendar': '/calendar',
+                    'intercom': '/intercom',
+                    'settings': '/settings',
+                    'google_photos': '/settings#photos',
+                    'news': '/news'
+                };
+                if (pages[appName]) {
+                    window.location.href = pages[appName];
+                }
+            }
+        }
+
+        function openPage(url) {
+            if (!editMode) {
+                window.location.href = url;
+            }
+        }
+
+        function goHome() {
+            window.location.href = '/';
+        }
+
+        // ============================
+        // Weather
+        // ============================
+        function updateWeather() {
+            fetch('/api/weather/comprehensive')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.current) {
+                        const c = data.current;
+                        const tempEl = document.getElementById('weatherTemp');
+                        const locEl = document.getElementById('weatherLocation');
+                        const iconEl = document.getElementById('weatherIcon');
+                        const descEl = document.getElementById('weatherDesc');
+                        const humEl = document.getElementById('weatherHumidity');
+                        const windEl = document.getElementById('weatherWind');
+                        const feelsEl = document.getElementById('weatherFeels');
+
+                        if (tempEl) tempEl.textContent = c.temp + '°';
+                        if (locEl) locEl.textContent = c.location || settings.weather_location || 'Your Location';
+                        if (iconEl) iconEl.textContent = getWeatherIcon(c.condition);
+                        if (descEl) descEl.textContent = c.description || '--';
+                        if (humEl) humEl.textContent = (c.humidity || '--') + '%';
+                        if (windEl) windEl.textContent = (c.wind_speed || '--') + ' km/h';
+                        if (feelsEl) feelsEl.textContent = (c.feels_like || c.temp) + '°';
+                    }
+                })
+                .catch(e => console.error('Weather error:', e));
+        }
+
+        function getWeatherIcon(condition) {
+            const c = (condition || '').toLowerCase();
+            if (c.includes('clear') || c.includes('sunny')) return '☀️';
+            if (c.includes('cloud')) return '☁️';
+            if (c.includes('rain')) return '🌧️';
+            if (c.includes('thunder')) return '⛈️';
+            if (c.includes('snow')) return '❄️';
+            if (c.includes('mist') || c.includes('fog')) return '🌫️';
+            return '⛅';
+        }
+
+        function toggleWeatherRadar() {
+            const radar = document.getElementById('weatherRadar');
+            const radarFrame = document.getElementById('radarFrame');
+
+            if (!radar) return;
+
+            if (radar.classList.contains('active')) {
+                // Close radar
+                radar.classList.remove('active');
+                if (radarFrame) radarFrame.src = '';
+            } else {
+                // Open radar with location
+                const coords = getLocationCoords(settings.weather_location || 'Gold Coast');
+                const radarUrl = `https://www.rainviewer.com/map.html?loc=${coords.lat},${coords.lon},8&oFa=0&oC=0&oU=0&oCS=1&oF=0&oAP=1&c=3&o=83&lm=1&layer=radar&sm=1&sn=1`;
+
+                if (radarFrame) radarFrame.src = radarUrl;
+                radar.classList.add('active');
+            }
+        }
+
+        function closeRadar() {
+            const radar = document.getElementById('weatherRadar');
+            const radarFrame = document.getElementById('radarFrame');
+            if (radar) radar.classList.remove('active');
+            if (radarFrame) radarFrame.src = '';
+        }
+
+        // ============================
+        // Camera Widget
+        // ============================
+        function updateCameraWidget() {
+            fetch('/api/security-cameras')
+                .then(r => r.json())
+                .then(data => {
+                    const cameras = data.cameras || [];
+                    const countEl = document.getElementById('cameraCount');
+                    const previewEl = document.getElementById('cameraPreview');
+                    const placeholderEl = document.getElementById('cameraPlaceholder');
+
+                    if (countEl) {
+                        countEl.textContent = cameras.length + ' camera' + (cameras.length !== 1 ? 's' : '');
+                    }
+
+                    // Load first camera thumbnail if available
+                    if (cameras.length > 0 && cameras[0].thumbnail) {
+                        if (previewEl) {
+                            previewEl.src = cameras[0].thumbnail;
+                            previewEl.style.display = 'block';
+                        }
+                        if (placeholderEl) {
+                            placeholderEl.style.display = 'none';
+                        }
+                    }
+                })
+                .catch(e => console.log('Camera widget error:', e));
+        }
+
+        // Location coordinates lookup for Australian cities
+        function getLocationCoords(location) {
+            const locations = {
+                'gold coast': { lat: -28.0167, lon: 153.4000 },
+                'brisbane': { lat: -27.4698, lon: 153.0251 },
+                'sydney': { lat: -33.8688, lon: 151.2093 },
+                'melbourne': { lat: -37.8136, lon: 144.9631 },
+                'perth': { lat: -31.9505, lon: 115.8605 },
+                'adelaide': { lat: -34.9285, lon: 138.6007 },
+                'darwin': { lat: -12.4634, lon: 130.8456 },
+                'hobart': { lat: -42.8821, lon: 147.3272 },
+                'canberra': { lat: -35.2809, lon: 149.1300 },
+                'cairns': { lat: -16.9186, lon: 145.7781 },
+                'townsville': { lat: -19.2590, lon: 146.8169 },
+                'newcastle': { lat: -32.9283, lon: 151.7817 },
+                'wollongong': { lat: -34.4278, lon: 150.8931 },
+                'geelong': { lat: -38.1499, lon: 144.3617 },
+                'sunshine coast': { lat: -26.6500, lon: 153.0667 },
+                'toowoomba': { lat: -27.5598, lon: 151.9507 }
+            };
+
+            const loc = (location || '').toLowerCase();
+            for (const [city, coords] of Object.entries(locations)) {
+                if (loc.includes(city)) {
+                    return coords;
+                }
+            }
+            // Default to Gold Coast
+            return { lat: -28.0167, lon: 153.4000 };
+        }
+
+        // ============================
+        // Clock
+        // ============================
+        function startClock() {
+            function update() {
+                const now = new Date();
+                // Use the browser's local timezone which respects system settings
+                const timeStr = now.toLocaleTimeString('en', { hour: '2-digit', minute: '2-digit' });
+                const dateStr = now.toLocaleDateString('en', { weekday: 'short', month: 'short', day: 'numeric' });
+
+                const clockEl = document.getElementById('clockTime');
+                const dateEl = document.getElementById('clockDate');
+                const statusTimeEl = document.getElementById('statusTime');
+                const statusDateEl = document.getElementById('statusDate');
+
+                if (clockEl) clockEl.textContent = timeStr;
+                if (dateEl) dateEl.textContent = dateStr;
+                if (statusTimeEl) statusTimeEl.textContent = timeStr;
+                if (statusDateEl) statusDateEl.textContent = dateStr;
+            }
+
+            update();
+            setInterval(update, 1000);
+
+            // Update moon phase on start and every hour
+            updateMoonPhase();
+            setInterval(updateMoonPhase, 3600000);
+        }
+
+        // ============================
+        // Moon Phase Calculation
+        // ============================
+        function getMoonPhase(date) {
+            // Calculate moon phase using synodic month (29.53059 days)
+            // Known new moon reference: January 6, 2000 at 18:14 UTC
+            const knownNewMoon = new Date(Date.UTC(2000, 0, 6, 18, 14, 0));
+            const synodicMonth = 29.53059; // Average length of lunar month in days
+
+            // Get difference in days from reference new moon
+            const diffMs = date.getTime() - knownNewMoon.getTime();
+            const diffDays = diffMs / (1000 * 60 * 60 * 24);
+
+            // Calculate position in current lunar cycle (0-1)
+            let cyclePosition = (diffDays % synodicMonth) / synodicMonth;
+            if (cyclePosition < 0) cyclePosition += 1;
+
+            // Calculate illumination percentage
+            // Illumination follows a cosine curve
+            const illumination = Math.round((1 - Math.cos(cyclePosition * 2 * Math.PI)) / 2 * 100);
+
+            // Determine phase name and CSS class
+            let phaseName, phaseClass;
+            const dayInCycle = cyclePosition * synodicMonth;
+
+            if (dayInCycle < 1.85) {
+                phaseName = 'New Moon';
+                phaseClass = 'moon-phase-new';
+            } else if (dayInCycle < 5.53) {
+                phaseName = 'Waxing Crescent';
+                phaseClass = 'moon-phase-waxing-crescent';
+            } else if (dayInCycle < 9.22) {
+                phaseName = 'First Quarter';
+                phaseClass = 'moon-phase-first-quarter';
+            } else if (dayInCycle < 12.91) {
+                phaseName = 'Waxing Gibbous';
+                phaseClass = 'moon-phase-waxing-gibbous';
+            } else if (dayInCycle < 16.61) {
+                phaseName = 'Full Moon';
+                phaseClass = 'moon-phase-full';
+            } else if (dayInCycle < 20.30) {
+                phaseName = 'Waning Gibbous';
+                phaseClass = 'moon-phase-waning-gibbous';
+            } else if (dayInCycle < 23.99) {
+                phaseName = 'Last Quarter';
+                phaseClass = 'moon-phase-last-quarter';
+            } else if (dayInCycle < 27.68) {
+                phaseName = 'Waning Crescent';
+                phaseClass = 'moon-phase-waning-crescent';
+            } else {
+                phaseName = 'New Moon';
+                phaseClass = 'moon-phase-new';
+            }
+
+            // Calculate days until next full moon
+            let daysToFull;
+            const fullMoonDay = 14.76; // Day in cycle when full moon occurs
+            if (dayInCycle < fullMoonDay) {
+                daysToFull = Math.round(fullMoonDay - dayInCycle);
+            } else {
+                daysToFull = Math.round(synodicMonth - dayInCycle + fullMoonDay);
+            }
+
+            return {
+                phaseName,
+                phaseClass,
+                illumination,
+                dayInCycle: Math.round(dayInCycle * 10) / 10,
+                daysToFull,
+                cyclePosition
+            };
+        }
+
+        function updateMoonPhase() {
+            // Use current local time (respects system timezone)
+            const now = new Date();
+            const moonData = getMoonPhase(now);
+
+            // Update moon visual
+            const moonSphere = document.getElementById('moonSphere');
+            const moonPhaseName = document.getElementById('moonPhaseName');
+            const moonIllumination = document.getElementById('moonIllumination');
+
+            if (moonSphere) {
+                // Remove all phase classes
+                moonSphere.className = 'moon-sphere';
+                // Add current phase class
+                moonSphere.classList.add(moonData.phaseClass);
+            }
+
+            if (moonPhaseName) {
+                moonPhaseName.textContent = moonData.phaseName;
+            }
+
+            if (moonIllumination) {
+                if (moonData.phaseName === 'Full Moon') {
+                    moonIllumination.textContent = `${moonData.illumination}% illuminated`;
+                } else if (moonData.phaseName === 'New Moon') {
+                    moonIllumination.textContent = `${moonData.daysToFull} days to full`;
+                } else {
+                    moonIllumination.textContent = `${moonData.illumination}% • ${moonData.daysToFull}d to full`;
+                }
+            }
+        }
+
+        // ============================
+        // Photos
+        // ============================
+        let slideshowStarted = false;
+        let preloadedImage = null;
+        let slideshowInterval = null;
+
+        // Optimize URL for Pi (smaller size = faster load, less memory)
+        function optimizePhotoUrl(url) {
+            if (!url) return url;
+            // For Google Photos URLs, use smaller size for Pi display (1024x600)
+            if (url.includes('googleusercontent.com')) {
+                // Remove existing size params and add optimized size
+                const baseUrl = url.split('=')[0];
+                return baseUrl + '=w1024-h600-c';  // -c for crop to fit
+            }
+            return url;
+        }
+
+        function loadPhotos() {
+            // Try sources in order: Shared Album -> Google Photos OAuth -> Local Photos
+
+            // 1. Try shared Google Photos album first (easiest method)
+            if (settings.google_photos_shared_url) {
+                fetch('/api/google_photos/shared')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.photos && data.photos.length > 0) {
+                            photos = data.photos;
+                            console.log(`Loaded ${photos.length} photos from shared album`);
+                            startSlideshow();
+                        } else {
+                            console.log('Shared album failed, trying OAuth...');
+                            tryGooglePhotosOAuth();
+                        }
+                    })
+                    .catch(e => {
+                        console.log('Shared album error, trying OAuth...');
+                        tryGooglePhotosOAuth();
+                    });
+            }
+            // 2. Try Google Photos OAuth
+            else if (settings.google_photos_connected) {
+                tryGooglePhotosOAuth();
+            }
+            // 3. Fall back to local photos
+            else {
+                loadLocalPhotos();
+            }
+        }
+
+        function tryGooglePhotosOAuth() {
+            if (settings.google_photos_connected) {
+                fetch('/api/google_photos/photos')
+                    .then(r => r.json())
+                    .then(data => {
+                        if (data.success && data.photos && data.photos.length > 0) {
+                            photos = data.photos;
+                            console.log(`Loaded ${photos.length} photos from Google Photos`);
+                            startSlideshow();
+                        } else {
+                            loadLocalPhotos();
+                        }
+                    })
+                    .catch(e => {
+                        console.log('Google Photos OAuth failed');
+                        loadLocalPhotos();
+                    });
+            } else {
+                loadLocalPhotos();
+            }
+        }
+
+        function loadLocalPhotos() {
+            fetch('/api/photos/list')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.photos && data.photos.length > 0) {
+                        photos = data.photos;
+                        console.log(`Loaded ${photos.length} local photos`);
+                        startSlideshow();
+                    }
+                })
+                .catch(e => console.log('No local photos'));
+        }
+
+        function startSlideshow() {
+            if (photos.length > 0 && !slideshowStarted) {
+                slideshowStarted = true;
+                showPhoto(0);
+
+                // Preload next image
+                preloadNext(1);
+
+                const interval = (settings.google_photos_interval || 10) * 1000;
+                slideshowInterval = setInterval(() => {
+                    photoIndex = (photoIndex + 1) % photos.length;
+                    showPhoto(photoIndex);
+                    // Preload the next one
+                    preloadNext((photoIndex + 1) % photos.length);
+                }, interval);
+            }
+        }
+
+        function preloadNext(index) {
+            if (photos[index]) {
+                preloadedImage = new Image();
+                preloadedImage.src = optimizePhotoUrl(photos[index].url);
+            }
+        }
+
+        function showPhoto(index) {
+            const container = document.getElementById('photoContainer');
+            if (!container || !photos[index]) return;
+
+            const photoUrl = optimizePhotoUrl(photos[index].url);
+
+            // Create image with error handling
+            const img = new Image();
+            img.onload = function() {
+                container.innerHTML = '';
+                img.style.cssText = 'width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.5s;';
+                container.appendChild(img);
+                // Fade in
+                setTimeout(() => { img.style.opacity = '1'; }, 50);
+            };
+            img.onerror = function() {
+                console.log(`Failed to load photo ${index}, skipping...`);
+                // Try next photo after a short delay
+                setTimeout(() => {
+                    if (photos.length > 1) {
+                        photoIndex = (photoIndex + 1) % photos.length;
+                        showPhoto(photoIndex);
+                    }
+                }, 500);
+            };
+            img.src = photoUrl;
+        }
+
+        // ============================
+        // Socket Events
+        // ============================
+        socket.on('sensor_update', function(data) {
+            if (data.temperature !== undefined) {
+                const tempEl = document.getElementById('tempValue');
+                const sensorTempEl = document.getElementById('sensorTemp');
+                if (tempEl) tempEl.textContent = data.temperature.toFixed(1);
+                if (sensorTempEl) sensorTempEl.textContent = data.temperature.toFixed(1);
+            }
+            if (data.humidity !== undefined) {
+                const humEl = document.getElementById('humidityValue');
+                const sensorHumEl = document.getElementById('sensorHumidity');
+                if (humEl) humEl.textContent = data.humidity.toFixed(0);
+                if (sensorHumEl) sensorHumEl.textContent = data.humidity.toFixed(0);
+            }
+        });
+
+        socket.on('wake_word_detected', showVoiceOverlay);
+
+        socket.on('voice_response', function(data) {
+            if (data.command) {
+                document.getElementById('voiceCommand').textContent = '"' + data.command + '"';
+            }
+            if (data.response) {
+                document.getElementById('voiceStatus').textContent = data.response;
+            }
+            setTimeout(hideVoiceOverlay, 3000);
+        });
+
+        // ============================
+        // Voice
+        // ============================
+        function setupVoice() {
+            if (!('webkitSpeechRecognition' in window)) return;
+
+            const recognition = new webkitSpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+
+            recognition.onresult = function(event) {
+                const command = event.results[event.results.length - 1][0].transcript.toLowerCase();
+                const wakeWords = settings.wake_words || ['hey bing', 'okay bing'];
+
+                for (let wake of wakeWords) {
+                    if (command.includes(wake)) {
+                        showVoiceOverlay();
+                        const actual = command.replace(wake, '').trim();
+                        if (actual) {
+                            document.getElementById('voiceCommand').textContent = '"' + actual + '"';
+                            socket.emit('voice_command', { command: actual });
+                        }
+                        break;
+                    }
+                }
+            };
+
+            recognition.onend = () => {
+                try { recognition.start(); } catch(e) {}
+            };
+
+            try {
+                recognition.start();
+                document.getElementById('voiceIndicator').classList.add('active');
+            } catch(e) {}
+        }
+
+        function showVoiceOverlay() {
+            document.getElementById('voiceOverlay').classList.add('active');
+            document.getElementById('voiceStatus').textContent = 'Listening...';
+            document.getElementById('voiceCommand').textContent = '';
+        }
+
+        function hideVoiceOverlay() {
+            document.getElementById('voiceOverlay').classList.remove('active');
+        }
+
+        // ============================
+        // Data Updates
+        // ============================
+        setInterval(() => socket.emit('request_sensor_data'), 5000);
+        setInterval(updateWeather, 600000);
+    </script>
+    <!-- Navigation Overlay -->
+</body>
+</html>

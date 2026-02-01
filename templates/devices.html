@@ -1,0 +1,502 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1024, height=600, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Smart Devices - BingHome</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        :root {
+            --bg-primary: #000000;
+            --bg-secondary: #0a0a0a;
+            --bg-tile: #141414;
+            --accent: #00ff88;
+            --text-primary: #ffffff;
+            --text-secondary: #999999;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            width: 1024px;
+            height: 600px;
+            overflow: hidden;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 50px;
+        }
+
+        .header-left {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .back-btn {
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 24px;
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+        }
+
+        .scan-btn {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border: none;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        .scan-btn:active {
+            transform: scale(0.95);
+        }
+
+        .scan-btn.scanning {
+            background: var(--text-secondary);
+            pointer-events: none;
+        }
+
+        .content {
+            height: 550px;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .device-section {
+            margin-bottom: 30px;
+        }
+
+        .section-header {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .device-count {
+            background: var(--bg-tile);
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 12px;
+            color: var(--accent);
+        }
+
+        .devices-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+        }
+
+        .device-card {
+            background: var(--bg-tile);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .device-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .device-card.online {
+            border-left: 3px solid var(--accent);
+        }
+
+        .device-card.offline {
+            opacity: 0.5;
+            border-left: 3px solid var(--text-secondary);
+        }
+
+        .device-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 10px;
+        }
+
+        .device-icon {
+            font-size: 28px;
+        }
+
+        .device-status {
+            font-size: 10px;
+            padding: 3px 8px;
+            border-radius: 10px;
+            background: var(--accent);
+            color: var(--bg-primary);
+            font-weight: 600;
+        }
+
+        .device-status.offline {
+            background: var(--text-secondary);
+        }
+
+        .device-name {
+            font-size: 14px;
+            font-weight: 600;
+            margin-bottom: 5px;
+        }
+
+        .device-info {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .device-controls {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+
+        .control-btn {
+            flex: 1;
+            padding: 8px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .control-btn:hover {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border-color: var(--accent);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        .empty-icon {
+            font-size: 48px;
+            margin-bottom: 15px;
+        }
+
+        .scanning-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .scanning-overlay.active {
+            display: flex;
+        }
+
+        .scanning-content {
+            text-align: center;
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 4px solid var(--bg-tile);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <div class="header-left">
+            <button class="back-btn" onclick="window.location.href='/'">◀</button>
+            <div class="header-title">Smart Devices</div>
+        </div>
+        <button class="scan-btn" id="scanBtn" onclick="scanDevices()">🔍 Scan Devices</button>
+    </div>
+
+    <div class="content">
+        <!-- Home Assistant Devices -->
+        <div class="device-section" id="haSection" style="display: none;">
+            <div class="section-header">
+                <span>Home Assistant Devices</span>
+                <span class="device-count" id="haCount">0</span>
+            </div>
+            <div class="devices-grid" id="haDevices"></div>
+        </div>
+
+        <!-- Network Devices -->
+        <div class="device-section" id="wifiSection" style="display: none;">
+            <div class="section-header">
+                <span>Network Devices</span>
+                <span class="device-count" id="wifiCount">0</span>
+            </div>
+            <div class="devices-grid" id="wifiDevices"></div>
+        </div>
+
+        <!-- Bluetooth Devices -->
+        <div class="device-section" id="btSection" style="display: none;">
+            <div class="section-header">
+                <span>Bluetooth Devices</span>
+                <span class="device-count" id="btCount">0</span>
+            </div>
+            <div class="devices-grid" id="btDevices"></div>
+        </div>
+
+        <!-- Empty State -->
+        <div class="empty-state" id="emptyState">
+            <div class="empty-icon">🏠</div>
+            <div style="font-size: 16px; margin-bottom: 10px;">No Devices Found</div>
+            <div style="font-size: 13px;">Tap "Scan Devices" to discover smart home devices on your network</div>
+        </div>
+    </div>
+
+    <!-- Scanning Overlay -->
+    <div class="scanning-overlay" id="scanningOverlay">
+        <div class="scanning-content">
+            <div class="spinner"></div>
+            <div style="font-size: 18px; margin-bottom: 10px;">Scanning for devices...</div>
+            <div style="font-size: 13px; color: var(--text-secondary);">This may take a few moments</div>
+        </div>
+    </div>
+
+    <script>
+        let devices = {};
+
+        // Load devices on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDevices();
+        });
+
+        function scanDevices() {
+            const scanBtn = document.getElementById('scanBtn');
+            const overlay = document.getElementById('scanningOverlay');
+
+            scanBtn.classList.add('scanning');
+            scanBtn.textContent = '⏳ Scanning...';
+            overlay.classList.add('active');
+
+            fetch('/api/devices/scan', { method: 'POST' })
+                .then(response => response.json())
+                .then(data => {
+                    devices = data.devices || {};
+                    displayDevices();
+                })
+                .catch(error => {
+                    console.error('Scan error:', error);
+                    alert('Error scanning devices');
+                })
+                .finally(() => {
+                    scanBtn.classList.remove('scanning');
+                    scanBtn.textContent = '🔍 Scan Devices';
+                    overlay.classList.remove('active');
+                });
+        }
+
+        function loadDevices() {
+            fetch('/api/devices')
+                .then(response => response.json())
+                .then(data => {
+                    devices = data.devices || {};
+                    displayDevices();
+                })
+                .catch(error => console.error('Load devices error:', error));
+        }
+
+        function displayDevices() {
+            const hasDevices = Object.values(devices).some(arr => arr.length > 0);
+
+            if (!hasDevices) {
+                document.getElementById('emptyState').style.display = 'block';
+                document.getElementById('haSection').style.display = 'none';
+                document.getElementById('wifiSection').style.display = 'none';
+                document.getElementById('btSection').style.display = 'none';
+                return;
+            }
+
+            document.getElementById('emptyState').style.display = 'none';
+
+            // Display Home Assistant devices
+            if (devices.home_assistant && devices.home_assistant.length > 0) {
+                displayHomeAssistantDevices(devices.home_assistant);
+            }
+
+            // Display WiFi devices
+            if (devices.wifi && devices.wifi.length > 0) {
+                displayWiFiDevices(devices.wifi);
+            }
+
+            // Display Bluetooth devices
+            if (devices.bluetooth && devices.bluetooth.length > 0) {
+                displayBluetoothDevices(devices.bluetooth);
+            }
+        }
+
+        function displayHomeAssistantDevices(deviceList) {
+            const section = document.getElementById('haSection');
+            const container = document.getElementById('haDevices');
+            const count = document.getElementById('haCount');
+
+            section.style.display = 'block';
+            count.textContent = deviceList.length;
+
+            container.innerHTML = deviceList.map(device => {
+                const icon = getDeviceIcon(device.domain);
+                const isOnline = device.online;
+                const isOn = device.state === 'on';
+
+                return `
+                    <div class="device-card ${isOnline ? 'online' : 'offline'}">
+                        <div class="device-header">
+                            <div class="device-icon">${icon}</div>
+                            <div class="device-status ${isOnline ? 'online' : 'offline'}">
+                                ${isOnline ? 'Online' : 'Offline'}
+                            </div>
+                        </div>
+                        <div class="device-name">${device.name}</div>
+                        <div class="device-info">${device.domain} • ${device.state}</div>
+                        <div class="device-controls">
+                            ${device.domain === 'light' || device.domain === 'switch' ? `
+                                <button class="control-btn" onclick="controlDevice('${device.entity_id}', '${isOn ? 'turn_off' : 'turn_on'}')">
+                                    ${isOn ? 'Turn Off' : 'Turn On'}
+                                </button>
+                            ` : ''}
+                            ${device.domain === 'light' && isOn ? `
+                                <button class="control-btn" onclick="controlDevice('${device.entity_id}', 'toggle')">
+                                    Dim
+                                </button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function displayWiFiDevices(deviceList) {
+            const section = document.getElementById('wifiSection');
+            const container = document.getElementById('wifiDevices');
+            const count = document.getElementById('wifiCount');
+
+            section.style.display = 'block';
+            count.textContent = deviceList.length;
+
+            container.innerHTML = deviceList.map(device => {
+                return `
+                    <div class="device-card online">
+                        <div class="device-header">
+                            <div class="device-icon">📡</div>
+                            <div class="device-status online">Online</div>
+                        </div>
+                        <div class="device-name">${device.name}</div>
+                        <div class="device-info">${device.ip} • ${device.manufacturer}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function displayBluetoothDevices(deviceList) {
+            const section = document.getElementById('btSection');
+            const container = document.getElementById('btDevices');
+            const count = document.getElementById('btCount');
+
+            section.style.display = 'block';
+            count.textContent = deviceList.length;
+
+            container.innerHTML = deviceList.map(device => {
+                return `
+                    <div class="device-card online">
+                        <div class="device-header">
+                            <div class="device-icon">📶</div>
+                            <div class="device-status online">Online</div>
+                        </div>
+                        <div class="device-name">${device.name}</div>
+                        <div class="device-info">${device.address} • ${device.device_type}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getDeviceIcon(domain) {
+            const icons = {
+                'light': '💡',
+                'switch': '🔌',
+                'sensor': '🌡️',
+                'climate': '❄️',
+                'cover': '🚪',
+                'fan': '💨',
+                'lock': '🔒',
+                'media_player': '📺',
+                'camera': '📷',
+                'vacuum': '🧹'
+            };
+            return icons[domain] || '📱';
+        }
+
+        function controlDevice(entityId, action) {
+            fetch('/api/devices/control', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    device_type: 'home_assistant',
+                    device_id: entityId,
+                    action: action
+                })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    // Reload devices to reflect changes
+                    setTimeout(loadDevices, 1000);
+                } else {
+                    alert('Failed to control device: ' + (data.error || 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Control error:', error);
+                alert('Error controlling device');
+            });
+        }
+    </script>
+
+    <!-- Persistent Home Button -->
+    <!-- Old home button removed - using nav-overlay instead -->
+    <!-- Navigation Overlay -->
+</body>
+</html>

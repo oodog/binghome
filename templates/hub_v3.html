@@ -1,0 +1,1484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>BingHome Hub</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tile: #1a1a25;
+            --bg-tile-hover: #252535;
+            --accent: #00ff88;
+            --accent-dim: #00cc66;
+            --accent-glow: rgba(0, 255, 136, 0.3);
+            --text-primary: #ffffff;
+            --text-secondary: #888899;
+            --border: rgba(255, 255, 255, 0.08);
+            --danger: #ff4757;
+            --warning: #ffa502;
+            --success: #00ff88;
+            --info: #3498db;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            overflow: hidden;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            user-select: none;
+        }
+
+        /* SVG Icon Helper */
+        .icon {
+            width: 24px;
+            height: 24px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+
+        .icon-sm { width: 18px; height: 18px; }
+        .icon-lg { width: 32px; height: 32px; }
+        .icon-xl { width: 48px; height: 48px; }
+
+        /* Status Bar */
+        .status-bar {
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+            padding: 0 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            height: 40px;
+            flex-shrink: 0;
+            font-size: 12px;
+        }
+
+        .status-left, .status-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 12px;
+        }
+
+        .status-value {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        /* Main Content */
+        .main-content {
+            flex: 1;
+            display: grid;
+            grid-template-columns: 1fr 1.5fr;
+            gap: 2px;
+            background: var(--bg-secondary);
+            overflow: hidden;
+        }
+
+        /* Left Panel */
+        .left-panel {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+            background: var(--bg-secondary);
+        }
+
+        /* Right Panel */
+        .right-panel {
+            display: flex;
+            flex-direction: column;
+            background: var(--bg-primary);
+            padding: 15px;
+            overflow-y: auto;
+        }
+
+        /* Weather Widget */
+        .weather-widget {
+            flex: 1;
+            background: var(--bg-primary);
+            padding: 15px;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .weather-widget:active {
+            background: var(--bg-tile);
+        }
+
+        .weather-current {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+        }
+
+        .weather-temp {
+            font-size: 48px;
+            font-weight: 300;
+            color: var(--accent);
+            line-height: 1;
+        }
+
+        .weather-location {
+            font-size: 13px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        .weather-icon-large {
+            width: 60px;
+            height: 60px;
+        }
+
+        .weather-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-align: right;
+            margin-top: 5px;
+        }
+
+        .weather-details {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid var(--border);
+        }
+
+        .weather-detail {
+            text-align: center;
+        }
+
+        .weather-detail-value {
+            font-size: 16px;
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .weather-detail-label {
+            font-size: 10px;
+            color: var(--text-secondary);
+            margin-top: 2px;
+        }
+
+        .weather-forecast {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .forecast-day {
+            flex: 1;
+            text-align: center;
+            padding: 8px 4px;
+            background: var(--bg-tile);
+            border-radius: 8px;
+        }
+
+        .forecast-day-name {
+            font-size: 10px;
+            color: var(--text-secondary);
+        }
+
+        .forecast-icon {
+            width: 24px;
+            height: 24px;
+            margin: 5px 0;
+        }
+
+        .forecast-temp {
+            font-size: 11px;
+            color: var(--accent);
+        }
+
+        /* Weather Radar */
+        .weather-radar {
+            display: none;
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        .weather-radar.active {
+            display: block;
+        }
+
+        .weather-radar iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .radar-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            width: 36px;
+            height: 36px;
+            background: rgba(0, 0, 0, 0.7);
+            border: none;
+            border-radius: 50%;
+            color: white;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        /* Photos Widget */
+        .photos-widget {
+            flex: 1;
+            background: var(--bg-primary);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .photos-slideshow {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .photos-slideshow img {
+            max-width: 100%;
+            max-height: 100%;
+            object-fit: contain;
+        }
+
+        .photos-placeholder {
+            text-align: center;
+            color: var(--text-secondary);
+        }
+
+        .photos-placeholder .icon {
+            width: 48px;
+            height: 48px;
+            opacity: 0.5;
+            margin-bottom: 10px;
+        }
+
+        /* Apps Grid */
+        .apps-section {
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .apps-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+        }
+
+        .app-tile {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 12px 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            border: 2px solid transparent;
+            aspect-ratio: 1;
+        }
+
+        .app-tile:hover {
+            background: var(--bg-tile-hover);
+            border-color: var(--accent);
+            transform: translateY(-2px);
+        }
+
+        .app-tile:active {
+            transform: scale(0.95);
+        }
+
+        .app-tile .icon {
+            width: 36px;
+            height: 36px;
+            margin-bottom: 6px;
+        }
+
+        .app-tile .app-name {
+            font-size: 11px;
+            color: var(--text-secondary);
+            text-align: center;
+        }
+
+        /* Quick Actions */
+        .quick-actions {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-top: auto;
+            padding-top: 15px;
+        }
+
+        .quick-action {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-action:hover {
+            background: var(--bg-tile-hover);
+        }
+
+        .quick-action:active {
+            transform: scale(0.98);
+        }
+
+        .quick-action .icon {
+            color: var(--accent);
+        }
+
+        .quick-action-text {
+            font-size: 12px;
+        }
+
+        /* Persistent Home Button - Always visible */
+        .home-button {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            width: 50px;
+            height: 50px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            box-shadow: 0 4px 15px var(--accent-glow);
+            transition: all 0.3s ease;
+        }
+
+        .home-button:hover {
+            transform: scale(1.1);
+            box-shadow: 0 6px 25px var(--accent-glow);
+        }
+
+        .home-button:active {
+            transform: scale(0.95);
+        }
+
+        .home-button .icon {
+            color: var(--bg-primary);
+            width: 28px;
+            height: 28px;
+        }
+
+        /* Settings Button */
+        .settings-button {
+            position: fixed;
+            bottom: 15px;
+            right: 15px;
+            width: 45px;
+            height: 45px;
+            background: var(--bg-tile);
+            border: 2px solid var(--border);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            transition: all 0.3s ease;
+        }
+
+        .settings-button:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .settings-button:hover .icon {
+            color: var(--bg-primary);
+        }
+
+        .settings-button .icon {
+            color: var(--text-primary);
+        }
+
+        /* Voice Indicator */
+        .voice-indicator {
+            position: fixed;
+            top: 50px;
+            right: 15px;
+            width: 45px;
+            height: 45px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9998;
+            animation: voice-pulse 1.5s ease-in-out infinite;
+            box-shadow: 0 0 20px var(--accent-glow);
+        }
+
+        .voice-indicator.active {
+            display: flex;
+        }
+
+        .voice-indicator .icon {
+            color: var(--bg-primary);
+        }
+
+        @keyframes voice-pulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.1); opacity: 0.8; }
+        }
+
+        /* Voice Overlay */
+        .voice-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.95);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+            backdrop-filter: blur(10px);
+        }
+
+        .voice-overlay.active {
+            display: flex;
+        }
+
+        .voice-content {
+            text-align: center;
+        }
+
+        .voice-animation {
+            width: 120px;
+            height: 120px;
+            margin: 0 auto 25px;
+            background: radial-gradient(circle, var(--accent), transparent);
+            border-radius: 50%;
+            animation: voice-pulse 2s ease-in-out infinite;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .voice-animation .icon {
+            width: 48px;
+            height: 48px;
+            color: var(--bg-primary);
+        }
+
+        .voice-status {
+            font-size: 20px;
+            margin-bottom: 10px;
+        }
+
+        .voice-command {
+            font-size: 16px;
+            color: var(--accent);
+            margin-top: 15px;
+            min-height: 25px;
+        }
+
+        /* App Frame */
+        .app-frame {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: var(--bg-primary);
+            display: none;
+            z-index: 5000;
+        }
+
+        .app-frame.active {
+            display: block;
+        }
+
+        .app-frame iframe {
+            width: 100%;
+            height: 100%;
+            border: none;
+        }
+
+        .app-controls {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            display: flex;
+            gap: 10px;
+            z-index: 5001;
+        }
+
+        .app-control-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.8);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            backdrop-filter: blur(10px);
+            transition: all 0.2s;
+        }
+
+        .app-control-btn:hover {
+            background: var(--accent);
+            border-color: var(--accent);
+        }
+
+        .app-control-btn:hover .icon {
+            color: var(--bg-primary);
+        }
+
+        /* Alert Banner */
+        .alert-banner {
+            position: fixed;
+            top: 40px;
+            left: 0;
+            right: 0;
+            padding: 12px 20px;
+            display: none;
+            align-items: center;
+            justify-content: space-between;
+            z-index: 9997;
+            font-size: 13px;
+        }
+
+        .alert-banner.active {
+            display: flex;
+        }
+
+        .alert-banner.danger {
+            background: var(--danger);
+        }
+
+        .alert-banner.warning {
+            background: var(--warning);
+            color: #000;
+        }
+
+        .alert-banner.info {
+            background: var(--info);
+        }
+
+        .alert-close {
+            cursor: pointer;
+            padding: 5px;
+        }
+
+        /* Now Playing Widget */
+        .now-playing {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 12px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 15px;
+        }
+
+        .now-playing-art {
+            width: 50px;
+            height: 50px;
+            border-radius: 8px;
+            background: var(--bg-secondary);
+        }
+
+        .now-playing-info {
+            flex: 1;
+            min-width: 0;
+        }
+
+        .now-playing-title {
+            font-size: 13px;
+            font-weight: 600;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .now-playing-artist {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .now-playing-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .now-playing-controls button {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: var(--bg-secondary);
+            border: none;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .now-playing-controls button:hover {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        /* Display Mode Indicator */
+        .display-mode {
+            position: fixed;
+            top: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: var(--bg-tile);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 11px;
+            color: var(--text-secondary);
+            z-index: 100;
+            display: none;
+        }
+
+        .display-mode.show {
+            display: block;
+        }
+
+        /* 4K TV Mode Adjustments */
+        @media (min-width: 1920px) {
+            body {
+                font-size: 18px;
+            }
+
+            .status-bar {
+                height: 60px;
+                font-size: 16px;
+            }
+
+            .weather-temp {
+                font-size: 72px;
+            }
+
+            .apps-grid {
+                grid-template-columns: repeat(6, 1fr);
+                gap: 20px;
+            }
+
+            .app-tile {
+                padding: 20px;
+            }
+
+            .app-tile .icon {
+                width: 56px;
+                height: 56px;
+            }
+
+            .app-tile .app-name {
+                font-size: 16px;
+            }
+
+            .home-button {
+                width: 70px;
+                height: 70px;
+            }
+
+            .home-button .icon {
+                width: 40px;
+                height: 40px;
+            }
+        }
+
+        /* 7-inch Display Mode */
+        @media (max-width: 1024px) and (max-height: 768px) {
+            .main-content {
+                grid-template-columns: 40% 60%;
+            }
+
+            .apps-grid {
+                grid-template-columns: repeat(4, 1fr);
+            }
+
+            .weather-temp {
+                font-size: 42px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Include SVG Icons -->
+    <div style="display: none;">
+        <!-- Icons will be loaded via fetch -->
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+        <div class="status-left">
+            <div class="status-item">
+                <svg class="icon icon-sm"><use href="/static/icons/icons.svg#icon-wifi"></use></svg>
+                <span id="networkStatus">WiFi</span>
+            </div>
+            <div class="status-item">
+                <span id="currentTime">--:--</span>
+            </div>
+            <div class="status-item">
+                <span id="currentDate">--</span>
+            </div>
+        </div>
+
+        <div class="status-right">
+            <div class="status-item">
+                <svg class="icon icon-sm"><use href="/static/icons/icons.svg#icon-temp"></use></svg>
+                <span class="status-value" id="indoorTemp">--</span>°C
+            </div>
+            <div class="status-item">
+                <svg class="icon icon-sm"><use href="/static/icons/icons.svg#icon-humidity"></use></svg>
+                <span class="status-value" id="indoorHumidity">--</span>%
+            </div>
+            <div class="status-item">
+                <svg class="icon icon-sm"><use href="/static/icons/icons.svg#icon-air"></use></svg>
+                <span class="status-value" id="airQuality">Good</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alert Banner -->
+    <div class="alert-banner" id="alertBanner">
+        <span id="alertMessage"></span>
+        <span class="alert-close" onclick="hideAlert()">
+            <svg class="icon icon-sm"><use href="/static/icons/icons.svg#icon-close"></use></svg>
+        </span>
+    </div>
+
+    <!-- Display Mode Indicator -->
+    <div class="display-mode" id="displayMode">4K TV Mode</div>
+
+    <!-- Main Content -->
+    <div class="main-content">
+        <!-- Left Panel -->
+        <div class="left-panel">
+            <!-- Weather Widget -->
+            <div class="weather-widget" onclick="toggleWeatherView()">
+                <div id="weatherMain">
+                    <div class="weather-current">
+                        <div>
+                            <div class="weather-temp" id="weatherTemp">--°</div>
+                            <div class="weather-location" id="weatherLocation">Loading...</div>
+                        </div>
+                        <div style="text-align: right;">
+                            <img id="weatherIcon" class="weather-icon-large" src="" alt="" style="display: none;">
+                            <div id="weatherIconFallback" style="font-size: 48px;">☀️</div>
+                            <div class="weather-desc" id="weatherDesc">--</div>
+                        </div>
+                    </div>
+
+                    <div class="weather-details">
+                        <div class="weather-detail">
+                            <div class="weather-detail-value" id="weatherHumidity">--%</div>
+                            <div class="weather-detail-label">Humidity</div>
+                        </div>
+                        <div class="weather-detail">
+                            <div class="weather-detail-value" id="weatherWind">-- km/h</div>
+                            <div class="weather-detail-label">Wind</div>
+                        </div>
+                        <div class="weather-detail">
+                            <div class="weather-detail-value" id="weatherFeels">--°</div>
+                            <div class="weather-detail-label">Feels Like</div>
+                        </div>
+                    </div>
+
+                    <div class="weather-forecast" id="weatherForecast">
+                        <!-- Forecast populated by JS -->
+                    </div>
+                </div>
+
+                <div class="weather-radar" id="weatherRadar">
+                    <button class="radar-close" onclick="event.stopPropagation(); closeRadar();">
+                        <svg class="icon"><use href="/static/icons/icons.svg#icon-close"></use></svg>
+                    </button>
+                    <iframe id="radarFrame" src="" title="Weather Radar"></iframe>
+                </div>
+            </div>
+
+            <!-- Photos Widget -->
+            <div class="photos-widget">
+                <div class="photos-slideshow" id="photosSlideshow">
+                    <div class="photos-placeholder" id="photosPlaceholder">
+                        <svg class="icon icon-xl"><use href="/static/icons/icons.svg#icon-photos"></use></svg>
+                        <div>Photo Slideshow</div>
+                        <div style="font-size: 11px; margin-top: 5px;">Configure in Settings</div>
+                    </div>
+                    <img id="slideshowImage" src="" alt="" style="display: none;">
+                </div>
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="right-panel">
+            <!-- Now Playing (hidden by default) -->
+            <div class="now-playing" id="nowPlaying" style="display: none;">
+                <div class="now-playing-art" id="nowPlayingArt"></div>
+                <div class="now-playing-info">
+                    <div class="now-playing-title" id="nowPlayingTitle">Not Playing</div>
+                    <div class="now-playing-artist" id="nowPlayingArtist">--</div>
+                </div>
+                <div class="now-playing-controls">
+                    <button onclick="mediaControl('prev')">
+                        <svg class="icon icon-sm"><use href="/static/icons/icons.svg#icon-skip-prev"></use></svg>
+                    </button>
+                    <button onclick="mediaControl('play')">
+                        <svg class="icon icon-sm"><use href="/static/icons/icons.svg#icon-play"></use></svg>
+                    </button>
+                    <button onclick="mediaControl('next')">
+                        <svg class="icon icon-sm"><use href="/static/icons/icons.svg#icon-skip-next"></use></svg>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Entertainment Apps -->
+            <div class="apps-section">
+                <div class="section-title">Entertainment</div>
+                <div class="apps-grid">
+                    <div class="app-tile" onclick="launchApp('netflix')">
+                        <svg class="icon icon-lg"><use href="/static/icons/icons.svg#icon-netflix"></use></svg>
+                        <div class="app-name">Netflix</div>
+                    </div>
+                    <div class="app-tile" onclick="launchApp('youtube')">
+                        <svg class="icon icon-lg"><use href="/static/icons/icons.svg#icon-youtube"></use></svg>
+                        <div class="app-name">YouTube</div>
+                    </div>
+                    <div class="app-tile" onclick="launchApp('spotify')">
+                        <svg class="icon icon-lg"><use href="/static/icons/icons.svg#icon-spotify"></use></svg>
+                        <div class="app-name">Spotify</div>
+                    </div>
+                    <div class="app-tile" onclick="launchApp('prime_video')">
+                        <svg class="icon icon-lg"><use href="/static/icons/icons.svg#icon-prime"></use></svg>
+                        <div class="app-name">Prime Video</div>
+                    </div>
+                    <div class="app-tile" onclick="launchApp('xbox_cloud')">
+                        <svg class="icon icon-lg"><use href="/static/icons/icons.svg#icon-xbox"></use></svg>
+                        <div class="app-name">Xbox Cloud</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Smart Home -->
+            <div class="apps-section">
+                <div class="section-title">Smart Home</div>
+                <div class="apps-grid">
+                    <div class="app-tile" onclick="openPage('/devices')">
+                        <svg class="icon icon-lg"><use href="/static/icons/icons.svg#icon-devices"></use></svg>
+                        <div class="app-name">Devices</div>
+                    </div>
+                    <div class="app-tile" onclick="openPage('/routines')">
+                        <svg class="icon icon-lg"><use href="/static/icons/icons.svg#icon-routines"></use></svg>
+                        <div class="app-name">Routines</div>
+                    </div>
+                    <div class="app-tile" onclick="openPage('/cameras')">
+                        <svg class="icon icon-lg"><use href="/static/icons/icons.svg#icon-camera"></use></svg>
+                        <div class="app-name">Cameras</div>
+                    </div>
+                    <div class="app-tile" onclick="openPage('/timers')">
+                        <svg class="icon icon-lg"><use href="/static/icons/icons.svg#icon-timer"></use></svg>
+                        <div class="app-name">Timers</div>
+                    </div>
+                    <div class="app-tile" onclick="openPage('/intercom')">
+                        <svg class="icon icon-lg"><use href="/static/icons/icons.svg#icon-intercom"></use></svg>
+                        <div class="app-name">Intercom</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Quick Actions -->
+            <div class="quick-actions">
+                <div class="quick-action" onclick="openPage('/shopping')">
+                    <svg class="icon"><use href="/static/icons/icons.svg#icon-shopping"></use></svg>
+                    <span class="quick-action-text">Shopping List</span>
+                </div>
+                <div class="quick-action" onclick="openPage('/calendar')">
+                    <svg class="icon"><use href="/static/icons/icons.svg#icon-calendar"></use></svg>
+                    <span class="quick-action-text">Calendar</span>
+                </div>
+                <div class="quick-action" onclick="openPage('/news')">
+                    <svg class="icon"><use href="/static/icons/icons.svg#icon-news"></use></svg>
+                    <span class="quick-action-text">News</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Voice Overlay -->
+    <div class="voice-overlay" id="voiceOverlay">
+        <div class="voice-content">
+            <div class="voice-animation">
+                <svg class="icon icon-xl"><use href="/static/icons/icons.svg#icon-mic"></use></svg>
+            </div>
+            <div class="voice-status" id="voiceStatus">Listening...</div>
+            <div class="voice-command" id="voiceCommand"></div>
+        </div>
+    </div>
+
+    <!-- Voice Indicator -->
+    <div class="voice-indicator" id="voiceIndicator">
+        <svg class="icon"><use href="/static/icons/icons.svg#icon-mic"></use></svg>
+    </div>
+
+    <!-- App Frame -->
+    <div class="app-frame" id="appFrame">
+        <div class="app-controls">
+            <button class="app-control-btn" onclick="closeApp()">
+                <svg class="icon"><use href="/static/icons/icons.svg#icon-back"></use></svg>
+            </button>
+            <button class="app-control-btn" onclick="goHome()">
+                <svg class="icon"><use href="/static/icons/icons.svg#icon-home"></use></svg>
+            </button>
+        </div>
+        <iframe id="appIframe" src=""></iframe>
+    </div>
+
+    <!-- Persistent Home Button (always visible) -->
+    <div class="home-button" onclick="goHome()">
+        <svg class="icon"><use href="/static/icons/icons.svg#icon-home"></use></svg>
+    </div>
+
+    <!-- Settings Button -->
+    <div class="settings-button" onclick="openPage('/settings')">
+        <svg class="icon"><use href="/static/icons/icons.svg#icon-settings"></use></svg>
+    </div>
+
+    <!-- Socket.IO -->
+    <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
+
+    <script>
+        // =============================================
+        // BingHome Hub v3 - Main JavaScript
+        // =============================================
+
+        const socket = io();
+        let settings = {};
+        let recognition = null;
+        let weatherView = 'current';
+        let currentPhotos = [];
+        let photoIndex = 0;
+        let photoInterval = null;
+        let displayMode = 'standard'; // 'standard' or '4k'
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', function() {
+            detectDisplayMode();
+            initializeHub();
+            setupVoiceRecognition();
+            startDataUpdates();
+            setupNavigation();
+            updateClock();
+        });
+
+        // Detect display mode based on resolution
+        function detectDisplayMode() {
+            const width = window.screen.width;
+            const height = window.screen.height;
+
+            if (width >= 3840 || height >= 2160) {
+                displayMode = '4k';
+                document.getElementById('displayMode').textContent = '4K TV Mode';
+                document.getElementById('displayMode').classList.add('show');
+                setTimeout(() => {
+                    document.getElementById('displayMode').classList.remove('show');
+                }, 3000);
+            } else if (width <= 1024 && height <= 768) {
+                displayMode = '7inch';
+            }
+
+            console.log('Display mode:', displayMode, width + 'x' + height);
+        }
+
+        // Initialize hub
+        function initializeHub() {
+            fetch('/api/settings')
+                .then(r => r.json())
+                .then(data => {
+                    settings = data;
+                    initializePhotos();
+                })
+                .catch(e => console.error('Settings error:', e));
+
+            updateWeather();
+            updateNetworkStatus();
+        }
+
+        // Socket handlers
+        socket.on('connect', () => console.log('Connected to BingHome'));
+
+        socket.on('sensor_update', function(data) {
+            if (data.temperature !== undefined) {
+                document.getElementById('indoorTemp').textContent = data.temperature.toFixed(1);
+            }
+            if (data.humidity !== undefined) {
+                document.getElementById('indoorHumidity').textContent = data.humidity.toFixed(0);
+            }
+            if (data.air_quality) {
+                document.getElementById('airQuality').textContent = capitalize(data.air_quality);
+            }
+        });
+
+        socket.on('wake_word_detected', showVoiceOverlay);
+
+        socket.on('voice_response', function(data) {
+            if (data.command) {
+                document.getElementById('voiceCommand').textContent = '"' + data.command + '"';
+            }
+            if (data.response) {
+                document.getElementById('voiceStatus').textContent = data.response;
+            }
+            setTimeout(hideVoiceOverlay, 3000);
+        });
+
+        socket.on('weather_alert', function(data) {
+            showAlert(data.message, data.severity || 'warning');
+        });
+
+        socket.on('media_update', function(data) {
+            updateNowPlaying(data);
+        });
+
+        // =============================================
+        // Weather Functions
+        // =============================================
+
+        function updateWeather() {
+            fetch('/api/weather/comprehensive')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.current) {
+                        const c = data.current;
+                        document.getElementById('weatherTemp').textContent = c.temp + '°';
+                        document.getElementById('weatherDesc').textContent = c.description || '--';
+                        document.getElementById('weatherLocation').textContent = c.location || settings.weather_location || 'Your Location';
+                        document.getElementById('weatherHumidity').textContent = (c.humidity || '--') + '%';
+                        document.getElementById('weatherWind').textContent = (c.wind_speed || '--') + ' km/h';
+                        document.getElementById('weatherFeels').textContent = (c.feels_like || c.temp) + '°';
+
+                        // Weather icon
+                        updateWeatherIcon(c.condition || c.description);
+                    }
+
+                    if (data.forecast && data.forecast.length > 0) {
+                        renderForecast(data.forecast.slice(0, 4));
+                    }
+
+                    // Set radar URL with location
+                    if (data.radar && data.radar.available) {
+                        const location = settings.weather_location || 'Gold Coast, QLD';
+                        let radarUrl = data.radar.url;
+                        // Add location parameters if it's rainviewer
+                        if (radarUrl.includes('rainviewer')) {
+                            const coords = getLocationCoords(location);
+                            radarUrl = `https://www.rainviewer.com/map.html?loc=${coords.lat},${coords.lon},8&oFa=0&oC=0&oU=0&oCS=1&oF=0&oAP=1&c=3&o=83&lm=1&layer=radar&sm=1&sn=1`;
+                        }
+                        document.getElementById('radarFrame').src = radarUrl;
+                    }
+
+                    // Check alerts
+                    if (data.alerts && data.alerts.length > 0) {
+                        const alert = data.alerts[0];
+                        showAlert(alert.title + ': ' + alert.description, alert.severity === 'high' ? 'danger' : 'warning');
+                    }
+                })
+                .catch(e => console.error('Weather error:', e));
+        }
+
+        function getLocationCoords(location) {
+            // Common Australian locations
+            const locations = {
+                'gold coast': { lat: -28.0167, lon: 153.4000 },
+                'brisbane': { lat: -27.4698, lon: 153.0251 },
+                'sydney': { lat: -33.8688, lon: 151.2093 },
+                'melbourne': { lat: -37.8136, lon: 144.9631 },
+                'perth': { lat: -31.9505, lon: 115.8605 },
+                'adelaide': { lat: -34.9285, lon: 138.6007 },
+                'darwin': { lat: -12.4634, lon: 130.8456 },
+                'hobart': { lat: -42.8821, lon: 147.3272 },
+                'canberra': { lat: -35.2809, lon: 149.1300 }
+            };
+
+            const key = location.toLowerCase().split(',')[0].trim();
+            return locations[key] || { lat: -28.0167, lon: 153.4000 }; // Default to Gold Coast
+        }
+
+        function updateWeatherIcon(condition) {
+            const iconMap = {
+                'clear': '☀️', 'sunny': '☀️',
+                'clouds': '☁️', 'cloudy': '☁️', 'overcast': '☁️',
+                'partly cloudy': '⛅',
+                'rain': '🌧️', 'light rain': '🌦️', 'showers': '🌦️',
+                'thunderstorm': '⛈️', 'storm': '⛈️',
+                'snow': '❄️', 'snowy': '❄️',
+                'mist': '🌫️', 'fog': '🌫️', 'haze': '🌫️',
+                'drizzle': '🌦️',
+                'windy': '💨'
+            };
+
+            const key = (condition || '').toLowerCase();
+            let icon = '🌤️';
+            for (const [k, v] of Object.entries(iconMap)) {
+                if (key.includes(k)) {
+                    icon = v;
+                    break;
+                }
+            }
+            document.getElementById('weatherIconFallback').textContent = icon;
+        }
+
+        function renderForecast(forecast) {
+            const el = document.getElementById('weatherForecast');
+            el.innerHTML = forecast.map(day => {
+                const date = new Date(day.date);
+                const dayName = date.toLocaleDateString('en', { weekday: 'short' });
+                const icon = getWeatherEmoji(day.condition);
+                return `
+                    <div class="forecast-day">
+                        <div class="forecast-day-name">${dayName}</div>
+                        <div style="font-size: 20px; margin: 5px 0;">${icon}</div>
+                        <div class="forecast-temp">${day.temp_min}°/${day.temp_max}°</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function getWeatherEmoji(condition) {
+            const c = (condition || '').toLowerCase();
+            if (c.includes('clear') || c.includes('sunny')) return '☀️';
+            if (c.includes('cloud')) return '☁️';
+            if (c.includes('rain')) return '🌧️';
+            if (c.includes('thunder') || c.includes('storm')) return '⛈️';
+            if (c.includes('snow')) return '❄️';
+            if (c.includes('mist') || c.includes('fog')) return '🌫️';
+            return '⛅';
+        }
+
+        function toggleWeatherView() {
+            const main = document.getElementById('weatherMain');
+            const radar = document.getElementById('weatherRadar');
+
+            if (weatherView === 'current') {
+                main.style.display = 'none';
+                radar.classList.add('active');
+                weatherView = 'radar';
+            } else {
+                closeRadar();
+            }
+        }
+
+        function closeRadar() {
+            document.getElementById('weatherMain').style.display = 'block';
+            document.getElementById('weatherRadar').classList.remove('active');
+            weatherView = 'current';
+        }
+
+        // =============================================
+        // Photo Slideshow
+        // =============================================
+
+        function initializePhotos() {
+            // Check for local photos folder
+            fetch('/api/photos/list')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.photos && data.photos.length > 0) {
+                        currentPhotos = data.photos;
+                        startSlideshow();
+                    } else {
+                        // Try Google Photos
+                        if (settings.google_photos_connected) {
+                            loadGooglePhotos();
+                        }
+                    }
+                })
+                .catch(() => {
+                    // Fallback to Google Photos
+                    if (settings.google_photos_connected) {
+                        loadGooglePhotos();
+                    }
+                });
+        }
+
+        function loadGooglePhotos() {
+            fetch('/api/google_photos/recent')
+                .then(r => r.json())
+                .then(data => {
+                    if (data.photos && data.photos.length > 0) {
+                        currentPhotos = data.photos.map(p => p.url || p.baseUrl);
+                        startSlideshow();
+                    }
+                })
+                .catch(e => console.error('Google Photos error:', e));
+        }
+
+        function startSlideshow() {
+            if (currentPhotos.length === 0) return;
+
+            document.getElementById('photosPlaceholder').style.display = 'none';
+            const img = document.getElementById('slideshowImage');
+            img.style.display = 'block';
+
+            showPhoto(0);
+
+            const interval = (settings.google_photos_interval || 10) * 1000;
+            photoInterval = setInterval(() => {
+                photoIndex = (photoIndex + 1) % currentPhotos.length;
+                showPhoto(photoIndex);
+            }, interval);
+        }
+
+        function showPhoto(index) {
+            const img = document.getElementById('slideshowImage');
+            img.src = currentPhotos[index];
+        }
+
+        // =============================================
+        // Voice Recognition
+        // =============================================
+
+        function setupVoiceRecognition() {
+            if (!('webkitSpeechRecognition' in window || 'SpeechRecognition' in window)) {
+                console.log('Voice recognition not supported');
+                return;
+            }
+
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            recognition = new SpeechRecognition();
+            recognition.continuous = true;
+            recognition.interimResults = false;
+            recognition.lang = settings.language || 'en-US';
+
+            recognition.onresult = function(event) {
+                const last = event.results.length - 1;
+                const command = event.results[last][0].transcript.toLowerCase();
+
+                const wakeWords = settings.wake_words || ['hey bing', 'okay bing'];
+                for (let wake of wakeWords) {
+                    if (command.includes(wake)) {
+                        showVoiceOverlay();
+                        const actual = command.replace(wake, '').trim();
+                        if (actual) processVoiceCommand(actual);
+                        break;
+                    }
+                }
+            };
+
+            recognition.onerror = function(e) {
+                console.error('Voice error:', e.error);
+            };
+
+            recognition.onend = function() {
+                try { recognition.start(); } catch (e) {}
+            };
+
+            try {
+                recognition.start();
+                document.getElementById('voiceIndicator').classList.add('active');
+            } catch (e) {
+                console.log('Voice already started');
+            }
+        }
+
+        function showVoiceOverlay() {
+            document.getElementById('voiceOverlay').classList.add('active');
+            document.getElementById('voiceStatus').textContent = 'Listening...';
+            document.getElementById('voiceCommand').textContent = '';
+        }
+
+        function hideVoiceOverlay() {
+            document.getElementById('voiceOverlay').classList.remove('active');
+        }
+
+        function processVoiceCommand(command) {
+            document.getElementById('voiceCommand').textContent = '"' + command + '"';
+            socket.emit('voice_command', { command });
+
+            // Local command handling
+            const cmd = command.toLowerCase();
+            if (cmd.includes('weather') || cmd.includes('radar')) {
+                if (cmd.includes('radar')) toggleWeatherView();
+                document.getElementById('voiceStatus').textContent = 'Showing weather...';
+            } else if (cmd.includes('netflix')) {
+                launchApp('netflix');
+                hideVoiceOverlay();
+            } else if (cmd.includes('youtube')) {
+                launchApp('youtube');
+                hideVoiceOverlay();
+            } else if (cmd.includes('spotify') || cmd.includes('music')) {
+                launchApp('spotify');
+                hideVoiceOverlay();
+            } else if (cmd.includes('home') || cmd.includes('go back')) {
+                goHome();
+                hideVoiceOverlay();
+            } else if (cmd.includes('device')) {
+                openPage('/devices');
+                hideVoiceOverlay();
+            } else if (cmd.includes('shopping') || cmd.includes('list')) {
+                openPage('/shopping');
+                hideVoiceOverlay();
+            } else if (cmd.includes('timer')) {
+                openPage('/timers');
+                hideVoiceOverlay();
+            }
+        }
+
+        // =============================================
+        // Navigation
+        // =============================================
+
+        function setupNavigation() {
+            let touchStartX = 0;
+
+            document.addEventListener('touchstart', e => {
+                touchStartX = e.touches[0].clientX;
+            }, { passive: true });
+
+            document.addEventListener('touchend', e => {
+                const deltaX = e.changedTouches[0].clientX - touchStartX;
+                if (touchStartX < 50 && deltaX > 100) {
+                    goHome();
+                }
+            }, { passive: true });
+
+            document.addEventListener('keydown', e => {
+                if (e.key === 'Escape' || e.key === 'Backspace') {
+                    e.preventDefault();
+                    goHome();
+                }
+            });
+        }
+
+        function goHome() {
+            closeApp();
+            hideVoiceOverlay();
+            closeRadar();
+            window.location.href = '/';
+        }
+
+        function openPage(url) {
+            window.location.href = url;
+        }
+
+        function launchApp(appName) {
+            const externalApps = {
+                'netflix': 'https://www.netflix.com',
+                'youtube': 'https://www.youtube.com',
+                'spotify': 'https://open.spotify.com',
+                'prime': 'https://www.primevideo.com',
+                'prime_video': 'https://www.primevideo.com',
+                'xbox': 'https://www.xbox.com/play',
+                'xbox_cloud': 'https://www.xbox.com/play',
+                'disney_plus': 'https://www.disneyplus.com'
+            };
+            
+            if (externalApps[appName]) {
+                window.location.href = externalApps[appName];
+            } else {
+                const pages = {
+                    'devices': '/devices',
+                    'timers': '/timers',
+                    'routines': '/routines',
+                    'shopping': '/shopping',
+                    'calendar': '/calendar',
+                    'intercom': '/intercom',
+                    'settings': '/settings',
+                    'news': '/news'
+                };
+                if (pages[appName]) {
+                    window.location.href = pages[appName];
+                }
+            }
+        }
+
+
+        // Alerts
+        function showAlert(message, severity = 'warning') {
+            const banner = document.getElementById('alertBanner');
+            banner.textContent = message;
+            banner.className = 'alert-banner active ' + severity;
+            setTimeout(hideAlert, 10000);
+        }
+
+        function hideAlert() {
+            document.getElementById('alertBanner').classList.remove('active');
+        }
+
+        // Updates
+        function updateNetworkStatus() {
+            fetch('/api/network_status')
+                .then(r => r.json())
+                .then(data => {
+                    const el = document.getElementById('networkStatus');
+                    if (data.ethernet && data.ethernet.connected) {
+                        el.textContent = 'Ethernet';
+                    } else if (data.wifi && data.wifi.connected) {
+                        el.textContent = data.wifi.ssid || 'WiFi';
+                    } else {
+                        el.textContent = 'Offline';
+                    }
+                })
+                .catch(e => console.error('Network error:', e));
+        }
+
+        function startDataUpdates() {
+            setInterval(() => socket.emit('request_sensor_data'), 5000);
+            setInterval(updateWeather, 600000);
+            setInterval(updateNetworkStatus, 30000);
+        }
+
+        // Utility
+        function capitalize(str) {
+            return str ? str.charAt(0).toUpperCase() + str.slice(1) : '';
+        }
+    </script>
+</body>
+</html>

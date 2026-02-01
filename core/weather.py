@@ -303,6 +303,17 @@ class WeatherService:
                 'coverage': 'Queensland state-wide',
                 'type': 'precipitation_radar'
             }
+        elif self.weather_source == 'openweather':
+            # Use RainViewer for radar overlay
+            return {
+                'available': True,
+                'url': 'https://www.rainviewer.com/map.html',
+                'title': 'Weather Radar',
+                'description': 'Live weather radar showing precipitation worldwide',
+                'update_frequency': 'Every 10 minutes',
+                'coverage': 'Global',
+                'type': 'precipitation_radar'
+            }
         else:
             return {
                 'available': False,

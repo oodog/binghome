@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Calendar - BingHome</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tile: #1a1a25;
+            --accent: #00ff88;
+            --text-primary: #ffffff;
+            --text-secondary: #888899;
+            --border: rgba(255, 255, 255, 0.08);
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .back-btn {
+            width: 40px;
+            height: 40px;
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 24px;
+            cursor: pointer;
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .content {
+            padding: 20px;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .month-nav {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        .month-title {
+            font-size: 24px;
+            font-weight: 600;
+        }
+
+        .nav-btn {
+            width: 40px;
+            height: 40px;
+            background: var(--bg-tile);
+            border: none;
+            border-radius: 8px;
+            color: var(--text-primary);
+            font-size: 18px;
+            cursor: pointer;
+        }
+
+        .weekdays {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+            margin-bottom: 8px;
+        }
+
+        .weekday {
+            text-align: center;
+            font-size: 12px;
+            color: var(--text-secondary);
+            padding: 8px 0;
+        }
+
+        .days {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 4px;
+        }
+
+        .day {
+            aspect-ratio: 1;
+            background: var(--bg-tile);
+            border-radius: 8px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+        }
+
+        .day:hover {
+            background: var(--bg-secondary);
+        }
+
+        .day.other-month {
+            opacity: 0.3;
+        }
+
+        .day.today {
+            border: 2px solid var(--accent);
+        }
+
+        .day.selected {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .day-number {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .day-events {
+            position: absolute;
+            bottom: 4px;
+            display: flex;
+            gap: 2px;
+        }
+
+        .event-dot {
+            width: 4px;
+            height: 4px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        .upcoming {
+            margin-top: 30px;
+        }
+
+        .section-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+
+        .event-card {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            gap: 15px;
+        }
+
+        .event-time {
+            width: 50px;
+            text-align: center;
+        }
+
+        .event-hour {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .event-period {
+            font-size: 11px;
+            color: var(--text-secondary);
+        }
+
+        .event-details {
+            flex: 1;
+        }
+
+        .event-title {
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .event-location {
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+
+        .event-color {
+            width: 4px;
+            border-radius: 2px;
+        }
+
+        .event-color.work { background: #3498db; }
+        .event-color.personal { background: var(--accent); }
+        .event-color.family { background: #9b59b6; }
+
+        .no-events {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-secondary);
+        }
+
+        /* Home Button */
+        .home-button { display: none !important; /* Hidden - using nav-overlay */
+        }
+
+        .old-home-button-hidden {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            width: 50px;
+            height: 50px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            font-size: 24px;
+            color: var(--bg-primary);
+            box-shadow: 0 4px 15px rgba(0, 255, 136, 0.3);
+        }
+
+        .connect-btn {
+            background: var(--accent);
+            color: var(--bg-primary);
+            border: none;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 15px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button class="back-btn" onclick="window.location.href='/'">◀</button>
+        <div class="header-title">Calendar</div>
+    </div>
+
+    <div class="content">
+        <div class="month-nav">
+            <button class="nav-btn" onclick="prevMonth()">◀</button>
+            <div class="month-title" id="monthTitle">January 2026</div>
+            <button class="nav-btn" onclick="nextMonth()">▶</button>
+        </div>
+
+        <div class="weekdays">
+            <div class="weekday">Sun</div>
+            <div class="weekday">Mon</div>
+            <div class="weekday">Tue</div>
+            <div class="weekday">Wed</div>
+            <div class="weekday">Thu</div>
+            <div class="weekday">Fri</div>
+            <div class="weekday">Sat</div>
+        </div>
+
+        <div class="days" id="calendarDays"></div>
+
+        <div class="upcoming">
+            <div class="section-title">Upcoming Events</div>
+            <div id="eventsList">
+                <div class="no-events">
+                    <div style="font-size: 48px; margin-bottom: 15px;">📅</div>
+                    <div>No calendar connected</div>
+                    <div style="font-size: 13px; margin-top: 10px;">Connect Google Calendar or iCloud to see your events</div>
+                    <button class="connect-btn" onclick="connectCalendar()">Connect Calendar</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Home Button -->
+    <!-- Old home button removed - using nav-overlay instead -->
+
+    <script>
+        let currentDate = new Date();
+        let selectedDate = new Date();
+
+        function renderCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+
+            document.getElementById('monthTitle').textContent =
+                currentDate.toLocaleDateString('en', { month: 'long', year: 'numeric' });
+
+            const firstDay = new Date(year, month, 1);
+            const lastDay = new Date(year, month + 1, 0);
+            const startDay = firstDay.getDay();
+            const totalDays = lastDay.getDate();
+
+            const today = new Date();
+            let html = '';
+
+            // Previous month days
+            const prevMonth = new Date(year, month, 0);
+            for (let i = startDay - 1; i >= 0; i--) {
+                const day = prevMonth.getDate() - i;
+                html += `<div class="day other-month"><span class="day-number">${day}</span></div>`;
+            }
+
+            // Current month days
+            for (let day = 1; day <= totalDays; day++) {
+                const isToday = day === today.getDate() && month === today.getMonth() && year === today.getFullYear();
+                const isSelected = day === selectedDate.getDate() && month === selectedDate.getMonth() && year === selectedDate.getFullYear();
+
+                html += `
+                    <div class="day ${isToday ? 'today' : ''} ${isSelected ? 'selected' : ''}" onclick="selectDay(${day})">
+                        <span class="day-number">${day}</span>
+                    </div>
+                `;
+            }
+
+            // Next month days
+            const remaining = 42 - (startDay + totalDays);
+            for (let day = 1; day <= remaining; day++) {
+                html += `<div class="day other-month"><span class="day-number">${day}</span></div>`;
+            }
+
+            document.getElementById('calendarDays').innerHTML = html;
+        }
+
+        function prevMonth() {
+            currentDate.setMonth(currentDate.getMonth() - 1);
+            renderCalendar();
+        }
+
+        function nextMonth() {
+            currentDate.setMonth(currentDate.getMonth() + 1);
+            renderCalendar();
+        }
+
+        function selectDay(day) {
+            selectedDate = new Date(currentDate.getFullYear(), currentDate.getMonth(), day);
+            renderCalendar();
+            loadEvents(selectedDate);
+        }
+
+        function loadEvents(date) {
+            fetch('/api/calendar/events?date=' + date.toISOString())
+                .then(r => r.json())
+                .then(data => {
+                    if (data.events && data.events.length > 0) {
+                        renderEvents(data.events);
+                    }
+                })
+                .catch(e => console.error('Calendar error:', e));
+        }
+
+        function renderEvents(events) {
+            const container = document.getElementById('eventsList');
+            container.innerHTML = events.map(event => `
+                <div class="event-card">
+                    <div class="event-color ${event.category || 'personal'}"></div>
+                    <div class="event-time">
+                        <div class="event-hour">${formatTime(event.start).hour}</div>
+                        <div class="event-period">${formatTime(event.start).period}</div>
+                    </div>
+                    <div class="event-details">
+                        <div class="event-title">${event.title}</div>
+                        <div class="event-location">${event.location || ''}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function formatTime(dateStr) {
+            const date = new Date(dateStr);
+            const hours = date.getHours();
+            return {
+                hour: hours > 12 ? hours - 12 : hours || 12,
+                period: hours >= 12 ? 'PM' : 'AM'
+            };
+        }
+
+        function connectCalendar() {
+            window.location.href = '/settings#calendar';
+        }
+
+        renderCalendar();
+    </script>
+    <!-- Navigation Overlay -->
+</body>
+</html>

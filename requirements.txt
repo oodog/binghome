@@ -38,6 +38,10 @@ vosk==0.3.45
 homeassistant-api==4.1.0
 paho-mqtt==1.6.1  # For MQTT integration
 
+# Device Discovery
+python-nmap==0.7.1  # For network device scanning
+pybluez==0.23  # For Bluetooth device discovery (may need system bluetooth libs)
+
 # System Monitoring
 psutil==5.9.5
 

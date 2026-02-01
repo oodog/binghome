@@ -1,0 +1,1300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Timers & Alarms - BingHome</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #12121a;
+            --bg-tile: #1a1a25;
+            --accent: #00ff88;
+            --accent-glow: rgba(0, 255, 136, 0.3);
+            --text-primary: #ffffff;
+            --text-secondary: #888899;
+            --border: rgba(255, 255, 255, 0.08);
+            --danger: #ff4757;
+            --warning: #ffa502;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+        }
+
+        .header {
+            background: var(--bg-secondary);
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+            border-bottom: 1px solid var(--border);
+            position: sticky;
+            top: 0;
+            z-index: 100;
+        }
+
+        .back-btn {
+            width: 44px;
+            height: 44px;
+            background: none;
+            border: none;
+            color: var(--accent);
+            font-size: 24px;
+            cursor: pointer;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .back-btn:active {
+            background: var(--bg-tile);
+        }
+
+        .header-title {
+            font-size: 18px;
+            font-weight: 600;
+            flex: 1;
+        }
+
+        .tab-bar {
+            display: flex;
+            background: var(--bg-secondary);
+            border-bottom: 1px solid var(--border);
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            cursor: pointer;
+            font-size: 14px;
+            color: var(--text-secondary);
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+
+        .tab.active {
+            color: var(--accent);
+            border-bottom-color: var(--accent);
+        }
+
+        .tab-content {
+            display: none;
+            padding: 20px;
+            padding-bottom: 100px;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        /* Timer Display */
+        .timer-display {
+            text-align: center;
+            padding: 40px 20px;
+        }
+
+        .timer-time {
+            font-size: 72px;
+            font-weight: 200;
+            color: var(--accent);
+            font-variant-numeric: tabular-nums;
+            letter-spacing: -2px;
+        }
+
+        .timer-label {
+            font-size: 16px;
+            color: var(--text-secondary);
+            margin-top: 10px;
+        }
+
+        .timer-controls {
+            display: flex;
+            justify-content: center;
+            gap: 20px;
+            margin-top: 30px;
+        }
+
+        .timer-btn {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .timer-btn.primary {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .timer-btn.secondary {
+            background: var(--bg-tile);
+            color: var(--text-primary);
+        }
+
+        .timer-btn:active {
+            transform: scale(0.95);
+        }
+
+        /* Quick Timer Presets */
+        .presets-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin: 30px 0 15px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .preset-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .preset-btn {
+            background: var(--bg-tile);
+            border: none;
+            border-radius: 12px;
+            padding: 15px 10px;
+            color: var(--text-primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preset-btn:hover {
+            background: var(--bg-secondary);
+            border: 1px solid var(--accent);
+        }
+
+        .preset-btn:active {
+            transform: scale(0.95);
+        }
+
+        .preset-time {
+            font-size: 18px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        .preset-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        /* Active Timers List */
+        .active-timers {
+            margin-top: 30px;
+        }
+
+        .timer-card {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .timer-card.running {
+            border-left: 4px solid var(--accent);
+        }
+
+        .timer-card.paused {
+            border-left: 4px solid var(--warning);
+            opacity: 0.7;
+        }
+
+        .timer-card-time {
+            font-size: 28px;
+            font-weight: 300;
+            color: var(--accent);
+            min-width: 100px;
+        }
+
+        .timer-card-info {
+            flex: 1;
+        }
+
+        .timer-card-name {
+            font-size: 14px;
+            font-weight: 600;
+        }
+
+        .timer-card-status {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        .timer-card-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .timer-card-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: none;
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 16px;
+        }
+
+        .timer-card-btn:hover {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .timer-card-btn.danger:hover {
+            background: var(--danger);
+        }
+
+        /* Custom Timer Input */
+        .custom-timer {
+            background: var(--bg-tile);
+            border-radius: 16px;
+            padding: 25px;
+            margin-top: 20px;
+        }
+
+        .custom-timer-title {
+            font-size: 14px;
+            color: var(--text-secondary);
+            margin-bottom: 15px;
+        }
+
+        .time-input-group {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .time-input-wrapper {
+            text-align: center;
+        }
+
+        .time-input {
+            width: 80px;
+            height: 80px;
+            background: var(--bg-secondary);
+            border: 2px solid var(--border);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 32px;
+            text-align: center;
+            font-weight: 300;
+        }
+
+        .time-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .time-input-label {
+            font-size: 11px;
+            color: var(--text-secondary);
+            margin-top: 5px;
+        }
+
+        .time-separator {
+            font-size: 32px;
+            color: var(--text-secondary);
+            line-height: 80px;
+        }
+
+        .timer-name-input {
+            width: 100%;
+            padding: 12px 15px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-primary);
+            font-size: 14px;
+            margin-bottom: 15px;
+        }
+
+        .timer-name-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .start-timer-btn {
+            width: 100%;
+            padding: 15px;
+            background: var(--accent);
+            border: none;
+            border-radius: 12px;
+            color: var(--bg-primary);
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .start-timer-btn:active {
+            transform: scale(0.98);
+        }
+
+        /* Alarm Section */
+        .alarm-card {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .alarm-time {
+            font-size: 36px;
+            font-weight: 300;
+            min-width: 120px;
+        }
+
+        .alarm-info {
+            flex: 1;
+        }
+
+        .alarm-label {
+            font-size: 14px;
+            font-weight: 500;
+        }
+
+        .alarm-days {
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-top: 4px;
+        }
+
+        .alarm-toggle {
+            width: 55px;
+            height: 30px;
+            background: var(--bg-secondary);
+            border-radius: 15px;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.2s;
+        }
+
+        .alarm-toggle.active {
+            background: var(--accent);
+        }
+
+        .alarm-toggle::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: white;
+            border-radius: 50%;
+            top: 3px;
+            left: 3px;
+            transition: left 0.2s;
+        }
+
+        .alarm-toggle.active::after {
+            left: 28px;
+        }
+
+        .add-alarm-btn {
+            width: 100%;
+            padding: 18px;
+            background: var(--bg-tile);
+            border: 2px dashed var(--border);
+            border-radius: 12px;
+            color: var(--text-secondary);
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .add-alarm-btn:hover {
+            border-color: var(--accent);
+            color: var(--accent);
+        }
+
+        /* Stopwatch */
+        .stopwatch-display {
+            text-align: center;
+            padding: 50px 20px;
+        }
+
+        .stopwatch-time {
+            font-size: 64px;
+            font-weight: 200;
+            font-variant-numeric: tabular-nums;
+        }
+
+        .stopwatch-ms {
+            font-size: 32px;
+            color: var(--text-secondary);
+        }
+
+        .lap-list {
+            max-height: 250px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+
+        .lap-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 15px;
+            background: var(--bg-tile);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            font-size: 14px;
+        }
+
+        .lap-number {
+            color: var(--text-secondary);
+        }
+
+        .lap-time {
+            font-weight: 600;
+            color: var(--accent);
+        }
+
+        /* Home Button */
+        .home-button { display: none !important; /* Hidden - using nav-overlay */
+        }
+
+        .old-home-button-hidden {
+            position: fixed;
+            bottom: 15px;
+            left: 15px;
+            width: 50px;
+            height: 50px;
+            background: var(--accent);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 9999;
+            font-size: 24px;
+            color: var(--bg-primary);
+            box-shadow: 0 4px 15px var(--accent-glow);
+        }
+
+        .home-button:active {
+            transform: scale(0.95);
+        }
+
+        /* Modal */
+        .modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.9);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 10000;
+        }
+
+        .modal.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--bg-tile);
+            border-radius: 20px;
+            padding: 25px;
+            width: 90%;
+            max-width: 400px;
+        }
+
+        .modal-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .day-picker {
+            display: flex;
+            justify-content: space-between;
+            margin: 15px 0;
+        }
+
+        .day-btn {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            border: 2px solid var(--border);
+            background: none;
+            color: var(--text-secondary);
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        .day-btn.active {
+            background: var(--accent);
+            border-color: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .modal-btn {
+            flex: 1;
+            padding: 14px;
+            border-radius: 10px;
+            border: none;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .modal-btn.cancel {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+        }
+
+        .modal-btn.save {
+            background: var(--accent);
+            color: var(--bg-primary);
+        }
+
+        /* Timer Ring Animation */
+        .timer-ring-container {
+            position: relative;
+            width: 200px;
+            height: 200px;
+            margin: 0 auto 20px;
+        }
+
+        .timer-ring {
+            transform: rotate(-90deg);
+        }
+
+        .timer-ring-bg {
+            fill: none;
+            stroke: var(--bg-tile);
+            stroke-width: 8;
+        }
+
+        .timer-ring-progress {
+            fill: none;
+            stroke: var(--accent);
+            stroke-width: 8;
+            stroke-linecap: round;
+            transition: stroke-dashoffset 0.5s;
+        }
+
+        .timer-ring-time {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 36px;
+            font-weight: 300;
+            color: var(--accent);
+        }
+
+        /* Voice tip */
+        .voice-tip {
+            background: var(--bg-tile);
+            border-radius: 12px;
+            padding: 12px 15px;
+            margin-bottom: 20px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <button class="back-btn" onclick="window.location.href='/'">◀</button>
+        <div class="header-title">Timers & Alarms</div>
+    </div>
+
+    <div class="tab-bar">
+        <div class="tab active" data-tab="timer" onclick="switchTab('timer')">Timer</div>
+        <div class="tab" data-tab="alarm" onclick="switchTab('alarm')">Alarm</div>
+        <div class="tab" data-tab="stopwatch" onclick="switchTab('stopwatch')">Stopwatch</div>
+    </div>
+
+    <!-- Timer Tab -->
+    <div class="tab-content active" id="timerTab">
+        <div class="voice-tip">
+            <span style="font-size: 18px;">🎤</span>
+            <span>Say "Hey Bing, set a timer for 5 minutes"</span>
+        </div>
+
+        <div class="timer-display" id="mainTimerDisplay" style="display: none;">
+            <div class="timer-ring-container">
+                <svg class="timer-ring" width="200" height="200">
+                    <circle class="timer-ring-bg" cx="100" cy="100" r="90"/>
+                    <circle class="timer-ring-progress" id="timerProgress" cx="100" cy="100" r="90"
+                        stroke-dasharray="565.48" stroke-dashoffset="0"/>
+                </svg>
+                <div class="timer-ring-time" id="mainTimerTime">00:00</div>
+            </div>
+            <div class="timer-label" id="mainTimerLabel">Timer</div>
+            <div class="timer-controls">
+                <button class="timer-btn secondary" onclick="resetMainTimer()">↺</button>
+                <button class="timer-btn primary" id="mainTimerBtn" onclick="toggleMainTimer()">⏸</button>
+            </div>
+        </div>
+
+        <div class="presets-title">Quick Timers</div>
+        <div class="preset-grid">
+            <button class="preset-btn" onclick="startPresetTimer(1, 'Quick Timer')">
+                <div class="preset-time">1:00</div>
+                <div class="preset-label">1 min</div>
+            </button>
+            <button class="preset-btn" onclick="startPresetTimer(3, 'Egg Timer')">
+                <div class="preset-time">3:00</div>
+                <div class="preset-label">3 min</div>
+            </button>
+            <button class="preset-btn" onclick="startPresetTimer(5, 'Break')">
+                <div class="preset-time">5:00</div>
+                <div class="preset-label">5 min</div>
+            </button>
+            <button class="preset-btn" onclick="startPresetTimer(10, 'Coffee')">
+                <div class="preset-time">10:00</div>
+                <div class="preset-label">10 min</div>
+            </button>
+            <button class="preset-btn" onclick="startPresetTimer(15, 'Tea')">
+                <div class="preset-time">15:00</div>
+                <div class="preset-label">15 min</div>
+            </button>
+            <button class="preset-btn" onclick="startPresetTimer(20, 'Nap')">
+                <div class="preset-time">20:00</div>
+                <div class="preset-label">20 min</div>
+            </button>
+            <button class="preset-btn" onclick="startPresetTimer(30, 'Exercise')">
+                <div class="preset-time">30:00</div>
+                <div class="preset-label">30 min</div>
+            </button>
+            <button class="preset-btn" onclick="startPresetTimer(60, 'Focus')">
+                <div class="preset-time">60:00</div>
+                <div class="preset-label">1 hour</div>
+            </button>
+        </div>
+
+        <!-- Custom Timer -->
+        <div class="custom-timer">
+            <div class="custom-timer-title">Custom Timer</div>
+            <div class="time-input-group">
+                <div class="time-input-wrapper">
+                    <input type="number" class="time-input" id="customHours" value="0" min="0" max="23">
+                    <div class="time-input-label">Hours</div>
+                </div>
+                <span class="time-separator">:</span>
+                <div class="time-input-wrapper">
+                    <input type="number" class="time-input" id="customMinutes" value="5" min="0" max="59">
+                    <div class="time-input-label">Minutes</div>
+                </div>
+                <span class="time-separator">:</span>
+                <div class="time-input-wrapper">
+                    <input type="number" class="time-input" id="customSeconds" value="0" min="0" max="59">
+                    <div class="time-input-label">Seconds</div>
+                </div>
+            </div>
+            <input type="text" class="timer-name-input" id="customTimerName" placeholder="Timer name (optional)">
+            <button class="start-timer-btn" onclick="startCustomTimer()">Start Timer</button>
+        </div>
+
+        <!-- Active Timers -->
+        <div class="active-timers">
+            <div class="presets-title">Active Timers</div>
+            <div id="activeTimersList">
+                <p style="color: var(--text-secondary); text-align: center; padding: 20px;">No active timers</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Alarm Tab -->
+    <div class="tab-content" id="alarmTab">
+        <div class="voice-tip">
+            <span style="font-size: 18px;">🎤</span>
+            <span>Say "Hey Bing, set an alarm for 7 AM"</span>
+        </div>
+
+        <div id="alarmsList">
+            <!-- Alarms will be populated here -->
+        </div>
+
+        <button class="add-alarm-btn" onclick="showAddAlarmModal()">+ Add Alarm</button>
+    </div>
+
+    <!-- Stopwatch Tab -->
+    <div class="tab-content" id="stopwatchTab">
+        <div class="stopwatch-display">
+            <div class="stopwatch-time">
+                <span id="stopwatchTime">00:00</span><span class="stopwatch-ms" id="stopwatchMs">.00</span>
+            </div>
+            <div class="timer-controls">
+                <button class="timer-btn secondary" id="lapResetBtn" onclick="lapOrReset()">Lap</button>
+                <button class="timer-btn primary" id="stopwatchBtn" onclick="toggleStopwatch()">▶</button>
+            </div>
+        </div>
+
+        <div class="lap-list" id="lapList">
+            <!-- Laps will be shown here -->
+        </div>
+    </div>
+
+    <!-- Home Button -->
+    <!-- Old home button removed - using nav-overlay instead -->
+
+    <!-- Add Alarm Modal -->
+    <div class="modal" id="alarmModal">
+        <div class="modal-content">
+            <div class="modal-title">Set Alarm</div>
+
+            <div class="time-input-group">
+                <div class="time-input-wrapper">
+                    <input type="number" class="time-input" id="alarmHour" value="7" min="0" max="23" style="width: 70px; height: 70px; font-size: 28px;">
+                    <div class="time-input-label">Hour</div>
+                </div>
+                <span class="time-separator" style="font-size: 28px; line-height: 70px;">:</span>
+                <div class="time-input-wrapper">
+                    <input type="number" class="time-input" id="alarmMinute" value="0" min="0" max="59" style="width: 70px; height: 70px; font-size: 28px;">
+                    <div class="time-input-label">Minute</div>
+                </div>
+            </div>
+
+            <input type="text" class="timer-name-input" id="alarmLabel" placeholder="Alarm label (optional)">
+
+            <div class="custom-timer-title">Repeat</div>
+            <div class="day-picker">
+                <button class="day-btn" data-day="0">S</button>
+                <button class="day-btn active" data-day="1">M</button>
+                <button class="day-btn active" data-day="2">T</button>
+                <button class="day-btn active" data-day="3">W</button>
+                <button class="day-btn active" data-day="4">T</button>
+                <button class="day-btn active" data-day="5">F</button>
+                <button class="day-btn" data-day="6">S</button>
+            </div>
+
+            <div class="modal-actions">
+                <button class="modal-btn cancel" onclick="closeAlarmModal()">Cancel</button>
+                <button class="modal-btn save" onclick="saveAlarm()">Save</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Timer Complete Modal -->
+    <div class="modal" id="timerCompleteModal">
+        <div class="modal-content" style="text-align: center;">
+            <div style="font-size: 64px; margin-bottom: 20px;">⏰</div>
+            <div class="modal-title" id="completedTimerName">Timer Complete!</div>
+            <button class="modal-btn save" onclick="dismissTimerAlert()" style="margin-top: 20px;">Dismiss</button>
+        </div>
+    </div>
+
+    <script>
+        // ============================
+        // State
+        // ============================
+        let timers = [];
+        let alarms = [];
+        let mainTimer = null;
+        let stopwatchRunning = false;
+        let stopwatchTime = 0;
+        let stopwatchInterval = null;
+        let laps = [];
+
+        // ============================
+        // Tab Navigation
+        // ============================
+        function switchTab(tabName) {
+            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+            document.getElementById(tabName + 'Tab').classList.add('active');
+        }
+
+        // ============================
+        // Timer Functions
+        // ============================
+        function startPresetTimer(minutes, name) {
+            const totalSeconds = minutes * 60;
+            createTimer(totalSeconds, name);
+        }
+
+        function startCustomTimer() {
+            const hours = parseInt(document.getElementById('customHours').value) || 0;
+            const minutes = parseInt(document.getElementById('customMinutes').value) || 0;
+            const seconds = parseInt(document.getElementById('customSeconds').value) || 0;
+            const name = document.getElementById('customTimerName').value || 'Timer';
+
+            const totalSeconds = hours * 3600 + minutes * 60 + seconds;
+            if (totalSeconds > 0) {
+                createTimer(totalSeconds, name);
+                document.getElementById('customTimerName').value = '';
+            }
+        }
+
+        function createTimer(totalSeconds, name) {
+            const timer = {
+                id: Date.now(),
+                name: name,
+                totalSeconds: totalSeconds,
+                remainingSeconds: totalSeconds,
+                running: true,
+                startTime: Date.now()
+            };
+
+            timers.push(timer);
+            saveTimers();
+            updateTimerDisplay();
+
+            // Show main timer if this is the only one
+            if (timers.length === 1) {
+                showMainTimer(timer);
+            }
+
+            startTimerInterval(timer);
+        }
+
+        function startTimerInterval(timer) {
+            timer.interval = setInterval(() => {
+                if (timer.running && timer.remainingSeconds > 0) {
+                    timer.remainingSeconds--;
+                    updateTimerDisplay();
+
+                    // Update main timer display
+                    if (mainTimer && mainTimer.id === timer.id) {
+                        updateMainTimerDisplay();
+                    }
+
+                    if (timer.remainingSeconds === 0) {
+                        timerComplete(timer);
+                    }
+                }
+            }, 1000);
+        }
+
+        function timerComplete(timer) {
+            clearInterval(timer.interval);
+
+            // Play sound
+            playAlarmSound();
+
+            // Show modal
+            document.getElementById('completedTimerName').textContent = timer.name + ' Complete!';
+            document.getElementById('timerCompleteModal').classList.add('active');
+
+            // Remove from list
+            timers = timers.filter(t => t.id !== timer.id);
+            saveTimers();
+            updateTimerDisplay();
+
+            if (mainTimer && mainTimer.id === timer.id) {
+                hideMainTimer();
+            }
+        }
+
+        function dismissTimerAlert() {
+            document.getElementById('timerCompleteModal').classList.remove('active');
+            stopAlarmSound();
+        }
+
+        function showMainTimer(timer) {
+            mainTimer = timer;
+            document.getElementById('mainTimerDisplay').style.display = 'block';
+            document.getElementById('mainTimerLabel').textContent = timer.name;
+            updateMainTimerDisplay();
+        }
+
+        function hideMainTimer() {
+            mainTimer = null;
+            document.getElementById('mainTimerDisplay').style.display = 'none';
+
+            // Show next timer if available
+            if (timers.length > 0) {
+                showMainTimer(timers[0]);
+            }
+        }
+
+        function updateMainTimerDisplay() {
+            if (!mainTimer) return;
+
+            const mins = Math.floor(mainTimer.remainingSeconds / 60);
+            const secs = mainTimer.remainingSeconds % 60;
+            document.getElementById('mainTimerTime').textContent =
+                String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+
+            // Update progress ring
+            const progress = mainTimer.remainingSeconds / mainTimer.totalSeconds;
+            const circumference = 2 * Math.PI * 90;
+            const offset = circumference * (1 - progress);
+            document.getElementById('timerProgress').style.strokeDashoffset = offset;
+
+            // Update button
+            document.getElementById('mainTimerBtn').textContent = mainTimer.running ? '⏸' : '▶';
+        }
+
+        function toggleMainTimer() {
+            if (mainTimer) {
+                mainTimer.running = !mainTimer.running;
+                updateMainTimerDisplay();
+            }
+        }
+
+        function resetMainTimer() {
+            if (mainTimer) {
+                clearInterval(mainTimer.interval);
+                timers = timers.filter(t => t.id !== mainTimer.id);
+                hideMainTimer();
+                saveTimers();
+                updateTimerDisplay();
+            }
+        }
+
+        function pauseTimer(id) {
+            const timer = timers.find(t => t.id === id);
+            if (timer) {
+                timer.running = !timer.running;
+                updateTimerDisplay();
+            }
+        }
+
+        function cancelTimer(id) {
+            const timer = timers.find(t => t.id === id);
+            if (timer) {
+                clearInterval(timer.interval);
+                timers = timers.filter(t => t.id !== id);
+                saveTimers();
+                updateTimerDisplay();
+
+                if (mainTimer && mainTimer.id === id) {
+                    hideMainTimer();
+                }
+            }
+        }
+
+        function updateTimerDisplay() {
+            const container = document.getElementById('activeTimersList');
+
+            if (timers.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-secondary); text-align: center; padding: 20px;">No active timers</p>';
+                return;
+            }
+
+            container.innerHTML = timers.map(timer => {
+                const mins = Math.floor(timer.remainingSeconds / 60);
+                const secs = timer.remainingSeconds % 60;
+                const timeStr = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+
+                return `
+                    <div class="timer-card ${timer.running ? 'running' : 'paused'}">
+                        <div class="timer-card-time">${timeStr}</div>
+                        <div class="timer-card-info">
+                            <div class="timer-card-name">${timer.name}</div>
+                            <div class="timer-card-status">${timer.running ? 'Running' : 'Paused'}</div>
+                        </div>
+                        <div class="timer-card-actions">
+                            <button class="timer-card-btn" onclick="pauseTimer(${timer.id})">
+                                ${timer.running ? '⏸' : '▶'}
+                            </button>
+                            <button class="timer-card-btn danger" onclick="cancelTimer(${timer.id})">✕</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ============================
+        // Alarm Functions
+        // ============================
+        function loadAlarms() {
+            const saved = localStorage.getItem('binghome_alarms');
+            alarms = saved ? JSON.parse(saved) : [
+                { id: 1, hour: 7, minute: 0, label: 'Wake Up', days: [1,2,3,4,5], enabled: true },
+                { id: 2, hour: 22, minute: 0, label: 'Bedtime', days: [0,1,2,3,4,5,6], enabled: false }
+            ];
+            renderAlarms();
+            checkAlarms();
+        }
+
+        function saveAlarms() {
+            localStorage.setItem('binghome_alarms', JSON.stringify(alarms));
+        }
+
+        function renderAlarms() {
+            const container = document.getElementById('alarmsList');
+            const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+
+            container.innerHTML = alarms.map(alarm => {
+                const timeStr = String(alarm.hour).padStart(2, '0') + ':' + String(alarm.minute).padStart(2, '0');
+                const daysStr = alarm.days.length === 7 ? 'Every day' :
+                    alarm.days.length === 5 && !alarm.days.includes(0) && !alarm.days.includes(6) ? 'Weekdays' :
+                    alarm.days.map(d => dayNames[d]).join(', ');
+
+                return `
+                    <div class="alarm-card">
+                        <div class="alarm-time">${timeStr}</div>
+                        <div class="alarm-info">
+                            <div class="alarm-label">${alarm.label || 'Alarm'}</div>
+                            <div class="alarm-days">${daysStr}</div>
+                        </div>
+                        <div class="alarm-toggle ${alarm.enabled ? 'active' : ''}" onclick="toggleAlarm(${alarm.id})"></div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function toggleAlarm(id) {
+            const alarm = alarms.find(a => a.id === id);
+            if (alarm) {
+                alarm.enabled = !alarm.enabled;
+                saveAlarms();
+                renderAlarms();
+            }
+        }
+
+        function showAddAlarmModal() {
+            document.getElementById('alarmModal').classList.add('active');
+
+            // Setup day picker
+            document.querySelectorAll('.day-btn').forEach(btn => {
+                btn.onclick = () => btn.classList.toggle('active');
+            });
+        }
+
+        function closeAlarmModal() {
+            document.getElementById('alarmModal').classList.remove('active');
+        }
+
+        function saveAlarm() {
+            const hour = parseInt(document.getElementById('alarmHour').value) || 0;
+            const minute = parseInt(document.getElementById('alarmMinute').value) || 0;
+            const label = document.getElementById('alarmLabel').value || 'Alarm';
+
+            const days = [];
+            document.querySelectorAll('.day-btn.active').forEach(btn => {
+                days.push(parseInt(btn.dataset.day));
+            });
+
+            alarms.push({
+                id: Date.now(),
+                hour: hour,
+                minute: minute,
+                label: label,
+                days: days.length > 0 ? days : [0,1,2,3,4,5,6],
+                enabled: true
+            });
+
+            saveAlarms();
+            renderAlarms();
+            closeAlarmModal();
+        }
+
+        function checkAlarms() {
+            setInterval(() => {
+                const now = new Date();
+                const currentDay = now.getDay();
+                const currentHour = now.getHours();
+                const currentMinute = now.getMinutes();
+
+                alarms.forEach(alarm => {
+                    if (alarm.enabled &&
+                        alarm.days.includes(currentDay) &&
+                        alarm.hour === currentHour &&
+                        alarm.minute === currentMinute &&
+                        now.getSeconds() === 0) {
+                        triggerAlarm(alarm);
+                    }
+                });
+            }, 1000);
+        }
+
+        function triggerAlarm(alarm) {
+            playAlarmSound();
+            document.getElementById('completedTimerName').textContent = alarm.label + '!';
+            document.getElementById('timerCompleteModal').classList.add('active');
+        }
+
+        // ============================
+        // Stopwatch Functions
+        // ============================
+        function toggleStopwatch() {
+            if (stopwatchRunning) {
+                stopwatchRunning = false;
+                clearInterval(stopwatchInterval);
+                document.getElementById('stopwatchBtn').textContent = '▶';
+                document.getElementById('lapResetBtn').textContent = 'Reset';
+            } else {
+                stopwatchRunning = true;
+                const startTime = Date.now() - stopwatchTime;
+                stopwatchInterval = setInterval(() => {
+                    stopwatchTime = Date.now() - startTime;
+                    updateStopwatchDisplay();
+                }, 10);
+                document.getElementById('stopwatchBtn').textContent = '⏸';
+                document.getElementById('lapResetBtn').textContent = 'Lap';
+            }
+        }
+
+        function lapOrReset() {
+            if (stopwatchRunning) {
+                // Lap
+                laps.unshift({
+                    number: laps.length + 1,
+                    time: stopwatchTime
+                });
+                renderLaps();
+            } else {
+                // Reset
+                stopwatchTime = 0;
+                laps = [];
+                updateStopwatchDisplay();
+                renderLaps();
+            }
+        }
+
+        function updateStopwatchDisplay() {
+            const totalMs = stopwatchTime;
+            const mins = Math.floor(totalMs / 60000);
+            const secs = Math.floor((totalMs % 60000) / 1000);
+            const ms = Math.floor((totalMs % 1000) / 10);
+
+            document.getElementById('stopwatchTime').textContent =
+                String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+            document.getElementById('stopwatchMs').textContent = '.' + String(ms).padStart(2, '0');
+        }
+
+        function renderLaps() {
+            const container = document.getElementById('lapList');
+
+            if (laps.length === 0) {
+                container.innerHTML = '';
+                return;
+            }
+
+            container.innerHTML = laps.map(lap => {
+                const mins = Math.floor(lap.time / 60000);
+                const secs = Math.floor((lap.time % 60000) / 1000);
+                const ms = Math.floor((lap.time % 1000) / 10);
+                const timeStr = String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0') + '.' + String(ms).padStart(2, '0');
+
+                return `
+                    <div class="lap-item">
+                        <span class="lap-number">Lap ${lap.number}</span>
+                        <span class="lap-time">${timeStr}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // ============================
+        // Audio
+        // ============================
+        let alarmAudio = null;
+
+        function playAlarmSound() {
+            // Create oscillator for alarm sound
+            try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = ctx.createOscillator();
+                const gain = ctx.createGain();
+
+                osc.connect(gain);
+                gain.connect(ctx.destination);
+
+                osc.frequency.value = 800;
+                osc.type = 'sine';
+                gain.gain.value = 0.3;
+
+                osc.start();
+
+                // Beep pattern
+                let beeps = 0;
+                const beepInterval = setInterval(() => {
+                    gain.gain.value = gain.gain.value > 0 ? 0 : 0.3;
+                    beeps++;
+                    if (beeps > 20) {
+                        clearInterval(beepInterval);
+                        osc.stop();
+                    }
+                }, 200);
+
+                alarmAudio = { ctx, osc, beepInterval };
+            } catch (e) {
+                console.log('Audio not available');
+            }
+        }
+
+        function stopAlarmSound() {
+            if (alarmAudio) {
+                try {
+                    clearInterval(alarmAudio.beepInterval);
+                    alarmAudio.osc.stop();
+                } catch (e) {}
+                alarmAudio = null;
+            }
+        }
+
+        // ============================
+        // Storage
+        // ============================
+        function saveTimers() {
+            localStorage.setItem('binghome_timers', JSON.stringify(
+                timers.map(t => ({
+                    id: t.id,
+                    name: t.name,
+                    totalSeconds: t.totalSeconds,
+                    remainingSeconds: t.remainingSeconds,
+                    running: t.running
+                }))
+            ));
+        }
+
+        function loadTimers() {
+            const saved = localStorage.getItem('binghome_timers');
+            if (saved) {
+                const savedTimers = JSON.parse(saved);
+                savedTimers.forEach(t => {
+                    t.interval = null;
+                    timers.push(t);
+                    if (t.running && t.remainingSeconds > 0) {
+                        startTimerInterval(t);
+                    }
+                });
+                updateTimerDisplay();
+
+                if (timers.length > 0) {
+                    showMainTimer(timers[0]);
+                }
+            }
+        }
+
+        // ============================
+        // Initialize
+        // ============================
+        loadTimers();
+        loadAlarms();
+    </script>
+    <!-- Navigation Overlay -->
+</body>
+</html>
