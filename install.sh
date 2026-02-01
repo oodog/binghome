@@ -69,6 +69,9 @@ update_system() {
     echo -e "\n${BLUE}Updating system packages...${NC}"
     sudo apt-get update
     sudo apt-get upgrade -y
+
+    # Install git early (needed to clone repo)
+    sudo apt-get install -y git curl wget
 }
 
 # Install system dependencies
@@ -94,7 +97,22 @@ install_dependencies() {
     sudo apt-get install -y \
         network-manager \
         wireless-tools \
-        wpasupplicant || true
+        wpasupplicant \
+        nmap || true
+
+    # Camera and video tools
+    sudo apt-get install -y \
+        ffmpeg \
+        v4l-utils \
+        libcamera-tools \
+        libcamera-apps || true
+
+    # Bluetooth
+    sudo apt-get install -y \
+        bluetooth \
+        bluez \
+        bluez-tools \
+        python3-dbus || true
     
     # Development tools
     sudo apt-get install -y \
@@ -145,26 +163,31 @@ install_nodejs() {
 # Setup project
 setup_project() {
     echo -e "\n${BLUE}Setting up BingHome Hub project...${NC}"
-    
+
     # Clone or update repository
-    if [ -d "$INSTALL_DIR" ]; then
+    if [ -d "$INSTALL_DIR" ] && [ -d "$INSTALL_DIR/.git" ]; then
         echo -e "${YELLOW}Updating existing installation...${NC}"
         cd "$INSTALL_DIR"
-        git stash
-        git pull || true
+        git stash 2>/dev/null || true
+        git pull origin master || true
+    elif [ -d "$INSTALL_DIR" ] && [ ! -d "$INSTALL_DIR/.git" ]; then
+        # Directory exists but not a git repo - backup and clone fresh
+        echo -e "${YELLOW}Backing up existing directory and cloning fresh...${NC}"
+        mv "$INSTALL_DIR" "${INSTALL_DIR}.backup.$(date +%Y%m%d%H%M%S)"
+        git clone "$GITHUB_REPO" "$INSTALL_DIR"
     else
-        echo -e "${BLUE}Cloning repository...${NC}"
+        echo -e "${BLUE}Cloning repository from GitHub...${NC}"
         git clone "$GITHUB_REPO" "$INSTALL_DIR" || {
-            echo -e "${YELLOW}Creating local installation...${NC}"
-            mkdir -p "$INSTALL_DIR"
+            echo -e "${RED}Failed to clone repository. Check your internet connection.${NC}"
+            exit 1
         }
     fi
-    
+
     cd "$INSTALL_DIR"
-    
+
     # Create required directories
-    mkdir -p core templates static/js static/css models logs
-    
+    mkdir -p core templates static/js static/css static/icons static/snapshots models logs data
+
     echo -e "${GREEN}✓ Project structure created${NC}"
 }
 
@@ -219,6 +242,12 @@ setup_python_env() {
     # Install Home Assistant API
     echo -e "${BLUE}Installing Home Automation packages...${NC}"
     pip install homeassistant-api paho-mqtt || true
+
+    # Install from requirements.txt if it exists
+    if [ -f "requirements.txt" ]; then
+        echo -e "${BLUE}Installing from requirements.txt...${NC}"
+        pip install -r requirements.txt || true
+    fi
     
     echo -e "${GREEN}✓ Python environment ready${NC}"
 }
@@ -604,10 +633,12 @@ main() {
     
     echo -e "\n${CYAN}Features:${NC}"
     echo -e "  ✓ Local voice recognition (Vosk)"
-    echo -e "  ✓ Smart home control"
-    echo -e "  ✓ Streaming apps integration"
-    echo -e "  ✓ Weather & news"
-    echo -e "  ✓ Home automation"
+    echo -e "  ✓ Google Photos slideshow (shared albums)"
+    echo -e "  ✓ Security cameras (RTSP streaming)"
+    echo -e "  ✓ Customizable dashboard"
+    echo -e "  ✓ Weather & sensors"
+    echo -e "  ✓ Home Assistant integration"
+    echo -e "  ✓ Touchscreen optimized (7\" display)"
     
     echo -e "\n${CYAN}Next Steps:${NC}"
     echo -e "  1. Open ${GREEN}http://$IP:5000${NC} in your browser"

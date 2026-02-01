@@ -62,14 +62,38 @@ A modern smart home control system optimized for Raspberry Pi 5 with a 7-inch to
 - **Routines** - Automated actions
 - **Intercom** - Audio communication between devices
 
-## Quick Start
+## One-Line Install (Fresh Raspberry Pi)
 
-### One-Line Install
+Run this single command on a fresh Raspberry Pi OS installation:
+
 ```bash
 curl -sSL https://raw.githubusercontent.com/oodog/binghome/master/install.sh | bash
 ```
 
-### Manual Installation
+**That's it!** The installer will:
+- Update your system packages
+- Install all dependencies (Python, ffmpeg, audio, camera tools, etc.)
+- Clone the BingHome repository
+- Set up Python virtual environment
+- Download voice recognition models
+- Configure systemd service for auto-start
+- Set up kiosk mode for touchscreen
+
+After installation, access BingHome at: `http://<your-pi-ip>:5000`
+
+### Alternative: wget
+```bash
+wget -qO- https://raw.githubusercontent.com/oodog/binghome/master/install.sh | bash
+```
+
+### With Whisper (better voice recognition, requires more RAM)
+```bash
+curl -sSL https://raw.githubusercontent.com/oodog/binghome/master/install.sh | bash -s -- --with-whisper
+```
+
+---
+
+## Manual Installation
 ```bash
 # Clone the repository
 git clone https://github.com/oodog/binghome.git
